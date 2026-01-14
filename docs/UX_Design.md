@@ -19,14 +19,18 @@
 ### 3.1 The Multi-View Dashboard
 Users can toggle between three primary contexts:
 1.  **Board:** Kanban style for workflow management.
-2.  **Calendar (5-Day Sprint):** A focused view of the upcoming work week with daily columns. Supports drag-and-drop rescheduling.
-3.  **List:** High-density view for bulk review.
+2.  **Calendar (Dynamic Sprint):** A responsive, horizontal-scroll view of the project timeline.
+    *   **Dynamic Range:** Automatically expands to show the full range of active tasks (from earliest overdue/today to latest deadline).
+    *   **Smart Defaults:** Always maintains a minimum 5-day lookahead.
+    *   **Filters:** Toggles for "Show Completed" and "Show Weekends" (business-days-only mode).
+    *   **Overdue Handling:** Auto-adjusts start date to reveal missed deadlines; visual alerts for past dates.
+3.  **List:** High-density view for bulk review with sortable columns and due date visibility.
 
 ### 3.2 AI Feature Access Points
 
 #### ✨ Smart Search (Global)
 *   **Location:** Header (accessible via Cmd+K).
-*   **Interaction:** A modal dialog where users type natural language. Results appear as cards ranked by semantic relevance.
+*   **Interaction:** A modal dialog where users type natural language. Results appear as cards ranked by semantic relevance. Clicking a result opens the full Issue Detail view.
 
 #### 🤖 AI Planner (Strategic)
 *   **Location:** Header "AI Plan" button.
@@ -34,7 +38,9 @@ Users can toggle between three primary contexts:
 
 #### 📅 AI Schedule (Tactical)
 *   **Location:** Calendar View header ("AI Schedule").
-*   **Interaction:** A single click that reorganizes open tasks into a balanced 5-day schedule, preventing overload.
+*   **Interaction:** A single click that reorganizes open tasks into a balanced schedule.
+    *   **Weekday Only:** Strictly schedules tasks on Mon-Fri, skipping weekends to prevent burnout.
+    *   **Overdue Recovery:** Automatically moves past-due tasks to Today or future slots.
 
 #### 🪄 AI Auto-Triage (Operational)
 *   **Location:** "New Issue" modal.
@@ -47,6 +53,9 @@ Users can toggle between three primary contexts:
     *   Dropdowns for Status and Priority.
     *   Delete functionality.
     *   Meta information (ID, Created At).
+    *   **Overdue Actions:** If a task is past due, a red alert box provides one-click actions:
+        *   **"Do Today":** Reschedules the task to the current date.
+        *   **"Complete":** Marks the task as Done.
 
 ## 4. User Interaction Flows
 

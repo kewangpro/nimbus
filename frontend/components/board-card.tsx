@@ -3,6 +3,8 @@
 import { Draggable } from "@hello-pangea/dnd"
 import { Issue, IssuePriority } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { isOverdue } from "@/lib/utils"
+import { AlertCircle } from "lucide-react"
 
 interface BoardCardProps {
   issue: Issue
@@ -21,6 +23,8 @@ const getPriorityColor = (priority: IssuePriority) => {
 }
 
 export function BoardCard({ issue, index, onClick }: BoardCardProps) {
+  const overdue = isOverdue(issue)
+
   return (
     <Draggable draggableId={issue.id} index={index}>
       {(provided, snapshot) => (
@@ -31,12 +35,13 @@ export function BoardCard({ issue, index, onClick }: BoardCardProps) {
           className={`mb-2 ${snapshot.isDragging ? "opacity-50" : ""}`}
           onClick={() => onClick(issue)}
         >
-          <Card className="cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow">
+          <Card className={`cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${overdue ? "border-red-300 bg-red-50/20" : ""}`}>
             <CardHeader className="p-3 pb-0 space-y-0">
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-sm font-medium leading-none">
+              <div className="flex justify-between items-start gap-2">
+                <CardTitle className="text-sm font-medium leading-none break-words">
                   {issue.title}
                 </CardTitle>
+                {overdue && <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />}
               </div>
             </CardHeader>
             <CardContent className="p-3 pt-2">

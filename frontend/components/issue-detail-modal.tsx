@@ -4,6 +4,7 @@ import { useState } from "react"
 import { format } from "date-fns"
 import { api } from "@/lib/api"
 import { Issue, IssueStatus, IssuePriority } from "@/types"
+import { isOverdue } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { CalendarIcon, Trash2, Loader2, Save } from "lucide-react"
+import { CalendarIcon, Trash2, Loader2, Save, AlertCircle, CheckCircle2, CalendarDays } from "lucide-react"
 import { toast } from "sonner"
 
 interface IssueDetailModalProps {
@@ -100,14 +101,47 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
       }
   }
 
+  const handleComplete = async () => {
+      if (!issue) return
+      setLoading(true)
+      try {
+          await api.patch(`/issues/${issue.id}`, { status: IssueStatus.DONE })
+          toast.success("Issue completed!")
+          onUpdate()
+          onClose()
+      } catch (err) {
+          toast.error("Failed to complete issue")
+      } finally {
+          setLoading(false)
+      }
+  }
+
+  const handleRescheduleToday = async () => {
+      if (!issue) return
+      setLoading(true)
+      try {
+          // Set to today
+          const today = new Date().toISOString().split('T')[0]
+          await api.patch(`/issues/${issue.id}`, { due_date: today })
+          toast.success("Rescheduled to today")
+          onUpdate()
+      } catch (err) {
+          toast.error("Failed to reschedule")
+      } finally {
+          setLoading(false)
+      }
+  }
+
   if (!issue) return null
+
+  const overdue = isOverdue(issue)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
-            <DialogTitle className="text-xl">
+            <DialogTitle className="text-xl flex items-center gap-2">
                 {isEditing ? (
                     <Input value={title} onChange={(e) => setTitle(e.target.value)} className="font-bold" />
                 ) : (
@@ -115,6 +149,7 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                         {issue.title}
                     </span>
                 )}
+                {overdue && <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Overdue</span>}
             </DialogTitle>
           </div>
           <DialogDescription className="flex items-center gap-2 mt-2">
@@ -123,6 +158,24 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
             <span className="text-xs text-muted-foreground">Created {format(new Date(issue.created_at), "MMM d, yyyy")}</span>
           </DialogDescription>
         </DialogHeader>
+
+        {overdue && !isEditing && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 flex items-center justify-between">
+                <div className="text-sm text-red-800">
+                    This task was due on <strong>{issue.due_date && format(new Date(issue.due_date), "MMM d")}</strong>.
+                </div>
+                <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="border-red-200 hover:bg-red-100 text-red-700" onClick={handleRescheduleToday} disabled={loading}>
+                        <CalendarDays className="w-4 h-4 mr-2" />
+                        Do Today
+                    </Button>
+                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleComplete} disabled={loading}>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Complete
+                    </Button>
+                </div>
+            </div>
+        )}
 
         <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -175,7 +228,7 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
             </div>
             
             {issue.due_date && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className={`flex items-center gap-2 text-sm ${overdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                     <CalendarIcon className="h-4 w-4" />
                     Due: {format(new Date(issue.due_date), "PPP")}
                 </div>

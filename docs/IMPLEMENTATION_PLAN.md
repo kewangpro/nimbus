@@ -81,3 +81,24 @@
 *   [x] **AI Schedule:** AI-powered prioritization and balanced workload distribution (3-5 tasks/day).
 *   [x] **Visual Status:** Color-coded tasks (Blue/Todo, Yellow/In Progress, Green/Done) in Calendar.
 *   [x] **Persistent UI:** "Show Completed" toggle preference saved in local storage.
+
+---
+
+## Phase 6: Refinement & Polish (Current) ✅
+**Goal:** Address usability feedback and ensure robust handling of real-world scenarios like overdue tasks and weekends.
+
+### 6.1 Calendar Evolution
+*   [x] **Dynamic Range:** Calendar view now expands to fit all relevant tasks (min 5 days).
+*   [x] **Smart Scheduling:** AI Scheduler now strictly respects business days (Mon-Fri only).
+*   [x] **Weekend Toggle:** Added "Show Weekends" toggle to filter view.
+*   [x] **Horizontal Scroll:** Responsive layout to handle dynamic day ranges.
+
+### 6.2 Overdue Task Management
+*   [x] **Visibility:** Red indicators/rows in Board, List, and Calendar views for past-due items.
+*   [x] **Actionable Detail:** "Do Today" and "Complete" buttons in Issue Detail modal.
+*   [x] **Auto-Adjust:** Calendar view auto-shifts start date to show overdue items.
+
+### 6.3 List View Enhancements
+*   [x] **Sorting:** Interactive column headers (ID, Title, Status, Priority, Due Date).
+*   [x] **Columns:** Added "Due Date" column.
+*   [x] **Smart Sort:** Overdue items automatically pinned to top.

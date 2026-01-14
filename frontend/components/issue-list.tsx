@@ -13,15 +13,35 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { IssueDetailModal } from "@/components/issue-detail-modal"
+import { isOverdue } from "@/lib/utils"
+import { AlertCircle, ChevronUp, ChevronDown } from "lucide-react"
 
 interface IssueListProps {
     refreshTrigger?: number
+}
+
+const PRIORITY_WEIGHT = {
+    [IssuePriority.LOW]: 1,
+    [IssuePriority.MEDIUM]: 2,
+    [IssuePriority.HIGH]: 3,
+    [IssuePriority.URGENT]: 4,
+}
+
+const STATUS_WEIGHT = {
+    [IssueStatus.TODO]: 1,
+    [IssueStatus.IN_PROGRESS]: 2,
+    [IssueStatus.DONE]: 3,
+    [IssueStatus.CANCELED]: 4,
 }
 
 export function IssueList({ refreshTrigger = 0 }: IssueListProps) {
   const [issues, setIssues] = useState<Issue[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
+  
+  // Sorting state
+  const [sortKey, setSortKey] = useState<keyof Issue | "overdue">("overdue")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
   const fetchIssues = async () => {
     try {
@@ -37,6 +57,20 @@ export function IssueList({ refreshTrigger = 0 }: IssueListProps) {
   useEffect(() => {
     fetchIssues()
   }, [refreshTrigger])
+
+  const handleSort = (key: keyof Issue | "overdue") => {
+      if (sortKey === key) {
+          setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+      } else {
+          setSortKey(key)
+          setSortOrder(key === "overdue" || key === "priority" ? "desc" : "asc")
+      }
+  }
+
+  const getSortIcon = (key: keyof Issue | "overdue") => {
+      if (sortKey !== key) return null
+      return sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+  }
 
   const getStatusColor = (status: IssueStatus) => {
     switch (status) {
@@ -60,46 +94,98 @@ export function IssueList({ refreshTrigger = 0 }: IssueListProps) {
 
   if (loading) return <div>Loading issues...</div>
 
+  const sortedIssues = [...issues].sort((a, b) => {
+    let aVal: any
+    let bVal: any
+
+    if (sortKey === "overdue") {
+        aVal = isOverdue(a) ? 1 : 0
+        bVal = isOverdue(b) ? 1 : 0
+    } else if (sortKey === "priority") {
+        aVal = PRIORITY_WEIGHT[a.priority]
+        bVal = PRIORITY_WEIGHT[b.priority]
+    } else if (sortKey === "status") {
+        aVal = STATUS_WEIGHT[a.status]
+        bVal = STATUS_WEIGHT[b.status]
+    } else {
+        aVal = a[sortKey]
+        bVal = b[sortKey]
+    }
+    
+    if (aVal === bVal) {
+        // Tie breaker: created_at descending
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+    
+    if (aVal === undefined || aVal === null) return 1
+    if (bVal === undefined || bVal === null) return -1
+    
+    const modifier = sortOrder === "asc" ? 1 : -1
+    return aVal > bVal ? modifier : -modifier
+  })
+
   return (
     <div className="space-y-4">
       <div className="border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[100px]">ID</TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead className="text-right">Created</TableHead>
+              <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort("id")}>
+                <div className="flex items-center gap-1">ID {getSortIcon("id")}</div>
+              </TableHead>
+              <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("title")}>
+                <div className="flex items-center gap-1">Title {getSortIcon("title")}</div>
+              </TableHead>
+              <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("status")}>
+                <div className="flex items-center gap-1">Status {getSortIcon("status")}</div>
+              </TableHead>
+              <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("priority")}>
+                <div className="flex items-center gap-1">Priority {getSortIcon("priority")}</div>
+              </TableHead>
+              <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("due_date")}>
+                <div className="flex items-center gap-1">Due Date {getSortIcon("due_date")}</div>
+              </TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => handleSort("created_at")}>
+                <div className="flex items-center justify-end gap-1">Created {getSortIcon("created_at")}</div>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {issues.length === 0 ? (
+            {sortedIssues.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24">
+                    <TableCell colSpan={6} className="text-center h-24">
                         No issues found. Create one to get started.
                     </TableCell>
                 </TableRow>
             ) : (
-                issues.map((issue) => (
-                <TableRow 
-                    key={issue.id} 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setSelectedIssue(issue)}
-                >
-                    <TableCell className="font-mono text-xs">{issue.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-medium">{issue.title}</TableCell>
-                    <TableCell>
-                    <Badge className={getStatusColor(issue.status)}>{issue.status}</Badge>
-                    </TableCell>
-                    <TableCell className={getPriorityColor(issue.priority)}>
-                        {issue.priority}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground text-sm">
-                        {new Date(issue.created_at).toLocaleDateString()}
-                    </TableCell>
-                </TableRow>
-                ))
+                sortedIssues.map((issue) => {
+                  const overdue = isOverdue(issue)
+                  return (
+                    <TableRow 
+                        key={issue.id} 
+                        className={`cursor-pointer hover:bg-muted/50 ${overdue ? "bg-red-50/30 hover:bg-red-50/50" : ""}`}
+                        onClick={() => setSelectedIssue(issue)}
+                    >
+                        <TableCell className="font-mono text-xs">{issue.id.slice(0, 8)}</TableCell>
+                        <TableCell className="font-medium flex items-center gap-2">
+                          {issue.title}
+                          {overdue && <AlertCircle className="w-4 h-4 text-red-500" />}
+                        </TableCell>
+                        <TableCell>
+                        <Badge className={getStatusColor(issue.status)}>{issue.status}</Badge>
+                        </TableCell>
+                        <TableCell className={getPriorityColor(issue.priority)}>
+                            {issue.priority}
+                        </TableCell>
+                        <TableCell className={`text-sm ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                            {issue.due_date ? new Date(issue.due_date).toLocaleDateString() : "-"}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground text-sm">
+                            {new Date(issue.created_at).toLocaleDateString()}
+                        </TableCell>
+                    </TableRow>
+                  )
+                })
             )}
           </TableBody>
         </Table>

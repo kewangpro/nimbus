@@ -54,17 +54,26 @@ async def auto_schedule(
     # 2. Prepare prompt
     issues_text = "\n".join([f"- ID: {i.id}, Title: {i.title}, Priority: {i.priority}" for i in open_issues])
     today = datetime.now()
-    next_5_days = [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
-    days_str = ", ".join(next_5_days)
+    
+    # Generate next 5 weekdays
+    next_5_weekdays = []
+    current_date = today
+    while len(next_5_weekdays) < 5:
+        if current_date.weekday() < 5: # 0-4 are Mon-Fri
+            next_5_weekdays.append(current_date.strftime("%Y-%m-%d"))
+        current_date += timedelta(days=1)
+        
+    days_str = ", ".join(next_5_weekdays)
     
     prompt = f"""
     You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
-    Your goal is to schedule these open tasks over the next 5 days ({days_str}) for MAXIMUM productivity.
+    Your goal is to schedule these open tasks over the next 5 WEEKDAYS ({days_str}) for MAXIMUM productivity.
     
     Rules:
     1. Distribute workload evenly. Do NOT put all tasks on the first day.
     2. High priority tasks should be earlier in the schedule.
     3. Limit to approx 3-5 significant tasks per day to prevent burnout.
+    4. STRICTLY use only the provided dates. NO weekends.
     
     Tasks:
     {issues_text}

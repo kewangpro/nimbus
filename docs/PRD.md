@@ -30,8 +30,8 @@ To build an **AI-Native OS for software delivery**. Unlike legacy tools where AI
 
 ### 3.3 AI-Native Core (Local Ollama)
 *   **AI Project Planner:** Extracts actionable tasks from unstructured text input.
-*   **AI Scheduler:** Auto-assigns due dates to balance workload over the next 5 days.
-*   **Smart Search:** Semantic search using vector embeddings.
+*   **AI Scheduler:** Auto-assigns due dates to balance workload. strictly adhering to business days (Mon-Fri) and skipping weekends.
+*   **Smart Search:** Semantic search using vector embeddings with auto-recovery for missing indices.
 *   **Auto-Triage:** Automatic priority suggestions.
 
 ### 3.4 File Storage
