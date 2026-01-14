@@ -9,17 +9,16 @@ Nimbus is a modern, high-performance project management tool designed to replace
 *   **Real-time Collaboration:** Live updates via WebSockets ensure your team is always in sync.
 *   **Interactive Views:**
     *   **Kanban Board:** Drag-and-drop interface with optimistic UI updates.
-    *   **5-Day Sprint View:** Focused timeline for managing the current week's workload. Supports drag-and-drop rescheduling and status-based coloring.
-    *   **List View:** Fast, high-density issue tracking for bulk review.
+    *   **Dynamic Sprint Plan (Calendar):** A responsive timeline that auto-adjusts to show all active and overdue tasks. Features horizontal scrolling and toggles for "Show Weekends" and "Show Completed".
+        ![Calendar View](docs/screenshots/calendar.png)
+    *   **List View:** Fast, high-density issue tracking with interactive column sorting (Priority, Status, Due Date, etc.) and overdue highlights.
 *   **Issue Management:**
-    *   **Detail View:** Comprehensive modal for viewing and editing issue details, including status, priority, and descriptions.
-    *   **Persistent Preferences:** Remembers UI settings like the "Show Completed" toggle across sessions.
+    *   **Detail View:** Comprehensive modal for editing issues with quick actions ("Do Today", "Complete") for overdue tasks.
+    *   **Persistent Preferences:** Remembers UI settings like the "Show Completed" and "Show Weekends" toggles across sessions.
 *   **Local AI Intelligence (Ollama):**
     *   **🤖 AI Project Planner:** Turn natural language "brain dumps" into structured project tasks automatically.
-    *   **📅 AI Schedule:** Intelligently distributes open tasks across the next 5 days to optimize output and prevent burnout.
-    *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning.
-    *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using `gemma3`.
-    *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-embed-text`.
+    *   **📅 AI Schedule:** Intelligently distributes open tasks across the work week (Monday-Friday), skipping weekends and automatically resolving overdue backlogs.
+    *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
 *   **Role-Based Access:** Distinct views for Admins, Members, and Clients.
 *   **File Storage:** Secure attachment handling with MinIO (S3 compatible).
 
