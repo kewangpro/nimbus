@@ -1,0 +1,208 @@
+"use client"
+
+import { useState } from "react"
+import { format } from "date-fns"
+import { api } from "@/lib/api"
+import { Issue, IssueStatus, IssuePriority } from "@/types"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { CalendarIcon, Trash2, Loader2, Save } from "lucide-react"
+import { toast } from "sonner"
+
+interface IssueDetailModalProps {
+  issue: Issue | null
+  isOpen: boolean
+  onClose: () => void
+  onUpdate: () => void
+}
+
+export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDetailModalProps) {
+  const [loading, setLoading] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  
+  // Local state for edits
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [status, setStatus] = useState<IssueStatus>(IssueStatus.TODO)
+  const [priority, setPriority] = useState<IssuePriority>(IssuePriority.MEDIUM)
+
+  // Sync state when issue opens
+  useState(() => {
+      if (issue) {
+          setTitle(issue.title)
+          setDescription(issue.description || "")
+          setStatus(issue.status)
+          setPriority(issue.priority)
+      }
+  })
+
+  // Re-sync if issue prop changes while open (e.g. fast switching)
+  if (issue && issue.title !== title && !isEditing && !loading) {
+      setTitle(issue.title)
+      setDescription(issue.description || "")
+      setStatus(issue.status)
+      setPriority(issue.priority)
+  }
+
+  const handleSave = async () => {
+      if (!issue) return
+      setLoading(true)
+      try {
+          await api.patch(`/issues/${issue.id}`, {
+              title,
+              description,
+              status,
+              priority
+          })
+          toast.success("Issue updated")
+          onUpdate()
+          setIsEditing(false)
+      } catch (err) {
+          console.error(err)
+          toast.error("Failed to update issue")
+      } finally {
+          setLoading(false)
+      }
+  }
+
+  const handleDelete = async () => {
+      if (!issue) return
+      if (!confirm("Are you sure you want to delete this issue?")) return
+      
+      setLoading(true)
+      try {
+          await api.delete(`/issues/${issue.id}`)
+          toast.success("Issue deleted")
+          onUpdate()
+          onClose()
+      } catch (err) {
+          console.error(err)
+          toast.error("Failed to delete issue")
+      } finally {
+          setLoading(false)
+      }
+  }
+
+  if (!issue) return null
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle className="text-xl">
+                {isEditing ? (
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} className="font-bold" />
+                ) : (
+                    <span onClick={() => setIsEditing(true)} className="cursor-pointer hover:underline underline-offset-4 decoration-dashed">
+                        {issue.title}
+                    </span>
+                )}
+            </DialogTitle>
+          </div>
+          <DialogDescription className="flex items-center gap-2 mt-2">
+            <span className="font-mono text-xs text-muted-foreground">{issue.id.slice(0, 8)}</span>
+            <span>•</span>
+            <span className="text-xs text-muted-foreground">Created {format(new Date(issue.created_at), "MMM d, yyyy")}</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={status} onValueChange={(v) => { setStatus(v as IssueStatus); if (!isEditing) setIsEditing(true); }}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={IssueStatus.TODO}>Todo</SelectItem>
+                            <SelectItem value={IssueStatus.IN_PROGRESS}>In Progress</SelectItem>
+                            <SelectItem value={IssueStatus.DONE}>Done</SelectItem>
+                            <SelectItem value={IssueStatus.CANCELED}>Canceled</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={priority} onValueChange={(v) => { setPriority(v as IssuePriority); if (!isEditing) setIsEditing(true); }}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={IssuePriority.LOW}>Low</SelectItem>
+                            <SelectItem value={IssuePriority.MEDIUM}>Medium</SelectItem>
+                            <SelectItem value={IssuePriority.HIGH}>High</SelectItem>
+                            <SelectItem value={IssuePriority.URGENT}>Urgent</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Description</Label>
+                {isEditing ? (
+                    <Textarea 
+                        value={description} 
+                        onChange={(e) => setDescription(e.target.value)} 
+                        className="min-h-[150px]"
+                    />
+                ) : (
+                    <div 
+                        onClick={() => setIsEditing(true)}
+                        className="min-h-[100px] p-3 rounded-md border bg-muted/20 text-sm whitespace-pre-wrap cursor-pointer hover:bg-muted/40"
+                    >
+                        {description || <span className="text-muted-foreground italic">No description provided. Click to add one.</span>}
+                    </div>
+                )}
+            </div>
+            
+            {issue.due_date && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarIcon className="h-4 w-4" />
+                    Due: {format(new Date(issue.due_date), "PPP")}
+                </div>
+            )}
+        </div>
+
+        <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
+            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={loading}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+            </Button>
+            
+            <div className="flex gap-2">
+                {isEditing ? (
+                    <>
+                        <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
+                        <Button onClick={handleSave} disabled={loading}>
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            Save Changes
+                        </Button>
+                    </>
+                ) : (
+                    <Button onClick={() => onClose()}>Close</Button>
+                )}
+            </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

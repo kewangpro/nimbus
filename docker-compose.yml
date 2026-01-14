@@ -1,0 +1,56 @@
+services:
+  backend:
+    build: ./backend
+    container_name: nimbus_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://nimbus:nimbus@db:5432/nimbus_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=changethisinproduction
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_SECURE=False
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    depends_on:
+      - db
+      - redis
+      - minio
+
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: nimbus_db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=nimbus
+      - POSTGRES_PASSWORD=nimbus
+      - POSTGRES_DB=nimbus_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: nimbus_redis
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    container_name: nimbus_minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:
