@@ -5,6 +5,7 @@ import { format } from "date-fns"
 import { api } from "@/lib/api"
 import { Issue, IssueStatus, IssuePriority } from "@/types"
 import { isOverdue } from "@/lib/utils"
+import { useProject } from "@/components/project-provider"
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { CalendarIcon, Trash2, Loader2, Save, AlertCircle, CheckCircle2, CalendarDays } from "lucide-react"
+import { CalendarIcon, Trash2, Loader2, Save, AlertCircle, CheckCircle2, CalendarDays, FolderKanban } from "lucide-react"
 import { toast } from "sonner"
 
 interface IssueDetailModalProps {
@@ -37,12 +38,14 @@ interface IssueDetailModalProps {
 export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDetailModalProps) {
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const { projects } = useProject()
   
   // Local state for edits
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<IssueStatus>(IssueStatus.TODO)
   const [priority, setPriority] = useState<IssuePriority>(IssuePriority.MEDIUM)
+  const [projectId, setProjectId] = useState<string>("")
 
   // Sync state when issue opens
   useState(() => {
@@ -51,15 +54,24 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
           setDescription(issue.description || "")
           setStatus(issue.status)
           setPriority(issue.priority)
+          setProjectId(issue.project_id || "")
       }
   })
 
   // Re-sync if issue prop changes while open (e.g. fast switching)
-  if (issue && issue.title !== title && !isEditing && !loading) {
+  if (issue && issue.title !== title && !isEditing && !loading && issue.id !== (projectId ? "dirty" : issue.id)) {
+      // Logic to prevent overwrite during edit is tricky, simplify:
+      // Only resync if issue ID changes
+  }
+  // Better sync logic
+  const [currentIssueId, setCurrentIssueId] = useState<string | null>(null)
+  if (issue && issue.id !== currentIssueId) {
       setTitle(issue.title)
       setDescription(issue.description || "")
       setStatus(issue.status)
       setPriority(issue.priority)
+      setProjectId(issue.project_id || "")
+      setCurrentIssueId(issue.id)
   }
 
   const handleSave = async () => {
@@ -70,7 +82,8 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
               title,
               description,
               status,
-              priority
+              priority,
+              project_id: projectId
           })
           toast.success("Issue updated")
           onUpdate()
@@ -178,6 +191,21 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
         )}
 
         <div className="grid gap-4 py-4">
+            {/* Project Selector */}
+            <div className="space-y-2">
+                <Label>Project</Label>
+                <Select value={projectId} onValueChange={(v) => { setProjectId(v); if (!isEditing) setIsEditing(true); }}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {projects.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label>Status</Label>

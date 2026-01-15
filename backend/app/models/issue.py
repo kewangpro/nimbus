@@ -28,15 +28,15 @@ class Issue(Base):
     status = Column(String, default=IssueStatus.TODO, index=True)
     priority = Column(String, default=IssuePriority.MEDIUM, index=True)
     
-    # Foreign Keys
-    assignee_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    
-    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     due_date = Column(DateTime(timezone=True), nullable=True)
-
+    
+    # Foreign Keys
+    assignee_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    
     # Relationships
     assignee = relationship("User", foreign_keys=[assignee_id])
-    owner = relationship("User", foreign_keys=[owner_id])
+    project = relationship("Project", back_populates="issues")

@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,8 @@ async def read_issues(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
+    project_id: Optional[UUID] = None,
+    assignee_id: Optional[UUID] = None,
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
@@ -48,7 +50,7 @@ async def read_issues(
     if current_user.role == "client":
         owner_id = current_user.id
         
-    issues = await crud_issue.get_multi(db, skip=skip, limit=limit, owner_id=owner_id)
+    issues = await crud_issue.get_multi(db, skip=skip, limit=limit, owner_id=owner_id, project_id=project_id, assignee_id=assignee_id)
     return issues
 
 @router.post("/", response_model=Issue)

@@ -45,9 +45,11 @@ const formSchema = z.object({
 
 interface CreateIssueDialogProps {
     onIssueCreated: () => void
+    projectId?: string
+    userId?: string
 }
 
-export function CreateIssueDialog({ onIssueCreated }: CreateIssueDialogProps) {
+export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateIssueDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [triageLoading, setTriageLoading] = useState(false)
@@ -86,7 +88,8 @@ export function CreateIssueDialog({ onIssueCreated }: CreateIssueDialogProps) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true)
     try {
-      await api.post("/issues/", values)
+      // Auto-assign to current user if userId is provided
+      await api.post("/issues/", { ...values, project_id: projectId, assignee_id: userId })
       setOpen(false)
       form.reset()
       onIssueCreated()

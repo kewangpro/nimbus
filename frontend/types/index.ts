@@ -12,6 +12,14 @@ export enum IssuePriority {
   URGENT = "urgent",
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  owner_id?: string;
+  created_at: string;
+}
+
 export interface Issue {
   id: string;
   title: string;
@@ -20,6 +28,7 @@ export interface Issue {
   priority: IssuePriority;
   assignee_id?: string;
   owner_id: string;
+  project_id: string;
   created_at: string;
   updated_at?: string;
   due_date?: string;

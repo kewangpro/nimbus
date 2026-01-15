@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { format, addDays, isSameDay, isToday, startOfDay, parseISO, isBefore, differenceInDays, isAfter } from "date-fns"
+import { format, addDays, isSameDay, isToday, startOfDay, parseISO, isBefore, isAfter } from "date-fns"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
 import { api } from "@/lib/api"
 import { Issue, IssueStatus } from "@/types"
@@ -15,9 +15,10 @@ import { isOverdue } from "@/lib/utils"
 
 interface CalendarViewProps {
     refreshTrigger?: number
+    userId?: string
 }
 
-export function CalendarView({ refreshTrigger = 0 }: CalendarViewProps) {
+export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) {
   const [issues, setIssues] = useState<Issue[]>([])
   const [scheduling, setScheduling] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
@@ -44,7 +45,9 @@ export function CalendarView({ refreshTrigger = 0 }: CalendarViewProps) {
 
   const fetchIssues = async () => {
     try {
-      const res = await api.get("/issues/")
+      const params: any = {}
+      if (userId) params.assignee_id = userId
+      const res = await api.get("/issues/", { params })
       setIssues(res.data)
     } catch (err) {
       console.error("Failed to fetch issues", err)
@@ -68,7 +71,7 @@ export function CalendarView({ refreshTrigger = 0 }: CalendarViewProps) {
   // Refetch when refreshTrigger changes
   useEffect(() => {
     fetchIssues()
-  }, [refreshTrigger])
+  }, [refreshTrigger, userId])
 
   const onDragEnd = async (result: DropResult) => {
       const { destination, source, draggableId } = result
@@ -151,7 +154,7 @@ export function CalendarView({ refreshTrigger = 0 }: CalendarViewProps) {
     <div className="h-full flex flex-col space-y-4">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold">Sprint Plan ({days.length} Days)</h2>
+            <h2 className="text-xl font-bold">My Sprint Plan ({days.length} Days)</h2>
             <div className="flex items-center gap-4">
                 <div className="flex items-center space-x-2 bg-muted/50 px-3 py-1 rounded-full border">
                     <Switch 
@@ -189,8 +192,8 @@ export function CalendarView({ refreshTrigger = 0 }: CalendarViewProps) {
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex-1 overflow-x-auto pb-2">
-            <div className="flex gap-4 h-full min-w-max px-1">
+        <div className="flex-1 overflow-hidden pb-2">
+            <div className="flex gap-4 h-full px-1">
                 {days.map(day => {
                     const dateKey = format(day, 'yyyy-MM-dd')
                     const dayIssues = getIssuesForDay(day)
@@ -198,7 +201,7 @@ export function CalendarView({ refreshTrigger = 0 }: CalendarViewProps) {
                     return (
                         <div 
                             key={dateKey} 
-                            className={`flex flex-col rounded-lg border bg-muted/30 h-full w-[280px] shrink-0 overflow-hidden ${
+                            className={`flex flex-col flex-1 min-w-0 rounded-lg border bg-muted/30 h-full overflow-hidden ${
                                 isToday(day) ? 'ring-2 ring-primary/20 bg-primary/5' : ''
                             }`}
                         >
@@ -236,11 +239,20 @@ export function CalendarView({ refreshTrigger = 0 }: CalendarViewProps) {
                                                         } ${isOverdue(issue) ? 'border-red-300 ring-1 ring-red-200' : ''}`}
                                                     >
                                                         <div className="flex items-center justify-between mb-1">
-                                                            <span className={`w-2 h-2 rounded-full ${
-                                                                issue.priority === 'URGENT' ? 'bg-red-500' : 
-                                                                issue.priority === 'HIGH' ? 'bg-orange-500' : 
-                                                                issue.priority === 'MEDIUM' ? 'bg-blue-500' : 'bg-gray-400'
-                                                            }`} />
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className={`w-2 h-2 rounded-full ${
+                                                                    issue.priority === 'URGENT' ? 'bg-red-500' : 
+                                                                    issue.priority === 'HIGH' ? 'bg-orange-500' : 
+                                                                    issue.priority === 'MEDIUM' ? 'bg-blue-500' : 'bg-gray-400'
+                                                                }`} />
+                                                                {/* Display Project Name */}
+                                                                {/* Use type assertion if project is not yet in type definition but present in API */}
+                                                                {issue.project && (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-background/50 rounded-sm font-medium opacity-70 truncate max-w-[80px]">
+                                                                        {(issue.project as any).name}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <span className="text-[10px] text-muted-foreground font-mono">{issue.id.slice(0,4)}</span>
                                                         </div>
                                                         <div className="text-sm font-medium leading-tight line-clamp-2 mb-1">{issue.title}</div>

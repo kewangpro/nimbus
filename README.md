@@ -12,6 +12,10 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using `gemma3`.
     *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-embed-text`.
+*   **Project Management:**
+    *   **Workspaces:** Create multiple projects ("Mobile App", "Marketing", "General") to organize work.
+    *   **Global vs. Specific:** Switch between a "My Calendar" view (all your tasks) and focused Project Boards.
+    *   **Sidebar Navigation:** Quickly jump between contexts.
 *   **Interactive Views:**
     *   **Dynamic Sprint Plan (Calendar):** A responsive timeline that auto-adjusts to show all active and overdue tasks. Features horizontal scrolling and toggles for "Show Weekends" and "Show Completed".
         ![Calendar View](docs/screenshots/calendar.png)

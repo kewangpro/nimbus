@@ -16,46 +16,24 @@
 
 ## 3. Key Interfaces
 
-### 3.1 The Multi-View Dashboard
-Users can toggle between three primary contexts:
-1.  **Board:** Kanban style for workflow management.
-2.  **Calendar (Dynamic Sprint):** A responsive, horizontal-scroll view of the project timeline.
-    *   **Dynamic Range:** Automatically expands to show the full range of active tasks (from earliest overdue/today to latest deadline).
-    *   **Smart Defaults:** Always maintains a minimum 5-day lookahead.
-    *   **Filters:** Toggles for "Show Completed" and "Show Weekends" (business-days-only mode).
-    *   **Overdue Handling:** Auto-adjusts start date to reveal missed deadlines; visual alerts for past dates.
-3.  **List:** High-density view for bulk review with sortable columns and due date visibility.
+### 3.1 The Dashboard Layout
+*   **Sidebar:** Primary navigation context.
+    *   **My Views:** "My Calendar" (Global view of all tasks assigned to the user).
+    *   **Projects:** List of active projects. Clicking a project opens its workspace.
+    *   **User Profile:** Logout and settings.
+*   **Main Content Area:** Dynamic view based on sidebar selection.
 
-### 3.2 AI Feature Access Points
+### 3.2 View Contexts
+1.  **My Calendar (Global):**
+    *   A responsive, horizontal-scroll timeline.
+    *   Shows all tasks assigned to the current user across **all projects**.
+    *   Visual indicators for project context on each card.
+2.  **Project Workspace (Board/List): СА
+    *   **Board:** Kanban style for workflow management within a specific project.
+    *   **List:** High-density view for bulk review of project tasks.
 
-#### ✨ Smart Search (Global)
-*   **Location:** Header (accessible via Cmd+K).
-*   **Interaction:** A modal dialog where users type natural language. Results appear as cards ranked by semantic relevance. Clicking a result opens the full Issue Detail view.
-
-#### 🤖 AI Planner (Strategic)
-*   **Location:** Header "AI Plan" button.
-*   **Interaction:** A large text area for "brain dumping" project ideas. AI breaks it down into a reviewable list of tasks with pre-set priority/status.
-
-#### 📅 AI Schedule (Tactical)
-*   **Location:** Calendar View header ("AI Schedule").
-*   **Interaction:** A single click that reorganizes open tasks into a balanced schedule.
-    *   **Weekday Only:** Strictly schedules tasks on Mon-Fri, skipping weekends to prevent burnout.
-    *   **Overdue Recovery:** Automatically moves past-due tasks to Today or future slots.
-
-#### 🪄 AI Auto-Triage (Operational)
-*   **Location:** "New Issue" modal.
-*   **Interaction:** A "Wand" button next to Priority that fills in fields based on the current title/description.
-
-### 3.3 Issue Detail Modal
-*   **Trigger:** Click on any issue in Board, Calendar, or List.
-*   **Features:**
-    *   Editable Title and Description.
-    *   Dropdowns for Status and Priority.
-    *   Delete functionality.
-    *   Meta information (ID, Created At).
-    *   **Overdue Actions:** If a task is past due, a red alert box provides one-click actions:
-        *   **"Do Today":** Reschedules the task to the current date.
-        *   **"Complete":** Marks the task as Done.
+### 3.3 AI Feature Access Points
+*   **Location:** Global Header (accessible from any view).
 
 ## 4. User Interaction Flows
 

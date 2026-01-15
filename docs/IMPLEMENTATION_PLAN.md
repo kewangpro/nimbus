@@ -99,6 +99,41 @@
 *   [x] **Auto-Adjust:** Calendar view auto-shifts start date to show overdue items.
 
 ### 6.3 List View Enhancements
+
 *   [x] **Sorting:** Interactive column headers (ID, Title, Status, Priority, Due Date).
+
 *   [x] **Columns:** Added "Due Date" column.
+
 *   [x] **Smart Sort:** Overdue items automatically pinned to top.
+
+
+
+---
+
+
+
+## Phase 7: Project Architecture (Completed) ✅
+
+**Goal:** Transition from a single-board system to a multi-project workspace.
+
+
+
+### 7.1 Data Model
+
+*   [x] **Projects:** Added `Project` entity and `issues.project_id` foreign key.
+
+*   [x] **Migration:** Backfilled existing issues to a default "General" project.
+
+*   [x] **API:** CRUD endpoints for Projects.
+
+
+
+### 7.2 Multi-Context UI
+
+*   [x] **Sidebar:** Implemented persistent sidebar for navigation.
+
+*   [x] **My Calendar:** Refactored Calendar to be user-centric (Global) rather than project-centric.
+
+*   [x] **Project Workspace:** Board and List views are now filtered by the selected project.
+
+*   [x] **Creation Flow:** New issues auto-assign to the user and the active project.

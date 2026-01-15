@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
 from app.models.issue import IssueStatus, IssuePriority
+from app.schemas.project import Project
 
 class IssueBase(BaseModel):
     title: str
@@ -13,19 +14,18 @@ class IssueBase(BaseModel):
     due_date: Optional[datetime] = None
 
 class IssueCreate(IssueBase):
-    pass
+    project_id: Optional[UUID] = None # Optional for API, default handled by backend if missing
 
-class IssueUpdate(BaseModel):
+class IssueUpdate(IssueBase):
     title: Optional[str] = None
-    description: Optional[str] = None
     status: Optional[IssueStatus] = None
     priority: Optional[IssuePriority] = None
-    assignee_id: Optional[UUID] = None
-    due_date: Optional[datetime] = None
+    project_id: Optional[UUID] = None
 
 class IssueInDBBase(IssueBase):
     id: UUID
     owner_id: UUID
+    project_id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -33,4 +33,4 @@ class IssueInDBBase(IssueBase):
         from_attributes = True
 
 class Issue(IssueInDBBase):
-    pass
+    project: Optional[Project] = None

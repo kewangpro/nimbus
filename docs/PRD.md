@@ -17,14 +17,20 @@ To build an **AI-Native OS for software delivery**. Unlike legacy tools where AI
 
 ## 2. Core Features & Functional Requirements
 
-### 3.1 Story Tracking & Issue Management
+### 3.1 Project Management
+*   **Projects:** Container for issues.
+*   **Default Project:** System initializes with a "General" project.
+*   **Association:** Every issue belongs to exactly one project.
+*   **Context:** Users can switch between projects to filter their view.
+
+### 3.2 Story Tracking & Issue Management
 *   **Views:**
     *   **Kanban Board:** Visual status columns with real-time drag-and-drop.
     *   **5-Day Sprint View:** Focused productivity timeline for the week with drag-and-drop rescheduling.
     *   **List View:** Fast review for bulk updates.
 *   **Management:** Comprehensive Issue Detail modal for editing and deletion.
 
-### 3.2 User Roles & Client Access (RBAC)
+### 3.3 User Roles & Client Access (RBAC)
 *   **Roles:** Admin, Member, Client.
 *   **Client Portal:** A restricted, simplified view where clients only see issues relevant to them.
 

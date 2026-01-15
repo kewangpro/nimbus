@@ -13,7 +13,7 @@ interface BoardColumnProps {
 
 export function BoardColumn({ id, title, issues, onIssueClick }: BoardColumnProps) {
   return (
-    <div className="flex flex-col w-80 min-w-[20rem] bg-secondary/50 rounded-lg p-2 mr-4 h-full">
+    <div className="flex flex-col flex-1 min-w-0 bg-secondary/50 rounded-lg p-2 h-full">
       <div className="flex items-center justify-between p-2 mb-2">
         <h3 className="font-semibold text-sm uppercase text-muted-foreground">{title}</h3>
         <span className="text-xs text-muted-foreground font-mono bg-background px-2 py-1 rounded-full">

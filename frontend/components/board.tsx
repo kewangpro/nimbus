@@ -16,16 +16,19 @@ const COLUMNS = [
 
 interface BoardProps {
     refreshTrigger?: number
+    projectId?: string
 }
 
-export function Board({ refreshTrigger = 0 }: BoardProps) {
+export function Board({ refreshTrigger = 0, projectId }: BoardProps) {
   const [issues, setIssues] = useState<Issue[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
 
   const fetchIssues = async () => {
     try {
-      const res = await api.get("/issues/")
+      const params: any = {}
+      if (projectId) params.project_id = projectId
+      const res = await api.get("/issues/", { params })
       setIssues(res.data)
     } catch (err) {
       console.error("Failed to fetch issues", err)
@@ -36,7 +39,7 @@ export function Board({ refreshTrigger = 0 }: BoardProps) {
 
   useEffect(() => {
     fetchIssues()
-  }, [refreshTrigger])
+  }, [refreshTrigger, projectId])
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result
@@ -78,9 +81,9 @@ export function Board({ refreshTrigger = 0 }: BoardProps) {
   }, {} as Record<IssueStatus, Issue[]>)
 
   return (
-    <div className="h-[calc(100vh-200px)] overflow-x-auto pb-4">
+    <div className="h-full flex flex-col overflow-hidden pb-4">
         <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex h-full">
+        <div className="flex h-full gap-4">
             {COLUMNS.map(col => (
             <BoardColumn
                 key={col.id}

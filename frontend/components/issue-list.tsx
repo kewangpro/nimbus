@@ -18,6 +18,7 @@ import { AlertCircle, ChevronUp, ChevronDown } from "lucide-react"
 
 interface IssueListProps {
     refreshTrigger?: number
+    projectId?: string
 }
 
 const PRIORITY_WEIGHT = {
@@ -34,7 +35,7 @@ const STATUS_WEIGHT = {
     [IssueStatus.CANCELED]: 4,
 }
 
-export function IssueList({ refreshTrigger = 0 }: IssueListProps) {
+export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
   const [issues, setIssues] = useState<Issue[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
@@ -45,7 +46,9 @@ export function IssueList({ refreshTrigger = 0 }: IssueListProps) {
 
   const fetchIssues = async () => {
     try {
-      const res = await api.get("/issues/")
+      const params: any = {}
+      if (projectId) params.project_id = projectId
+      const res = await api.get("/issues/", { params })
       setIssues(res.data)
     } catch (err) {
       console.error("Failed to fetch issues", err)
@@ -56,7 +59,7 @@ export function IssueList({ refreshTrigger = 0 }: IssueListProps) {
 
   useEffect(() => {
     fetchIssues()
-  }, [refreshTrigger])
+  }, [refreshTrigger, projectId])
 
   const handleSort = (key: keyof Issue | "overdue") => {
       if (sortKey === key) {
