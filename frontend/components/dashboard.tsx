@@ -43,7 +43,7 @@ export function Dashboard({ user, logout }: DashboardProps) {
 
   const handleIssueCreated = () => {
       // The WebSocket will trigger the refresh, but we can also do it optimistically/immediately
-      // setRefreshKey(prev => prev + 1) 
+      setRefreshKey(prev => prev + 1) 
   }
 
   return (
@@ -132,7 +132,7 @@ export function Dashboard({ user, logout }: DashboardProps) {
                 )}
             </div>
             <div className="flex items-center gap-3">
-                <AIPlanner onIssuesCreated={handleIssueCreated} />
+                <AIPlanner onIssuesCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
                 <AISearch />
                 <CreateIssueDialog onIssueCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
             </div>

@@ -35,6 +35,17 @@
 ### 3.3 AI Feature Access Points
 *   **Location:** Global Header (accessible from any view).
 
+#### 🤖 AI Planner (Strategic)
+*   **Location:** Header "AI Plan" button.
+*   **Interaction:** A large text area for "brain dumping" project ideas.
+*   **Intelligence:**
+    *   Breaks input down into structured tasks.
+    *   **Auto-Schedules:** Assigns balanced due dates (Mon-Fri) to tasks based on urgency and workload.
+    *   **Auto-Assigns:** Sets the current user as assignee and links to the active project.
+
+#### 📅 AI Schedule (Tactical)
+*   **Location:** Calendar View header ("AI Schedule").
+
 ## 4. User Interaction Flows
 
 ### 4.1 "Plan to Execution" Flow

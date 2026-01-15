@@ -16,12 +16,14 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { BrainCircuit, Loader2, Check, X } from "lucide-react"
+import { BrainCircuit, Loader2, Check, X, Calendar as CalendarIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 
 interface AIPlannerProps {
     onIssuesCreated: () => void
+    projectId?: string
+    userId?: string
 }
 
 interface PlannedIssue {
@@ -29,9 +31,10 @@ interface PlannedIssue {
     description: string
     priority: IssuePriority
     status: IssueStatus
+    due_date?: string
 }
 
-export function AIPlanner({ onIssuesCreated }: AIPlannerProps) {
+export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps) {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
@@ -58,7 +61,11 @@ export function AIPlanner({ onIssuesCreated }: AIPlannerProps) {
       try {
           // Create sequentially to maintain order (or Promise.all for speed)
           for (const issue of plan) {
-              await api.post("/issues/", issue)
+              await api.post("/issues/", {
+                  ...issue,
+                  project_id: projectId,
+                  assignee_id: userId
+              })
           }
           toast.success(`Created ${plan.length} issues`)
           setOpen(false)
@@ -91,8 +98,8 @@ export function AIPlanner({ onIssuesCreated }: AIPlannerProps) {
           <DialogTitle>AI Project Planner</DialogTitle>
           <DialogDescription>
             {step === 'input' 
-                ? "Describe your plan, features, or tasks in plain English. The AI will break it down." 
-                : "Review the suggested tasks before creating them."}
+                ? "Describe your plan, features, or tasks in plain English. The AI will break it down and schedule it." 
+                : "Review the suggested tasks and schedule before creating them."}
           </DialogDescription>
         </DialogHeader>
 
@@ -118,15 +125,21 @@ export function AIPlanner({ onIssuesCreated }: AIPlannerProps) {
                                 <X className="h-3 w-3" />
                             </Button>
                             <CardContent className="p-4 space-y-2">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <Badge variant="outline">{issue.status}</Badge>
                                     <Badge variant="secondary" className={
                                         issue.priority === 'URGENT' ? 'text-red-600' : 
                                         issue.priority === 'HIGH' ? 'text-orange-500' : ''
                                     }>{issue.priority}</Badge>
+                                    {issue.due_date && (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                            <CalendarIcon className="mr-1 h-3 w-3" />
+                                            {issue.due_date}
+                                        </Badge>
+                                    )}
                                     <Input 
                                         value={issue.title} 
-                                        className="font-semibold h-8 border-none shadow-none px-0 focus-visible:ring-0"
+                                        className="font-semibold h-8 border-none shadow-none px-0 focus-visible:ring-0 min-w-[200px]"
                                         onChange={(e) => {
                                             const newPlan = [...plan]
                                             newPlan[idx].title = e.target.value

@@ -41,6 +41,7 @@ const formSchema = z.object({
   description: z.string().optional(),
   priority: z.nativeEnum(IssuePriority),
   status: z.nativeEnum(IssueStatus),
+  due_date: z.string().optional(),
 })
 
 interface CreateIssueDialogProps {
@@ -61,6 +62,7 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
       description: "",
       priority: IssuePriority.MEDIUM,
       status: IssueStatus.TODO,
+      due_date: "",
     },
   })
 
@@ -88,8 +90,14 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true)
     try {
-      // Auto-assign to current user if userId is provided
-      await api.post("/issues/", { ...values, project_id: projectId, assignee_id: userId })
+      const payload = { 
+          ...values, 
+          project_id: projectId, 
+          assignee_id: userId,
+          due_date: values.due_date || undefined
+      }
+      
+      await api.post("/issues/", payload)
       setOpen(false)
       form.reset()
       onIssueCreated()
@@ -131,32 +139,7 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Details about the issue..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex justify-end">
-                <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleAutoTriage}
-                    disabled={triageLoading}
-                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                >
-                    <Wand2 className="mr-2 h-3 w-3" />
-                    {triageLoading ? "Analyzing..." : "AI Auto-Triage"}
-                </Button>
-            </div>
+            
             <div className="grid grid-cols-2 gap-4">
                 <FormField
                 control={form.control}
@@ -204,8 +187,51 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
                 )}
                 />
             </div>
+
+            <FormField
+              control={form.control}
+              name="due_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Due Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Details about the issue..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="flex justify-end">
+                <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleAutoTriage}
+                    disabled={triageLoading}
+                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                    <Wand2 className="mr-2 h-3 w-3" />
+                    {triageLoading ? "Analyzing..." : "AI Auto-Triage"}
+                </Button>
+            </div>
+
             <DialogFooter>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="w-full">
                   {loading ? "Creating..." : "Create Issue"}
               </Button>
             </DialogFooter>

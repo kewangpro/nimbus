@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -31,6 +31,7 @@ class PlannedIssue(BaseModel):
     description: str
     priority: IssuePriority
     status: IssueStatus
+    due_date: Optional[str] = None
 
 class ScheduleResponse(BaseModel):
     scheduled_count: int
@@ -127,8 +128,23 @@ async def plan_tasks(
     """
     Break down a natural language plan into structured issues.
     """
+    today = datetime.now()
+    
+    # Generate next 5 weekdays for context
+    next_5_weekdays = []
+    current_date = today
+    while len(next_5_weekdays) < 5:
+        if current_date.weekday() < 5: # 0-4 are Mon-Fri
+            next_5_weekdays.append(current_date.strftime("%Y-%m-%d"))
+        current_date += timedelta(days=1)
+    
+    days_str = ", ".join(next_5_weekdays)
+
     prompt = f"""
     You are an expert Project Manager. Break down the following user input into distinct, actionable software tasks.
+    
+    Today is {today.strftime("%Y-%m-%d")}.
+    Available work days: {days_str}
     
     User Input: "{request.text}"
     
@@ -137,9 +153,10 @@ async def plan_tasks(
     - description: A detailed explanation of what needs to be done.
     - priority: LOW, MEDIUM, HIGH, or URGENT (based on urgency/importance).
     - status: TODO, IN_PROGRESS, or DONE (context dependent, default to TODO).
+    - due_date: YYYY-MM-DD (Suggest a balanced due date from the available work days list. Avoid weekends. High priority earlier).
     
     Output STRICTLY a JSON array of objects. No markdown, no conversational text.
-    Example: [{{ "title": "...", "description": "...", "priority": "HIGH", "status": "TODO" }}]
+    Example: [{{ "title": "...", "description": "...", "priority": "HIGH", "status": "TODO", "due_date": "2023-10-27" }}]
     """
     
     response = await ai.generate_completion(prompt, system_prompt="You are a strict JSON output machine.")
@@ -163,11 +180,21 @@ async def plan_tasks(
             s = item.get("status", "TODO").upper()
             if s not in IssueStatus.__members__: s = "TODO"
             
+            # Validate due date
+            due_date = item.get("due_date")
+            if due_date:
+                try:
+                    # Validate format only
+                    datetime.strptime(due_date, "%Y-%m-%d")
+                except ValueError:
+                    due_date = None
+
             results.append(PlannedIssue(
                 title=item.get("title", "Untitled Task"),
                 description=item.get("description", ""),
                 priority=IssuePriority[p],
-                status=IssueStatus[s]
+                status=IssueStatus[s],
+                due_date=due_date
             ))
             
         return results
@@ -178,7 +205,8 @@ async def plan_tasks(
             title="Task from plan", 
             description=request.text, 
             priority=IssuePriority.MEDIUM, 
-            status=IssueStatus.TODO
+            status=IssueStatus.TODO,
+            due_date=today.strftime("%Y-%m-%d")
         )]
 
 @router.post("/search", response_model=List[Issue])

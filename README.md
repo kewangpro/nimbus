@@ -7,19 +7,15 @@ Nimbus is a modern, high-performance project management tool designed to replace
 ## 🚀 Features
 
 *   **Local AI Intelligence (Ollama):**
-    *   **🤖 AI Project Planner:** Turn natural language "brain dumps" into structured project tasks automatically.
+    *   **🤖 AI Project Planner:** Turn natural language "brain dumps" into structured project tasks, **automatically scheduling them** with balanced due dates across the work week.
     *   **📅 AI Schedule:** Intelligently distributes open tasks across the work week (Monday-Friday), skipping weekends and automatically resolving overdue backlogs.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using `gemma3`.
     *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-embed-text`.
-*   **Project Management:**
-    *   **Workspaces:** Create multiple projects ("Mobile App", "Marketing", "General") to organize work.
-    *   **Global vs. Specific:** Switch between a "My Calendar" view (all your tasks) and focused Project Boards.
-    *   **Sidebar Navigation:** Quickly jump between contexts.
 *   **Interactive Views:**
-    *   **Dynamic Sprint Plan (Calendar):** A responsive timeline that auto-adjusts to show all active and overdue tasks. Features horizontal scrolling and toggles for "Show Weekends" and "Show Completed".
+    *   **Dynamic Sprint Plan (My Calendar):** A user-centric timeline showing all tasks assigned to you across **all projects**. Features horizontal scrolling, auto-adjusting range, and toggles for "Show Weekends" and "Show Completed".
         ![Calendar View](docs/screenshots/calendar.png)
-    *   **Kanban Board:** Drag-and-drop interface with optimistic UI updates.
+    *   **Kanban Board:** Project-specific drag-and-drop interface with optimistic UI updates.
         ![Kanban Board](docs/screenshots/board.png)
     *   **List View:** Fast, high-density issue tracking with interactive column sorting (Priority, Status, Due Date, etc.) and overdue highlights.
         ![List View](docs/screenshots/list.png)
