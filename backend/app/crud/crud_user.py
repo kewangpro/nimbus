@@ -1,9 +1,16 @@
-from typing import Optional
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User
 from app.schemas.user import UserCreate
+
+async def get_multi(
+    db: AsyncSession, *, skip: int = 0, limit: int = 100
+) -> List[User]:
+    query = select(User).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
 
 async def get_by_email(db: AsyncSession, *, email: str) -> Optional[User]:
     result = await db.execute(select(User).where(User.email == email))

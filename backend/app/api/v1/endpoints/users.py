@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,19 @@ from app.crud import crud_user
 from app.schemas.user import User, UserCreate
 
 router = APIRouter()
+
+@router.get("/", response_model=List[User])
+async def read_users(
+    db: AsyncSession = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Retrieve users.
+    """
+    users = await crud_user.get_multi(db, skip=skip, limit=limit)
+    return users
 
 @router.post("/", response_model=User)
 async def create_user(

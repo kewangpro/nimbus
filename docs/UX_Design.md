@@ -44,7 +44,16 @@
     *   **Auto-Assigns:** Sets the current user as assignee and links to the active project.
 
 #### 📅 AI Schedule (Tactical)
-*   **Location:** Calendar View header ("AI Schedule").
+    *   **Overdue Actions:** If a task is past due, a red alert box provides one-click actions:
+        *   **"Do Today":** Reschedules the task to the current date.
+        *   **"Complete"::** Marks the task as Done.
+
+### 3.4 Visual Indicators
+The UI uses color-coded highlights to signal actionable states across all views (Board, List, Detail):
+*   **🔴 Overdue:** Red border/background. High urgency.
+*   **🟠 Needs Date:** Amber border/background. Indicates an active task that hasn't been scheduled yet.
+*   **🔵 Unassigned:** Blue border/background. Indicates an active task waiting for an owner.
+*   **Priority:** Visual pips (Red/Orange/Blue/Gray) indicate Urgency level.
 
 ## 4. User Interaction Flows
 

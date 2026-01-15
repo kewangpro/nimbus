@@ -19,6 +19,9 @@ Nimbus is a modern, high-performance project management tool designed to replace
         ![Kanban Board](docs/screenshots/board.png)
     *   **List View:** Fast, high-density issue tracking with interactive column sorting (Priority, Status, Due Date, etc.) and overdue highlights.
         ![List View](docs/screenshots/list.png)
+*   **Visual Management:**
+    *   **Smart Indicators:** Automatically highlights tasks that are **Overdue (Red)**, **Unassigned (Blue)**, or **Unscheduled (Amber)**.
+    *   **Assignee Avatars:** See who is working on what at a glance.
 *   **Real-time Collaboration:** Live updates via WebSockets ensure your team is always in sync.
 *   **Issue Management:**
     *   **Detail View:** Comprehensive modal for editing issues with quick actions ("Do Today", "Complete") for overdue tasks.

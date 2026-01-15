@@ -192,8 +192,8 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex-1 overflow-hidden pb-2">
-            <div className="flex gap-4 h-full px-1">
+        <div className="flex-1 overflow-x-auto pb-2">
+            <div className="flex gap-4 h-full min-w-full px-1">
                 {days.map(day => {
                     const dateKey = format(day, 'yyyy-MM-dd')
                     const dayIssues = getIssuesForDay(day)
@@ -201,7 +201,7 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
                     return (
                         <div 
                             key={dateKey} 
-                            className={`flex flex-col flex-1 min-w-0 rounded-lg border bg-muted/30 h-full overflow-hidden ${
+                            className={`flex flex-col w-[calc((100%-3rem)/4)] shrink-0 rounded-lg border bg-muted/30 h-full overflow-hidden ${
                                 isToday(day) ? 'ring-2 ring-primary/20 bg-primary/5' : ''
                             }`}
                         >

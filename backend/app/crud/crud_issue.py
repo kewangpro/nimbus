@@ -20,7 +20,10 @@ async def get(db: AsyncSession, id: UUID) -> Optional[Issue]:
 async def get_multi(
     db: AsyncSession, *, skip: int = 0, limit: int = 100, owner_id: Optional[UUID] = None, project_id: Optional[UUID] = None, assignee_id: Optional[UUID] = None
 ) -> List[Issue]:
-    query = select(Issue).options(joinedload(Issue.project)).offset(skip).limit(limit)
+    query = select(Issue).options(
+        joinedload(Issue.project),
+        joinedload(Issue.assignee)
+    ).offset(skip).limit(limit)
     
     if owner_id:
         query = query.where(Issue.owner_id == owner_id)

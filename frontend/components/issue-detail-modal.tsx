@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
 import { api } from "@/lib/api"
-import { Issue, IssueStatus, IssuePriority } from "@/types"
+import { Issue, IssueStatus, IssuePriority, User } from "@/types"
 import { isOverdue } from "@/lib/utils"
 import { useProject } from "@/components/project-provider"
 import {
@@ -25,7 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { CalendarIcon, Trash2, Loader2, Save, AlertCircle, CheckCircle2, CalendarDays, FolderKanban } from "lucide-react"
+import { CalendarIcon, Trash2, Loader2, Save, AlertCircle, CheckCircle2, CalendarDays, UserMinus, HelpCircle } from "lucide-react"
 import { toast } from "sonner"
 
 interface IssueDetailModalProps {
@@ -46,31 +46,30 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
   const [status, setStatus] = useState<IssueStatus>(IssueStatus.TODO)
   const [priority, setPriority] = useState<IssuePriority>(IssuePriority.MEDIUM)
   const [projectId, setProjectId] = useState<string>("")
+  const [dueDate, setDueDate] = useState<string>("")
+  const [assigneeId, setAssigneeId] = useState<string>("")
+  
+  const [users, setUsers] = useState<User[]>([])
 
-  // Sync state when issue opens
-  useState(() => {
-      if (issue) {
-          setTitle(issue.title)
-          setDescription(issue.description || "")
-          setStatus(issue.status)
-          setPriority(issue.priority)
-          setProjectId(issue.project_id || "")
+  // Fetch users on open
+  useEffect(() => {
+      if (isOpen) {
+          api.get("/users/").then(res => setUsers(res.data)).catch(console.error)
       }
-  })
+  }, [isOpen])
 
-  // Re-sync if issue prop changes while open (e.g. fast switching)
-  if (issue && issue.title !== title && !isEditing && !loading && issue.id !== (projectId ? "dirty" : issue.id)) {
-      // Logic to prevent overwrite during edit is tricky, simplify:
-      // Only resync if issue ID changes
-  }
   // Better sync logic
   const [currentIssueId, setCurrentIssueId] = useState<string | null>(null)
-  if (issue && issue.id !== currentIssueId) {
+  
+  if (isOpen && issue && issue.id !== currentIssueId) {
       setTitle(issue.title)
       setDescription(issue.description || "")
       setStatus(issue.status)
       setPriority(issue.priority)
       setProjectId(issue.project_id || "")
+      // Extract YYYY-MM-DD from ISO string
+      setDueDate(issue.due_date ? issue.due_date.split('T')[0] : "")
+      setAssigneeId(issue.assignee_id || "")
       setCurrentIssueId(issue.id)
   }
 
@@ -83,7 +82,9 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
               description,
               status,
               priority,
-              project_id: projectId
+              project_id: projectId,
+              due_date: dueDate || null,
+              assignee_id: assigneeId || null
           })
           toast.success("Issue updated")
           onUpdate()
@@ -148,6 +149,9 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
   if (!issue) return null
 
   const overdue = isOverdue(issue)
+  const isDone = issue.status === IssueStatus.DONE || issue.status === IssueStatus.CANCELED
+  const needsScheduling = !dueDate && !isDone
+  const isUnassigned = !assigneeId && !isDone
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -162,7 +166,11 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                         {issue.title}
                     </span>
                 )}
-                {overdue && <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Overdue</span>}
+                <div className="flex gap-1">
+                    {overdue && <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Overdue</span>}
+                    {isUnassigned && <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><UserMinus className="w-3 h-3" /> Unassigned</span>}
+                    {needsScheduling && <span className="bg-amber-100 text-amber-600 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><HelpCircle className="w-3 h-3" /> Needs Date</span>}
+                </div>
             </DialogTitle>
           </div>
           <DialogDescription className="flex items-center gap-2 mt-2">
@@ -191,19 +199,36 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
         )}
 
         <div className="grid gap-4 py-4">
-            {/* Project Selector */}
-            <div className="space-y-2">
-                <Label>Project</Label>
-                <Select value={projectId} onValueChange={(v) => { setProjectId(v); if (!isEditing) setIsEditing(true); }}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {projects.map(p => (
-                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+            <div className="grid grid-cols-2 gap-4">
+                {/* Project Selector */}
+                <div className="space-y-2">
+                    <Label>Project</Label>
+                    <Select value={projectId} onValueChange={(v) => { setProjectId(v); if (!isEditing) setIsEditing(true); }}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select Project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {projects.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Assignee Selector */}
+                <div className="space-y-2">
+                    <Label className={isUnassigned ? "text-blue-600 font-semibold" : ""}>Assign To</Label>
+                    <Select value={assigneeId} onValueChange={(v) => { setAssigneeId(v); if (!isEditing) setIsEditing(true); }}>
+                        <SelectTrigger className={cn("w-full", isUnassigned && "border-blue-300 bg-blue-50/30")}>
+                            <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {users.map(u => (
+                                <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -238,6 +263,31 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
             </div>
 
             <div className="space-y-2">
+                <Label className={needsScheduling ? "text-amber-600 font-semibold" : ""}>Due Date</Label>
+                {isEditing ? (
+                    <Input 
+                        type="date" 
+                        value={dueDate} 
+                        onChange={(e) => setDueDate(e.target.value)} 
+                        className={needsScheduling ? "border-amber-300 bg-amber-50/30" : ""}
+                    />
+                ) : (
+                    <div 
+                        onClick={() => setIsEditing(true)}
+                        className={cn(
+                            "flex items-center gap-2 text-sm p-2 rounded-md hover:bg-muted/50 cursor-pointer",
+                            overdue ? 'text-red-600 font-medium' : 
+                            needsScheduling ? 'text-amber-600 font-medium bg-amber-50/30 border border-amber-200' : 
+                            'text-muted-foreground'
+                        )}
+                    >
+                        <CalendarIcon className="h-4 w-4" />
+                        {dueDate ? format(new Date(dueDate), "PPP") : "No due date set"}
+                    </div>
+                )}
+            </div>
+
+            <div className="space-y-2">
                 <Label>Description</Label>
                 {isEditing ? (
                     <Textarea 
@@ -254,13 +304,6 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                     </div>
                 )}
             </div>
-            
-            {issue.due_date && (
-                <div className={`flex items-center gap-2 text-sm ${overdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                    <CalendarIcon className="h-4 w-4" />
-                    Due: {format(new Date(issue.due_date), "PPP")}
-                </div>
-            )}
         </div>
 
         <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
@@ -286,4 +329,8 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
       </DialogContent>
     </Dialog>
   )
+}
+
+function cn(...classes: any[]) {
+    return classes.filter(Boolean).join(' ')
 }

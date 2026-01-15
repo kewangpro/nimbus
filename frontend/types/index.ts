@@ -27,8 +27,10 @@ export interface Issue {
   status: IssueStatus;
   priority: IssuePriority;
   assignee_id?: string;
+  assignee?: User;
   owner_id: string;
   project_id: string;
+  project?: Project;
   created_at: string;
   updated_at?: string;
   due_date?: string;

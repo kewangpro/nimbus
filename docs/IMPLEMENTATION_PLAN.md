@@ -130,10 +130,46 @@
 
 ### 7.2 Multi-Context UI
 
+
+
 *   [x] **Sidebar:** Implemented persistent sidebar for navigation.
+
+
 
 *   [x] **My Calendar:** Refactored Calendar to be user-centric (Global) rather than project-centric.
 
+
+
 *   [x] **Project Workspace:** Board and List views are now filtered by the selected project.
 
+
+
 *   [x] **Creation Flow:** New issues auto-assign to the user and the active project.
+
+
+
+
+
+
+
+### 7.3 Visual Polish & Workflows
+
+
+
+*   [x] **Assignees:** Added "Assign To" workflow in detail view and avatar display in Board/List.
+
+
+
+*   [x] **Scheduling:** Added date picker to Detail view and creation dialog.
+
+
+
+*   [x] **Visual Signals:** Added consistent highlighting for Overdue, Unassigned, and Unscheduled tasks.
+
+
+
+*   [x] **Layout:** Refined Calendar/Board spacing to be consistent and responsive.
+
+
+
+

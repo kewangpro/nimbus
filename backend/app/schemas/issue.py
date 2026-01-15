@@ -4,6 +4,7 @@ from uuid import UUID
 from datetime import datetime
 from app.models.issue import IssueStatus, IssuePriority
 from app.schemas.project import Project
+from app.schemas.user import User
 
 class IssueBase(BaseModel):
     title: str
@@ -34,3 +35,4 @@ class IssueInDBBase(IssueBase):
 
 class Issue(IssueInDBBase):
     project: Optional[Project] = None
+    assignee: Optional[User] = None

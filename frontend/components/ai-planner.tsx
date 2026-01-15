@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { BrainCircuit, Loader2, Check, X, Calendar as CalendarIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { useProject } from "@/components/project-provider"
 
 interface AIPlannerProps {
     onIssuesCreated: () => void
@@ -40,6 +41,7 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
   const [loading, setLoading] = useState(false)
   const [plan, setPlan] = useState<PlannedIssue[]>([])
   const [step, setStep] = useState<'input' | 'review'>('input')
+  const { projects } = useProject()
 
   const handleAnalyze = async () => {
       if (!input.trim()) return
@@ -59,12 +61,15 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
   const handleCreateAll = async () => {
       setLoading(true)
       try {
+          const currentProject = projects.find(p => p.id === projectId)
+          const isGeneral = currentProject?.name === "General"
+          
           // Create sequentially to maintain order (or Promise.all for speed)
           for (const issue of plan) {
               await api.post("/issues/", {
                   ...issue,
                   project_id: projectId,
-                  assignee_id: userId
+                  assignee_id: isGeneral ? userId : undefined
               })
           }
           toast.success(`Created ${plan.length} issues`)

@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { IssueDetailModal } from "@/components/issue-detail-modal"
 import { isOverdue } from "@/lib/utils"
-import { AlertCircle, ChevronUp, ChevronDown } from "lucide-react"
+import { AlertCircle, ChevronUp, ChevronDown, HelpCircle, UserMinus } from "lucide-react"
 
 interface IssueListProps {
     refreshTrigger?: number
@@ -145,6 +145,9 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
               <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("priority")}>
                 <div className="flex items-center gap-1">Priority {getSortIcon("priority")}</div>
               </TableHead>
+              <TableHead className="cursor-pointer hover:bg-muted/50">
+                <div className="flex items-center gap-1">Assignee</div>
+              </TableHead>
               <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("due_date")}>
                 <div className="flex items-center gap-1">Due Date {getSortIcon("due_date")}</div>
               </TableHead>
@@ -156,23 +159,34 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
           <TableBody>
             {sortedIssues.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">
+                    <TableCell colSpan={7} className="text-center h-24">
                         No issues found. Create one to get started.
                     </TableCell>
                 </TableRow>
             ) : (
                 sortedIssues.map((issue) => {
                   const overdue = isOverdue(issue)
+                  const needsScheduling = !issue.due_date && issue.status !== IssueStatus.DONE && issue.status !== IssueStatus.CANCELED
+                  const isUnassigned = !issue.assignee_id && issue.status !== IssueStatus.DONE && issue.status !== IssueStatus.CANCELED
+
                   return (
                     <TableRow 
                         key={issue.id} 
-                        className={`cursor-pointer hover:bg-muted/50 ${overdue ? "bg-red-50/30 hover:bg-red-50/50" : ""}`}
+                        className={`cursor-pointer hover:bg-muted/50 ${
+                            overdue ? "bg-red-50/30 hover:bg-red-50/50" : 
+                            isUnassigned ? "bg-blue-50/20 hover:bg-blue-50/40" :
+                            needsScheduling ? "bg-amber-50/20 hover:bg-amber-50/40" : ""
+                        }`}
                         onClick={() => setSelectedIssue(issue)}
                     >
                         <TableCell className="font-mono text-xs">{issue.id.slice(0, 8)}</TableCell>
-                        <TableCell className="font-medium flex items-center gap-2">
-                          {issue.title}
-                          {overdue && <AlertCircle className="w-4 h-4 text-red-500" />}
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {issue.title}
+                            {overdue && <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />}
+                            {isUnassigned && <UserMinus className="w-4 h-4 text-blue-500 shrink-0" />}
+                            {needsScheduling && <HelpCircle className="w-4 h-4 text-amber-500 shrink-0" />}
+                          </div>
                         </TableCell>
                         <TableCell>
                         <Badge className={getStatusColor(issue.status)}>{issue.status}</Badge>
@@ -180,8 +194,25 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
                         <TableCell className={getPriorityColor(issue.priority)}>
                             {issue.priority}
                         </TableCell>
-                        <TableCell className={`text-sm ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-                            {issue.due_date ? new Date(issue.due_date).toLocaleDateString() : "-"}
+                        <TableCell>
+                            {issue.assignee ? (
+                                <div className="flex items-center gap-2" title={issue.assignee.email}>
+                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary">
+                                        {issue.assignee.full_name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground truncate max-w-[100px] hidden sm:inline-block">
+                                        {issue.assignee.full_name}
+                                    </span>
+                                </div>
+                            ) : (
+                                <span className="text-xs text-muted-foreground italic">Unassigned</span>
+                            )}
+                        </TableCell>
+                        <TableCell className={`text-sm ${
+                            overdue ? "text-red-600 font-medium" : 
+                            needsScheduling ? "text-amber-600 font-medium" : "text-muted-foreground"
+                        }`}>
+                            {issue.due_date ? new Date(issue.due_date).toLocaleDateString() : "No Date"}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground text-sm">
                             {new Date(issue.created_at).toLocaleDateString()}
