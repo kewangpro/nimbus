@@ -16,7 +16,9 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Dynamic Sprint Plan (Calendar):** A responsive timeline that auto-adjusts to show all active and overdue tasks. Features horizontal scrolling and toggles for "Show Weekends" and "Show Completed".
         ![Calendar View](docs/screenshots/calendar.png)
     *   **Kanban Board:** Drag-and-drop interface with optimistic UI updates.
+        ![Kanban Board](docs/screenshots/board.png)
     *   **List View:** Fast, high-density issue tracking with interactive column sorting (Priority, Status, Due Date, etc.) and overdue highlights.
+        ![List View](docs/screenshots/list.png)
 *   **Real-time Collaboration:** Live updates via WebSockets ensure your team is always in sync.
 *   **Issue Management:**
     *   **Detail View:** Comprehensive modal for editing issues with quick actions ("Do Today", "Complete") for overdue tasks.
