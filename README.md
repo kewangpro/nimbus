@@ -95,6 +95,15 @@ To test AI features:
 *   [UX Design](docs/UX_Design.md)
 *   [Deployment Guide](docs/DEPLOYMENT.md)
 
+## 🔧 Administrative Tasks
+
+### Reset User Password
+To manually reset a user's password, run the following command from the `backend/` directory:
+
+```bash
+python reset_password.py <email> <new_password>
+```
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
