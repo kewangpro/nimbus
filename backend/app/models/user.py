@@ -21,5 +21,6 @@ class User(Base):
     is_active = Column(Boolean(), default=True)
     is_superuser = Column(Boolean(), default=False)
     role = Column(String, default=UserRole.MEMBER, nullable=False)
+    timezone = Column(String, default="UTC", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

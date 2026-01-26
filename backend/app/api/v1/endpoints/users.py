@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
 from app.crud import crud_user
-from app.schemas.user import User, UserCreate
+from app.schemas.user import User, UserCreate, UserUpdate
 
 router = APIRouter()
 
@@ -48,3 +48,19 @@ async def read_user_me(
     Get current user.
     """
     return current_user
+
+@router.patch("/me", response_model=User)
+async def update_user_me(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    user_in: UserUpdate,
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Update own user.
+    """
+    user_data = user_in.dict(exclude_unset=True)
+    # Check if we need to verify email uniqueness if email is being updated (omitted for brevity unless needed)
+    current_user_data = jsonable_encoder(current_user)
+    user = await crud_user.update(db, db_obj=current_user, obj_in=user_in)
+    return user

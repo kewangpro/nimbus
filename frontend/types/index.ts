@@ -37,7 +37,8 @@ export interface Issue {
 }
 
 export interface User {
-    id: string;
-    email: string;
-    full_name: string;
+  id: string;
+  email: string;
+  full_name: string;
+  timezone?: string;
 }

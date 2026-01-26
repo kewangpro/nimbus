@@ -8,12 +8,19 @@ class UserBase(BaseModel):
     is_superuser: Optional[bool] = False
     full_name: Optional[str] = None
     role: str = "member"
+    timezone: Optional[str] = "UTC"
 
 class UserCreate(UserBase):
     password: str
 
-class UserUpdate(UserBase):
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
+    full_name: Optional[str] = None
     password: Optional[str] = None
+    role: Optional[str] = None
+    timezone: Optional[str] = None
 
 class UserInDBBase(UserBase):
     id: Optional[UUID] = None

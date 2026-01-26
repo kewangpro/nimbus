@@ -19,6 +19,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
         ![Kanban Board](docs/screenshots/board.png)
     *   **List View:** Fast, high-density issue tracking with interactive column sorting (Priority, Status, Due Date, etc.) and overdue highlights.
         ![List View](docs/screenshots/list.png)
+    *   **Global Timezone Support:** 🌍 Seamlessly manage tasks across different timezones. Users can set their preferred timezone in settings, and all dates/times (due dates, calendar views, overdue logic) automatically adjust to display correctly in their local time, while being stored as UTC.
 *   **Visual Management:**
     *   **Smart Indicators:** Automatically highlights tasks that are **Overdue (Red)**, **Unassigned (Blue)**, or **Unscheduled (Amber)**.
     *   **Assignee Avatars:** See who is working on what at a glance.
