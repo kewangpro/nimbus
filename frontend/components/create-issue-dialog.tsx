@@ -35,6 +35,8 @@ import {
 } from "@/components/ui/select"
 import { Plus, Wand2 } from "lucide-react"
 import { toast } from "sonner"
+import { useTimezone } from "@/components/timezone-provider"
+import { fromZonedTime } from "date-fns-tz"
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -45,15 +47,16 @@ const formSchema = z.object({
 })
 
 interface CreateIssueDialogProps {
-    onIssueCreated: () => void
-    projectId?: string
-    userId?: string
+  onIssueCreated: () => void
+  projectId?: string
+  userId?: string
 }
 
 export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateIssueDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [triageLoading, setTriageLoading] = useState(false)
+  const { timezone } = useTimezone()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -67,36 +70,42 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
   })
 
   async function handleAutoTriage() {
-      const { title, description } = form.getValues()
-      if (!title) {
-          toast.error("Please enter a title first")
-          return
-      }
-      
-      setTriageLoading(true)
-      try {
-          const res = await api.post("/ai/triage", { title, description: description || "" })
-          const { priority } = res.data
-          form.setValue("priority", priority)
-          toast.success("AI suggested: " + priority)
-      } catch (err) {
-          console.error(err)
-          toast.error("Failed to run AI triage")
-      } finally {
-          setTriageLoading(false)
-      }
+    const { title, description } = form.getValues()
+    if (!title) {
+      toast.error("Please enter a title first")
+      return
+    }
+
+    setTriageLoading(true)
+    try {
+      const res = await api.post("/ai/triage", { title, description: description || "" })
+      const { priority } = res.data
+      form.setValue("priority", priority)
+      toast.success("AI suggested: " + priority)
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to run AI triage")
+    } finally {
+      setTriageLoading(false)
+    }
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true)
     try {
-      const payload = { 
-          ...values, 
-          project_id: projectId, 
-          assignee_id: userId,
-          due_date: values.due_date || undefined
+      let formattedDueDate = undefined
+      if (values.due_date) {
+        // Convert the selected date (YYYY-MM-DD 00:00 user time) to UTC ISO
+        formattedDueDate = fromZonedTime(values.due_date + ' 00:00', timezone).toISOString()
       }
-      
+
+      const payload = {
+        ...values,
+        project_id: projectId,
+        assignee_id: userId,
+        due_date: formattedDueDate
+      }
+
       await api.post("/issues/", payload)
       setOpen(false)
       form.reset()
@@ -114,7 +123,7 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
-            <Plus className="mr-2 h-4 w-4" /> New Issue
+          <Plus className="mr-2 h-4 w-4" /> New Issue
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
@@ -139,53 +148,53 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
                 </FormItem>
               )}
             />
-            
+
             <div className="grid grid-cols-2 gap-4">
-                <FormField
+              <FormField
                 control={form.control}
                 name="status"
                 render={({ field }) => (
-                    <FormItem>
+                  <FormItem>
                     <FormLabel>Status</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
+                      <FormControl>
                         <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
+                          <SelectValue placeholder="Select status" />
                         </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            <SelectItem value={IssueStatus.TODO}>Todo</SelectItem>
-                            <SelectItem value={IssueStatus.IN_PROGRESS}>In Progress</SelectItem>
-                            <SelectItem value={IssueStatus.DONE}>Done</SelectItem>
-                        </SelectContent>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={IssueStatus.TODO}>Todo</SelectItem>
+                        <SelectItem value={IssueStatus.IN_PROGRESS}>In Progress</SelectItem>
+                        <SelectItem value={IssueStatus.DONE}>Done</SelectItem>
+                      </SelectContent>
                     </Select>
                     <FormMessage />
-                    </FormItem>
+                  </FormItem>
                 )}
-                />
-                 <FormField
+              />
+              <FormField
                 control={form.control}
                 name="priority"
                 render={({ field }) => (
-                    <FormItem>
+                  <FormItem>
                     <FormLabel>Priority</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
+                      <FormControl>
                         <SelectTrigger>
-                            <SelectValue placeholder="Select priority" />
+                          <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            <SelectItem value={IssuePriority.LOW}>Low</SelectItem>
-                            <SelectItem value={IssuePriority.MEDIUM}>Medium</SelectItem>
-                            <SelectItem value={IssuePriority.HIGH}>High</SelectItem>
-                            <SelectItem value={IssuePriority.URGENT}>Urgent</SelectItem>
-                        </SelectContent>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={IssuePriority.LOW}>Low</SelectItem>
+                        <SelectItem value={IssuePriority.MEDIUM}>Medium</SelectItem>
+                        <SelectItem value={IssuePriority.HIGH}>High</SelectItem>
+                        <SelectItem value={IssuePriority.URGENT}>Urgent</SelectItem>
+                      </SelectContent>
                     </Select>
                     <FormMessage />
-                    </FormItem>
+                  </FormItem>
                 )}
-                />
+              />
             </div>
 
             <FormField
@@ -215,24 +224,24 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
                 </FormItem>
               )}
             />
-            
+
             <div className="flex justify-end">
-                <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleAutoTriage}
-                    disabled={triageLoading}
-                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                >
-                    <Wand2 className="mr-2 h-3 w-3" />
-                    {triageLoading ? "Analyzing..." : "AI Auto-Triage"}
-                </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAutoTriage}
+                disabled={triageLoading}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                <Wand2 className="mr-2 h-3 w-3" />
+                {triageLoading ? "Analyzing..." : "AI Auto-Triage"}
+              </Button>
             </div>
 
             <DialogFooter>
               <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Creating..." : "Create Issue"}
+                {loading ? "Creating..." : "Create Issue"}
               </Button>
             </DialogFooter>
           </form>
