@@ -13,6 +13,12 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
+class UserCreatePublic(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+    timezone: Optional[str] = "UTC"
+
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
@@ -20,6 +26,12 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     password: Optional[str] = None
     role: Optional[str] = None
+    timezone: Optional[str] = None
+
+class UserSelfUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    password: Optional[str] = None
     timezone: Optional[str] = None
 
 class UserInDBBase(UserBase):

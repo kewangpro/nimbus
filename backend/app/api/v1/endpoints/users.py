@@ -1,11 +1,10 @@
 from typing import Any, List
-from fastapi import APIRouter, Body, Depends, HTTPException
-from fastapi.encoders import jsonable_encoder
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
 from app.crud import crud_user
-from app.schemas.user import User, UserCreate, UserUpdate
+from app.schemas.user import User, UserCreate, UserCreatePublic, UserSelfUpdate
 
 router = APIRouter()
 
@@ -26,7 +25,7 @@ async def read_users(
 async def create_user(
     *,
     db: AsyncSession = Depends(deps.get_db),
-    user_in: UserCreate,
+    user_in: UserCreatePublic,
 ) -> Any:
     """
     Create new user.
@@ -37,7 +36,18 @@ async def create_user(
             status_code=400,
             detail="The user with this username already exists in the system.",
         )
-    user = await crud_user.create(db, obj_in=user_in)
+    user = await crud_user.create(
+        db,
+        obj_in=UserCreate(
+            email=user_in.email,
+            password=user_in.password,
+            full_name=user_in.full_name,
+            is_superuser=False,
+            role="member",
+            is_active=True,
+            timezone=user_in.timezone or "UTC",
+        ),
+    )
     return user
 
 @router.get("/me", response_model=User)
@@ -53,14 +63,13 @@ async def read_user_me(
 async def update_user_me(
     *,
     db: AsyncSession = Depends(deps.get_db),
-    user_in: UserUpdate,
+    user_in: UserSelfUpdate,
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Update own user.
     """
-    user_data = user_in.dict(exclude_unset=True)
+    update_data = user_in.dict(exclude_unset=True)
     # Check if we need to verify email uniqueness if email is being updated (omitted for brevity unless needed)
-    current_user_data = jsonable_encoder(current_user)
-    user = await crud_user.update(db, db_obj=current_user, obj_in=user_in)
+    user = await crud_user.update(db, db_obj=current_user, obj_in=update_data)
     return user

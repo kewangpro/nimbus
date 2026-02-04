@@ -61,51 +61,6 @@ async def create(db: AsyncSession, *, obj_in: IssueCreate, owner_id: UUID) -> Is
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
-    
-    # Reload with project for response
-    return await get(db, db_obj.id)
-
-    # Generate Embedding (This part was unreachable due to return above, fixing flow)
-    # Actually, we should gen embedding usually via background task, but here it's inline.
-    # We need to call embedding BEFORE return or just re-get at the very end.
-    
-    # Let's fix the logic flow in the next block since I can't edit non-contiguous easily.
-    # I'll just rewrite the whole CREATE method in next tool call if needed, 
-    # but here I am replacing the TOP part of the file.
-    # The REPLACE tool works on contiguous blocks.
-    
-    # Wait, 'create' function body continues... 
-    # I will replace `get` and `get_multi` first. 
-    # Then I will replace `create` and `update` separately to be safe.
-
-# START REPLACEMENT 1: Imports and GET/GET_MULTI
-
-async def create(db: AsyncSession, *, obj_in: IssueCreate, owner_id: UUID) -> Issue:
-    # Handle Default Project
-    project_id = obj_in.project_id
-    if not project_id:
-        general_project = await crud_project.get_by_name(db, name="General")
-        if general_project:
-            project_id = general_project.id
-        else:
-            from app.schemas.project import ProjectCreate
-            new_proj = await crud_project.create(db, obj_in=ProjectCreate(name="General", description="Default project"))
-            project_id = new_proj.id
-
-    db_obj = Issue(
-        title=obj_in.title,
-        description=obj_in.description,
-        status=obj_in.status,
-        priority=obj_in.priority,
-        assignee_id=obj_in.assignee_id,
-        due_date=obj_in.due_date,
-        owner_id=owner_id,
-        project_id=project_id
-    )
-    db.add(db_obj)
-    await db.commit()
-    await db.refresh(db_obj)
-
     # Generate Embedding
     full_text = f"{db_obj.title} {db_obj.description or ''}"
     content_hash = get_content_hash(full_text)
