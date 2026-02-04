@@ -32,7 +32,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
 
 ## 🛠️ Tech Stack
 
-*   **Frontend:** Next.js 14, Tailwind CSS, Shadcn/UI, React Query.
+*   **Frontend:** Next.js 16, Tailwind CSS, Shadcn/UI, React Query.
 *   **Backend:** FastAPI (Python), SQLAlchemy (Async), Alembic.
 *   **Database:** PostgreSQL with `pgvector`.
 *   **Infrastructure:** Docker Compose, Redis, MinIO.
@@ -74,9 +74,10 @@ API Documentation: `http://localhost:8000/docs`
 ```bash
 cd frontend
 npm install
-npm run dev
+PORT=3000 npm run dev
 ```
 App: `http://localhost:3000`
+If port 3000 is in use, pick another port (e.g. `PORT=3001`).
 
 ## 🧠 AI Configuration
 Ensure **Ollama** is running on your host machine at `http://localhost:11434` (default).

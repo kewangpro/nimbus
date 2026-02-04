@@ -44,7 +44,7 @@ To build an **AI-Native OS for software delivery**. Unlike legacy tools where AI
 *   **Attachments:** Full support for file uploads via MinIO.
 
 ## 4. Technical Architecture
-*   **Frontend:** Next.js 14, Tailwind, Shadcn/UI, React Query.
+*   **Frontend:** Next.js 16, Tailwind, Shadcn/UI, React Query.
 *   **Backend:** FastAPI (Python), SQLAlchemy (Async).
 *   **Database:** PostgreSQL with `pgvector` & Redis.
 *   **AI Engine:** Local Ollama (`gemma3`, `nomic-embed-text`).

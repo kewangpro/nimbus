@@ -4,7 +4,7 @@
 Nimbus is composed of three Dockerized services:
 1.  **Frontend:** Next.js (Node.js runtime).
 2.  **Backend:** FastAPI (Python runtime).
-3.  **Worker:** Python Celery/ARQ (Optional, for AI tasks).
+3.  **Worker:** Not implemented (AI runs inline in the API service).
 
 Supporting Infrastructure:
 *   **Database:** PostgreSQL 15+ (Requires `pgvector` extension).
@@ -25,8 +25,8 @@ MINIO_SECRET_KEY=...
 
 ### Frontend (.env.local)
 ```ini
-NEXT_PUBLIC_API_URL=https://api.nimbus.app
-NEXT_PUBLIC_WS_URL=wss://api.nimbus.app/ws
+NEXT_PUBLIC_API_URL=https://api.nimbus.app/api/v1
+NEXT_PUBLIC_WS_URL=wss://api.nimbus.app/api/v1/ws
 ```
 
 ## 3. Deployment Options

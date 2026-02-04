@@ -4,7 +4,7 @@
 **Strategy:** "Core Mechanics First." We will build a lightning-fast, real-time project management tool first. AI features will *only* be implemented after the core UX (optimistic updates, drag-and-drop) is validated as buttery smooth.
 
 ### Tech Stack
-*   **Frontend:** Next.js 14, Tailwind, Shadcn/UI, React Query (for Optimistic UI).
+*   **Frontend:** Next.js 16, Tailwind, Shadcn/UI, React Query (for Optimistic UI).
 *   **Backend:** FastAPI, SQLAlchemy (Async), Redis (Real-time).
 *   **Database:** PostgreSQL.
 *   **Infrastructure:** Docker Compose.
@@ -169,7 +169,6 @@
 
 
 *   [x] **Layout:** Refined Calendar/Board spacing to be consistent and responsive.
-
 
 
 

@@ -6,15 +6,16 @@
 *   **Auth:** OAuth2 with Password Flow (Bearer Token).
 
 ## 1. Authentication
-*   `POST /auth/token`
-    *   **Body:** `username`, `password`
+*   `POST /auth/access-token`
+    *   **Body:** `username`, `password` (OAuth2 Password flow)
     *   **Response:** `{ "access_token": "jwt...", "token_type": "bearer" }`
-*   `POST /auth/register`
-    *   **Body:** `{ "email": "...", "password": "...", "full_name": "..." }`
+*   `POST /users`
+    *   **Body:** `{ "email": "...", "password": "...", "full_name": "...", "timezone": "..." }`
+    *   **Notes:** Public signup endpoint.
 
 ## 2. Issues (Core)
 *   `GET /issues`
-    *   **Query Params:** `project_id`, `status`, `assignee_id`
+    *   **Query Params:** `project_id`, `assignee_id`
     *   **Response:** `List[IssueSchema]`
 *   `POST /issues`
     *   **Body:** `{ "title": "...", "description": "...", "priority": "...", "due_date": "..." }`
@@ -28,7 +29,7 @@
 ## 3. Projects & Workspaces
 *   `GET /projects`
 *   `POST /projects`
-*   `GET /workspaces/me`
+*   `GET /users/me`
 
 ## 4. AI & Intelligence (Phase 3 & 5)
 *   `POST /ai/triage`
@@ -50,7 +51,7 @@
     *   **Response:** `{ "url": "https://minio.../file.png" }`
 
 ## 6. Real-time (WebSocket)
-*   `WS /ws/{client_id}`
+*   `WS /ws/{client_id}` (full path: `/api/v1/ws/{client_id}`)
     *   **Events:**
         *   `{"type": "ISSUE_CREATED", "data": "uuid"}`
         *   `{"type": "ISSUE_UPDATED", "data": "uuid"}`

@@ -28,7 +28,7 @@
     *   A responsive, horizontal-scroll timeline.
     *   Shows all tasks assigned to the current user across **all projects**.
     *   Visual indicators for project context on each card.
-2.  **Project Workspace (Board/List): СА
+2.  **Project Workspace (Board/List):**
     *   **Board:** Kanban style for workflow management within a specific project.
     *   **List:** High-density view for bulk review of project tasks.
 

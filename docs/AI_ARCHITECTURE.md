@@ -47,4 +47,4 @@ CREATE TABLE issue_embeddings (
 ## 5. Controls & Performance
 *   **Async:** All AI calls are made using `ollama.AsyncClient`.
 *   **Debounce:** Local state updates are immediate; vector updates happen on save.
-*   **Fallbacks:** If Ollama is offline, the system degrades gracefully to keyword-only search and manual triage.
+*   **Fallbacks:** If Ollama is offline, AI endpoints return errors and should be treated as unavailable (no keyword-only fallback yet).
