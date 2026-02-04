@@ -142,8 +142,8 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <Badge variant="outline">{issue.status}</Badge>
                                             <Badge variant="secondary" className={
-                                                issue.priority === 'URGENT' ? 'text-red-600' :
-                                                    issue.priority === 'HIGH' ? 'text-orange-500' : ''
+                                                issue.priority === IssuePriority.URGENT ? "text-red-600" :
+                                                    issue.priority === IssuePriority.HIGH ? "text-orange-500" : ""
                                             }>{issue.priority}</Badge>
                                             {issue.due_date && (
                                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
