@@ -38,6 +38,7 @@
 #### 🤖 AI Planner (Strategic)
 *   **Location:** Header "AI Plan" button.
 *   **Interaction:** A large text area for "brain dumping" project ideas.
+*   **Project Targeting:** Choose an existing project or create a new one before creating issues.
 *   **Intelligence:**
     *   Breaks input down into structured tasks.
     *   **Auto-Schedules:** Assigns balanced due dates (Mon-Fri) to tasks based on urgency and workload.

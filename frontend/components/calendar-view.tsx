@@ -30,20 +30,29 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
 
     // Load preferences from local storage on mount
     useEffect(() => {
-        const savedCompleted = localStorage.getItem("nimbus_calendar_show_completed")
+        if (typeof window === "undefined" || typeof window.localStorage?.getItem !== "function") {
+            return
+        }
+        const savedCompleted = window.localStorage.getItem("nimbus_calendar_show_completed")
         if (savedCompleted !== null) setShowCompleted(JSON.parse(savedCompleted))
 
-        const savedWeekends = localStorage.getItem("nimbus_calendar_show_weekends")
+        const savedWeekends = window.localStorage.getItem("nimbus_calendar_show_weekends")
         if (savedWeekends !== null) setShowWeekends(JSON.parse(savedWeekends))
     }, [])
 
     // Save preferences whenever they change
     useEffect(() => {
-        localStorage.setItem("nimbus_calendar_show_completed", JSON.stringify(showCompleted))
+        if (typeof window === "undefined" || typeof window.localStorage?.setItem !== "function") {
+            return
+        }
+        window.localStorage.setItem("nimbus_calendar_show_completed", JSON.stringify(showCompleted))
     }, [showCompleted])
 
     useEffect(() => {
-        localStorage.setItem("nimbus_calendar_show_weekends", JSON.stringify(showWeekends))
+        if (typeof window === "undefined" || typeof window.localStorage?.setItem !== "function") {
+            return
+        }
+        window.localStorage.setItem("nimbus_calendar_show_weekends", JSON.stringify(showWeekends))
     }, [showWeekends])
 
     const fetchIssues = async () => {

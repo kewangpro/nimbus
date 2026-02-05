@@ -35,7 +35,7 @@ CREATE TABLE issue_embeddings (
 *   **Prompt:** System instructs the model to return a structured JSON array of actionable tasks.
 
 ### 4.3 AI Schedule (Time Management)
-*   **Logic:** Analyzes all open tasks and distributes them across the **next 5 days**.
+*   **Logic:** Analyzes open tasks that are **unscheduled or past due** and distributes them across the **next 5 weekdays**.
 *   **Optimization:**
     *   Prioritizes `URGENT` items early.
     *   Limits workload to ~3-5 tasks per day to prevent burnout.

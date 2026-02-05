@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time, timezone
 
 from app.api import deps
 from app.core import ai
@@ -45,16 +45,56 @@ async def auto_schedule(
     """
     Auto-schedule open issues using AI.
     """
-    # 1. Fetch open issues
-    issues = await crud_issue.get_multi(db, limit=100) # Fetch up to 100
+    # 1. Fetch open issues (scoped by role)
+    owner_id = None
+    assignee_id = None
+    if getattr(current_user, "role", None) == "client":
+        owner_id = current_user.id
+    elif getattr(current_user, "role", None) == "member":
+        assignee_id = current_user.id
+
+    issues: list[Issue] = []
+    page_size = 200
+    skip = 0
+    while True:
+        batch = await crud_issue.get_multi(
+            db,
+            skip=skip,
+            limit=page_size,
+            owner_id=owner_id,
+            assignee_id=assignee_id,
+        )
+        if not batch:
+            break
+        issues.extend(batch)
+        if len(batch) < page_size:
+            break
+        skip += page_size
     open_issues = [i for i in issues if i.status != IssueStatus.DONE and i.status != IssueStatus.CANCELED]
+
+    # Only schedule issues with no due_date or past due
+    now_utc = datetime.now(timezone.utc)
+    schedulable_issues: list[Issue] = []
+    for issue in open_issues:
+        if issue.due_date is None:
+            schedulable_issues.append(issue)
+            continue
+        try:
+            due_dt = issue.due_date
+            if due_dt.tzinfo is None:
+                due_dt = due_dt.replace(tzinfo=timezone.utc)
+            if due_dt < now_utc:
+                schedulable_issues.append(issue)
+        except Exception:
+            # If due_date is malformed, treat as unscheduled
+            schedulable_issues.append(issue)
     
-    if not open_issues:
-        return {"scheduled_count": 0, "message": "No open issues to schedule."}
+    if not schedulable_issues:
+        return {"scheduled_count": 0, "message": "No unscheduled or overdue issues to schedule."}
 
     # 2. Prepare prompt
-    issues_text = "\n".join([f"- ID: {i.id}, Title: {i.title}, Priority: {i.priority}" for i in open_issues])
-    today = datetime.now()
+    issues_text = "\n".join([f"- ID: {i.id}, Title: {i.title}, Priority: {i.priority}" for i in schedulable_issues])
+    today = datetime.now(timezone.utc).date()
     
     # Generate next 5 weekdays
     next_5_weekdays = []
@@ -92,27 +132,37 @@ async def auto_schedule(
     try:
         clean_json = response.replace("```json", "").replace("```", "").strip()
         schedule_data = json.loads(clean_json)
-        
+
         from uuid import UUID
         from app.schemas.issue import IssueUpdate
-        
+
+        allowed_ids = {str(i.id) for i in schedulable_issues}
+        allowed_dates = set(next_5_weekdays)
+
         for item in schedule_data:
             issue_id_str = item.get("id")
             date_str = item.get("date")
-            
-            if issue_id_str and date_str:
-                try:
-                    issue_id = UUID(issue_id_str)
-                    due_date = datetime.strptime(date_str, "%Y-%m-%d")
-                    
-                    # Update issue
-                    issue_obj = await crud_issue.get(db, id=issue_id)
-                    if issue_obj:
-                        await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
-                        count += 1
-                except ValueError:
-                    continue
-                    
+
+            if not issue_id_str or not date_str:
+                continue
+            if issue_id_str not in allowed_ids:
+                continue
+            if date_str not in allowed_dates:
+                continue
+
+            try:
+                issue_id = UUID(issue_id_str)
+                due_day = datetime.strptime(date_str, "%Y-%m-%d").date()
+                due_date = datetime.combine(due_day, time.min, tzinfo=timezone.utc)
+
+                # Update issue
+                issue_obj = await crud_issue.get(db, id=issue_id)
+                if issue_obj:
+                    await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
+                    count += 1
+            except ValueError:
+                continue
+
         return {"scheduled_count": count, "message": f"Successfully scheduled {count} tasks."}
         
     except Exception as e:

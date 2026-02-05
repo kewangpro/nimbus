@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { api } from "@/lib/api"
 import { IssueStatus, IssuePriority } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,13 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -22,6 +29,7 @@ import { Badge } from "@/components/ui/badge"
 import { useProject } from "@/components/project-provider"
 import { useTimezone } from "@/components/timezone-provider"
 import { fromZonedTime } from "date-fns-tz"
+import { CreateProjectDialog } from "@/components/create-project-dialog"
 
 interface AIPlannerProps {
     onIssuesCreated: () => void
@@ -44,7 +52,28 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
     const [plan, setPlan] = useState<PlannedIssue[]>([])
     const [step, setStep] = useState<'input' | 'review'>('input')
     const { projects } = useProject()
+    const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(projectId)
+    const userSelectedProject = useRef(false)
     const { timezone } = useTimezone()
+
+    // Set default selection when dialog opens, but don't override user choice
+    useEffect(() => {
+        if (!open) {
+            userSelectedProject.current = false
+            return
+        }
+        if (userSelectedProject.current) return
+        const projectIds = new Set(projects.map(p => p.id))
+        if (selectedProjectId && projectIds.has(selectedProjectId)) return
+        if (projectId && projectIds.has(projectId)) {
+            setSelectedProjectId(projectId)
+            return
+        }
+        if (projects.length > 0) {
+            const general = projects.find(p => p.name === "General")
+            setSelectedProjectId(general?.id || projects[0].id)
+        }
+    }, [open, projectId, projects, selectedProjectId])
 
     const handleAnalyze = async () => {
         if (!input.trim()) return
@@ -64,7 +93,12 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
     const handleCreateAll = async () => {
         setLoading(true)
         try {
-            const currentProject = projects.find(p => p.id === projectId)
+            const targetProjectId = selectedProjectId || projects.find(p => p.name === "General")?.id
+            if (!targetProjectId) {
+                toast.error("Please select a project")
+                return
+            }
+            const currentProject = projects.find(p => p.id === targetProjectId)
             const isGeneral = currentProject?.name === "General"
 
             // Create sequentially to maintain order (or Promise.all for speed)
@@ -77,7 +111,7 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
                 await api.post("/issues/", {
                     ...issue,
                     due_date: formattedDueDate,
-                    project_id: projectId,
+                    project_id: targetProjectId,
                     assignee_id: isGeneral ? userId : undefined
                 })
             }
@@ -184,12 +218,39 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
                             {loading ? "Analyzing..." : "Generate Plan"}
                         </Button>
                     ) : (
-                        <div className="flex gap-2 w-full justify-end">
-                            <Button variant="ghost" onClick={() => setStep('input')}>Back</Button>
-                            <Button onClick={handleCreateAll} disabled={loading || plan.length === 0}>
-                                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                                Create {plan.length} Issues
-                            </Button>
+                        <div className="flex gap-2 w-full items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Select
+                                    value={selectedProjectId}
+                                    onValueChange={(value) => {
+                                        userSelectedProject.current = true
+                                        setSelectedProjectId(value)
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[220px]">
+                                        <SelectValue placeholder="Select a project" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {projects.map((p) => (
+                                            <SelectItem key={p.id} value={p.id}>
+                                                {p.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <CreateProjectDialog
+                                    onCreated={(p) => {
+                                        setSelectedProjectId(p.id)
+                                    }}
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="ghost" onClick={() => setStep('input')}>Back</Button>
+                                <Button onClick={handleCreateAll} disabled={loading || plan.length === 0}>
+                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                                    Create {plan.length} Issues
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </DialogFooter>

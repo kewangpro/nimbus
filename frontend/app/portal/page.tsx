@@ -15,7 +15,10 @@ export default function ClientPortal() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    if (typeof window === "undefined" || typeof window.localStorage?.getItem !== "function") {
+      return
+    }
+    const token = window.localStorage.getItem('token')
     if (!token) {
       router.push('/login')
       return
@@ -43,7 +46,9 @@ export default function ClientPortal() {
   }, [router])
 
   const logout = () => {
-      localStorage.removeItem('token')
+      if (typeof window !== "undefined" && typeof window.localStorage?.removeItem === "function") {
+        window.localStorage.removeItem('token')
+      }
       router.push('/login')
   }
 

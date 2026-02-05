@@ -34,7 +34,11 @@ const formSchema = z.object({
   description: z.string().optional(),
 })
 
-export function CreateProjectDialog() {
+interface CreateProjectDialogProps {
+  onCreated?: (project: { id: string; name: string }) => void
+}
+
+export function CreateProjectDialog({ onCreated }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const { refreshProjects } = useProject()
@@ -50,10 +54,13 @@ export function CreateProjectDialog() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true)
     try {
-      await api.post("/projects/", values)
+      const res = await api.post("/projects/", values)
       setOpen(false)
       form.reset()
       refreshProjects()
+      if (onCreated && res.data?.id) {
+        onCreated({ id: res.data.id, name: res.data.name })
+      }
       toast.success("Project created")
     } catch (err) {
       console.error(err)
