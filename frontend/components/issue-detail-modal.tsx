@@ -55,6 +55,8 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
     const [users, setUsers] = useState<User[]>([])
     const [aiSummary, setAiSummary] = useState<IssueSummary | null>(null)
     const [summaryLoading, setSummaryLoading] = useState(false)
+    const [dependencies, setDependencies] = useState<Issue[]>([])
+    const [dependencyLoading, setDependencyLoading] = useState(false)
 
     // Fetch users on open
     useEffect(() => {
@@ -78,7 +80,15 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
         setAssigneeId(issue.assignee_id || "")
         setCurrentIssueId(issue.id)
         setAiSummary(null)
+        setDependencies([])
     }
+
+    useEffect(() => {
+        if (!isOpen || !issue) return
+        api.get(`/issues/${issue.id}/dependencies`)
+            .then(res => setDependencies(res.data || []))
+            .catch(console.error)
+    }, [isOpen, issue?.id])
 
     const handleSave = async () => {
         if (!issue) return
@@ -166,6 +176,20 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
             toast.error("Failed to generate summary")
         } finally {
             setSummaryLoading(false)
+        }
+    }
+
+    const handleDetectDependencies = async () => {
+        if (!issue) return
+        setDependencyLoading(true)
+        try {
+            const res = await api.post("/ai/dependencies", { issue_id: issue.id, project_id: issue.project_id })
+            setDependencies(res.data || [])
+        } catch (err) {
+            console.error(err)
+            toast.error("Failed to detect dependencies")
+        } finally {
+            setDependencyLoading(false)
         }
     }
 
@@ -359,6 +383,37 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                             ) : (
                                 <div className="text-xs text-muted-foreground">
                                     Generate a concise summary and next steps for this issue.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label>Dependencies</Label>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleDetectDependencies}
+                                disabled={dependencyLoading}
+                            >
+                                {dependencyLoading ? "Detecting..." : "Detect Dependencies"}
+                            </Button>
+                        </div>
+                        <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[120px] max-h-[200px] overflow-y-auto">
+                            {dependencies.length > 0 ? (
+                                dependencies.map((dep) => (
+                                    <div key={dep.id} className="text-sm">
+                                        <div className="font-medium">{dep.title}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {dep.status} • {dep.priority} • {dep.id.slice(0, 8)}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-xs text-muted-foreground">
+                                    No dependencies detected yet.
                                 </div>
                             )}
                         </div>

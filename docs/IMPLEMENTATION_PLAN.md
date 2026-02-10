@@ -177,5 +177,7 @@
 
 *   [x] **Similar Issues:** Endpoint and UI to detect likely duplicates during create.
 *   [x] **Issue Summaries:** Per-issue AI summary with next steps.
+*   [x] **AI Filters:** Natural language filters for list views.
+*   [x] **Client Updates:** Draft client-facing weekly status summaries.
+*   [x] **Dependency Detection:** Extract and store issue dependencies.
 *   [ ] **Summary Caching:** Add background refresh strategy and invalidation metrics.
-

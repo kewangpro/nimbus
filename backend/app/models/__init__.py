@@ -4,3 +4,4 @@ from .issue import Issue
 from .embedding import IssueEmbedding
 from .label import Label
 from .issue_summary import IssueSummary
+from .issue_link import IssueLink

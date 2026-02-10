@@ -1,8 +1,10 @@
 from typing import List, Optional
 from uuid import UUID
 import hashlib
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import and_
 from app.models.issue import Issue
 from app.schemas.issue import IssueCreate, IssueUpdate
 from app.core import ai
@@ -24,7 +26,17 @@ async def get(db: AsyncSession, id: UUID) -> Optional[Issue]:
     return result.scalars().first()
 
 async def get_multi(
-    db: AsyncSession, *, skip: int = 0, limit: int = 100, owner_id: Optional[UUID] = None, project_id: Optional[UUID] = None, assignee_id: Optional[UUID] = None
+    db: AsyncSession,
+    *,
+    skip: int = 0,
+    limit: int = 100,
+    owner_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
+    assignee_id: Optional[UUID] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    overdue: Optional[bool] = None,
+    unscheduled: Optional[bool] = None,
 ) -> List[Issue]:
     query = select(Issue).options(
         joinedload(Issue.project),
@@ -38,6 +50,26 @@ async def get_multi(
         query = query.where(Issue.project_id == project_id)
     if assignee_id:
         query = query.where(Issue.assignee_id == assignee_id)
+    if status:
+        query = query.where(Issue.status == status)
+    if priority:
+        query = query.where(Issue.priority == priority)
+    if overdue:
+        now_utc = datetime.now(timezone.utc)
+        query = query.where(
+            and_(
+                Issue.due_date.isnot(None),
+                Issue.due_date < now_utc,
+                Issue.status.notin_(["done", "canceled"]),
+            )
+        )
+    if unscheduled:
+        query = query.where(
+            and_(
+                Issue.due_date.is_(None),
+                Issue.status.notin_(["done", "canceled"]),
+            )
+        )
         
     result = await db.execute(query)
     return result.scalars().all()

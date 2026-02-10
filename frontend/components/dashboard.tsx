@@ -9,6 +9,7 @@ import { Board } from "@/components/board"
 import { CreateIssueDialog } from "@/components/create-issue-dialog"
 import { AISearch } from "@/components/ai-search"
 import { AIPlanner } from "@/components/ai-planner"
+import { AIClientUpdate } from "@/components/ai-client-update"
 import { CalendarView } from "@/components/calendar-view"
 import { User } from "@/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -137,6 +138,9 @@ export function Dashboard({ user, logout }: DashboardProps) {
                         <div className="flex items-center gap-3">
                             <UserSettingsModal user={user} onUpdate={() => window.location.reload()} />
                             <AIPlanner onIssuesCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
+                            {viewMode === 'project' && project && (
+                                <AIClientUpdate projectId={project.id} />
+                            )}
                             <AISearch />
                             <CreateIssueDialog onIssueCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
                         </div>

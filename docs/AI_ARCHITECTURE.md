@@ -35,6 +35,15 @@ CREATE TABLE issue_summaries (
 );
 ```
 
+Dependencies are stored as directed links between issues.
+```sql
+CREATE TABLE issue_links (
+    issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    depends_on_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    PRIMARY KEY (issue_id, depends_on_id)
+);
+```
+
 ## 4. AI Feature Implementation
 
 ### 4.1 Auto-Triage (Single Issue)
@@ -62,6 +71,18 @@ CREATE TABLE issue_summaries (
 ### 4.6 Issue Summaries
 *   **Logic:** Generates a concise summary + next steps for a single issue.
 *   **Storage:** Stored per issue with content hash to avoid redundant regeneration.
+
+### 4.7 Natural Language Filters
+*   **Logic:** Converts plain English into structured issue filters (status, priority, overdue, etc.).
+*   **Use Case:** Quick filtering in list views without manual toggles.
+
+### 4.8 Client Update Drafts
+*   **Logic:** Generates weekly, client-friendly update text from project issues.
+*   **Use Case:** Status update emails or portal updates.
+
+### 4.9 Dependency Extraction
+*   **Logic:** Identifies which issues a given issue depends on from a candidate list.
+*   **Storage:** Persisted in an `issue_links` table.
 
 ## 5. Controls & Performance
 *   **Async:** All AI calls are made using `ollama.AsyncClient`.

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, date, time, timezone
 
 from app.api import deps
 from app.core import ai
-from app.crud import crud_embedding, crud_issue, crud_issue_summary
+from app.crud import crud_embedding, crud_issue, crud_issue_summary, crud_project, crud_user, crud_issue_link
 from app.schemas.issue import Issue, IssuePriority, IssueStatus
 
 router = APIRouter()
@@ -54,6 +54,31 @@ class SummaryResponse(BaseModel):
     issue_id: UUID
     summary: str
     next_steps: List[str]
+
+class QueryRequest(BaseModel):
+    text: str
+    project_id: Optional[UUID] = None
+    assignee_id: Optional[UUID] = None
+
+class QueryResponse(BaseModel):
+    project_id: Optional[UUID] = None
+    assignee_id: Optional[UUID] = None
+    status: Optional[IssueStatus] = None
+    priority: Optional[IssuePriority] = None
+    overdue: Optional[bool] = None
+    unscheduled: Optional[bool] = None
+
+class ClientUpdateRequest(BaseModel):
+    project_id: Optional[UUID] = None
+
+class ClientUpdateResponse(BaseModel):
+    project_id: Optional[UUID] = None
+    update_text: str
+
+class DependencyRequest(BaseModel):
+    issue_id: UUID
+    project_id: Optional[UUID] = None
+    limit: int = 30
 
 @router.post("/schedule", response_model=ScheduleResponse)
 async def auto_schedule(
@@ -413,6 +438,176 @@ async def summarize_issue(
     )
 
     return {"issue_id": issue.id, "summary": summary, "next_steps": next_steps}
+
+@router.post("/query", response_model=QueryResponse)
+async def ai_query_to_filters(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: QueryRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Convert natural language into structured issue filters.
+    """
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text is required")
+
+    projects = await crud_project.get_multi(db, limit=200)
+    users = await crud_user.get_multi(db, limit=200)
+
+    projects_text = "\n".join([f"- {p.id}: {p.name}" for p in projects])
+    users_text = "\n".join([f"- {u.id}: {u.full_name} ({u.email})" for u in users])
+
+    prompt = f"""
+    Convert the user query into JSON filters for issues.
+    Output JSON only. Allowed fields:
+    - project_id (uuid) from list or null
+    - assignee_id (uuid) from list or null
+    - status: one of TODO, IN_PROGRESS, DONE, CANCELED or null
+    - priority: one of LOW, MEDIUM, HIGH, URGENT or null
+    - overdue: true/false or null
+    - unscheduled: true/false or null
+
+    Projects:
+    {projects_text}
+
+    Users:
+    {users_text}
+
+    Query: "{request.text}"
+    """
+
+    response = await ai.generate_completion(prompt, system_prompt="You output strict JSON only.")
+    if not response:
+        raise HTTPException(status_code=500, detail="Failed to interpret query")
+
+    import json
+    try:
+        clean_json = response.replace("```json", "").replace("```", "").strip()
+        data = json.loads(clean_json)
+    except Exception as e:
+        print(f"Query parse error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse query")
+
+    def _normalize_enum(value: Optional[str], enum_cls):
+        if not value:
+            return None
+        value = value.upper()
+        return enum_cls[value] if value in enum_cls.__members__ else None
+
+    project_id = data.get("project_id") or request.project_id
+    assignee_id = data.get("assignee_id") or request.assignee_id
+    status = _normalize_enum(data.get("status"), IssueStatus)
+    priority = _normalize_enum(data.get("priority"), IssuePriority)
+    overdue = data.get("overdue")
+    unscheduled = data.get("unscheduled")
+
+    if getattr(current_user, "role", None) == "client":
+        assignee_id = None
+
+    return {
+        "project_id": project_id,
+        "assignee_id": assignee_id,
+        "status": status,
+        "priority": priority,
+        "overdue": overdue if isinstance(overdue, bool) else None,
+        "unscheduled": unscheduled if isinstance(unscheduled, bool) else None,
+    }
+
+@router.post("/client-update", response_model=ClientUpdateResponse)
+async def client_update_draft(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: ClientUpdateRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Draft a client-friendly weekly update for a project.
+    """
+    project_id = request.project_id
+    issues = await crud_issue.get_multi(db, limit=1000, project_id=project_id)
+
+    if getattr(current_user, "role", None) == "client":
+        issues = [i for i in issues if i.owner_id == current_user.id]
+
+    issues_text = "\n".join([
+        f"- {i.title} | status={i.status} | priority={i.priority} | due={i.due_date}"
+        for i in issues
+    ])
+
+    prompt = f"""
+    Draft a concise weekly client update based on the issues below.
+    Keep it under 8 bullet points. Use plain language.
+    Include sections: Summary, Completed, In Progress, Risks/Blockers.
+    Output plain text.
+
+    Issues:
+    {issues_text}
+    """
+
+    response = await ai.generate_completion(prompt, system_prompt="You write crisp client updates.")
+    if not response:
+        raise HTTPException(status_code=500, detail="Failed to generate update")
+
+    return {"project_id": project_id, "update_text": response.strip()}
+
+@router.post("/dependencies", response_model=List[Issue])
+async def detect_dependencies(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: DependencyRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Detect likely dependency issues for a given issue.
+    """
+    issue = await crud_issue.get(db, id=request.issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    if getattr(current_user, "role", None) == "client" and issue.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    candidates = await crud_issue.get_multi(
+        db,
+        limit=request.limit,
+        project_id=request.project_id or issue.project_id,
+    )
+    candidates = [c for c in candidates if c.id != issue.id]
+
+    candidate_text = "\n".join([f"- {c.id}: {c.title}" for c in candidates])
+    prompt = f"""
+    Identify which of these issues the target issue depends on.
+    Return STRICT JSON only: {{ "depends_on": ["uuid", ...] }}
+
+    Target Issue:
+    {issue.title}
+    {issue.description or ""}
+
+    Candidate Issues:
+    {candidate_text}
+    """
+
+    response = await ai.generate_completion(prompt, system_prompt="You output strict JSON only.")
+    if not response:
+        raise HTTPException(status_code=500, detail="Failed to detect dependencies")
+
+    import json
+    try:
+        clean_json = response.replace("```json", "").replace("```", "").strip()
+        data = json.loads(clean_json)
+        depends_on = data.get("depends_on", [])
+        if not isinstance(depends_on, list):
+            depends_on = []
+    except Exception as e:
+        print(f"Dependency parse error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse dependencies")
+
+    allowed_ids = {str(c.id) for c in candidates}
+    filtered_ids = [UUID(dep_id) for dep_id in depends_on if str(dep_id) in allowed_ids]
+    await crud_issue_link.set_dependencies(db, issue.id, filtered_ids)
+
+    deps_issues = await crud_issue_link.get_dependencies(db, issue.id)
+    return deps_issues
 
 @router.post("/triage", response_model=TriageResponse)
 async def auto_triage(

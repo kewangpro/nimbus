@@ -16,6 +16,9 @@ import { IssueDetailModal } from "@/components/issue-detail-modal"
 import { isOverdue } from "@/lib/utils"
 import { AlertCircle, ChevronUp, ChevronDown, HelpCircle, UserMinus } from "lucide-react"
 import { useTimezone } from "@/components/timezone-provider"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 interface IssueListProps {
   refreshTrigger?: number
@@ -41,15 +44,20 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
   const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const { timezone, formatInTimezone } = useTimezone()
+  const [filterText, setFilterText] = useState("")
+  const [filterLoading, setFilterLoading] = useState(false)
+  const [filterParams, setFilterParams] = useState<any | null>(null)
 
   // Sorting state
   const [sortKey, setSortKey] = useState<keyof Issue | "overdue">("overdue")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
-  const fetchIssues = async () => {
+  const fetchIssues = async (extraParams?: any) => {
     try {
       const params: any = {}
       if (projectId) params.project_id = projectId
+      if (filterParams) Object.assign(params, filterParams)
+      if (extraParams) Object.assign(params, extraParams)
       const res = await api.get("/issues/", { params })
       setIssues(res.data)
     } catch (err) {
@@ -61,7 +69,30 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
 
   useEffect(() => {
     fetchIssues()
-  }, [refreshTrigger, projectId])
+  }, [refreshTrigger, projectId, filterParams])
+
+  const handleAiFilter = async () => {
+    if (!filterText.trim()) {
+      toast.error("Enter a filter query")
+      return
+    }
+    setFilterLoading(true)
+    try {
+      const res = await api.post("/ai/query", { text: filterText, project_id: projectId })
+      setFilterParams(res.data)
+      toast.success("Filter applied")
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to apply AI filter")
+    } finally {
+      setFilterLoading(false)
+    }
+  }
+
+  const handleClearFilter = () => {
+    setFilterParams(null)
+    setFilterText("")
+  }
 
   const handleSort = (key: keyof Issue | "overdue") => {
     if (sortKey === key) {
@@ -131,6 +162,21 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex gap-2">
+        <Input
+          placeholder="AI filter (e.g. overdue high priority for Alice)"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <Button type="button" variant="outline" onClick={handleAiFilter} disabled={filterLoading}>
+          {filterLoading ? "Filtering..." : "AI Filter"}
+        </Button>
+        {filterParams && (
+          <Button type="button" variant="ghost" onClick={handleClearFilter}>
+            Clear
+          </Button>
+        )}
+      </div>
       <div className="border rounded-md">
         <Table>
           <TableHeader>

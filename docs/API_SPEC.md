@@ -15,7 +15,7 @@
 
 ## 2. Issues (Core)
 *   `GET /issues`
-    *   **Query Params:** `project_id`, `assignee_id`
+    *   **Query Params:** `project_id`, `assignee_id`, `status`, `priority`, `overdue`, `unscheduled`
     *   **Response:** `List[IssueSchema]`
 *   `POST /issues`
     *   **Body:** `{ "title": "...", "description": "...", "priority": "...", "due_date": "...", "labels": ["bug","backend"] }`
@@ -23,6 +23,8 @@
     *   **Body:** `{ "status": "DONE", "labels": ["bug","backend"], ... }` (Partial update)
     *   **Note:** Triggers WebSocket event `ISSUE_UPDATED`.
 *   `DELETE /issues/{id}`
+*   `GET /issues/{id}/dependencies`
+    *   **Response:** List of Issues that this issue depends on.
 *   `POST /issues/backfill`
     *   **Description:** Enqueues a background job to generate vector embeddings for all issues.
     *   **Response:** `{ "message": "Backfill job queued", "job_id": "uuid" }`
@@ -45,6 +47,15 @@
 *   `POST /ai/summary`
     *   **Body:** `{ "issue_id": "uuid", "force": false }`
     *   **Response:** `{ "issue_id": "uuid", "summary": "...", "next_steps": ["..."] }`
+*   `POST /ai/query`
+    *   **Body:** `{ "text": "...", "project_id": "uuid?", "assignee_id": "uuid?" }`
+    *   **Response:** `{ "project_id": "uuid?", "assignee_id": "uuid?", "status": "TODO?", "priority": "HIGH?", "overdue": true?, "unscheduled": false? }`
+*   `POST /ai/client-update`
+    *   **Body:** `{ "project_id": "uuid?" }`
+    *   **Response:** `{ "project_id": "uuid?", "update_text": "..." }`
+*   `POST /ai/dependencies`
+    *   **Body:** `{ "issue_id": "uuid", "project_id": "uuid?", "limit": 30 }`
+    *   **Response:** List of Issues (dependencies)
 *   `POST /ai/plan`
     *   **Body:** `{ "text": "Raw natural language plan..." }`
     *   **Response:** `List[PlannedIssue]` (suggested tasks).
