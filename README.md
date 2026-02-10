@@ -11,7 +11,9 @@ Nimbus is a modern, high-performance project management tool designed to replace
         *   **Project Selection:** Pick an existing project or create a new one before creating issues.
     *   **📅 AI Schedule:** Distributes open tasks that are unscheduled or past due across the work week (Monday-Friday), skipping weekends and resolving overdue backlogs.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
+    *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using `gemma3`.
+    *   **📝 AI Summary:** Generates a concise issue summary with next steps.
     *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-embed-text`.
 *   **Interactive Views:**
     *   **Dynamic Sprint Plan (My Calendar):** A user-centric timeline showing all tasks assigned to you across **all projects**. Features horizontal scrolling, auto-adjusting range, and toggles for "Show Weekends" and "Show Completed".
@@ -100,6 +102,8 @@ To test AI features:
 2.  **Schedule:** Go to "Calendar" tab and click "AI Schedule" to organize your week.
 3.  **Search:** Click "Smart Search..." and find issues by meaning.
 4.  **Triage Labels (API):** `POST /api/v1/ai/triage` with `issue_id` to persist labels.
+5.  **Similar Issues:** In Create Issue, use "Find Similar".
+6.  **Summary:** In Issue Detail, click "Generate Summary".
 
 ## 📚 Documentation
 

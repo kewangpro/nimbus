@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { api } from "@/lib/api"
-import { IssueStatus, IssuePriority } from "@/types"
+import { IssueStatus, IssuePriority, Issue } from "@/types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -56,6 +56,8 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [triageLoading, setTriageLoading] = useState(false)
+  const [similarLoading, setSimilarLoading] = useState(false)
+  const [similarIssues, setSimilarIssues] = useState<Issue[]>([])
   const { timezone } = useTimezone()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -90,6 +92,32 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
     }
   }
 
+  async function handleFindSimilar() {
+    const { title, description } = form.getValues()
+    if (!title) {
+      toast.error("Please enter a title first")
+      return
+    }
+    setSimilarLoading(true)
+    try {
+      const res = await api.post("/ai/similar", {
+        title,
+        description: description || "",
+        project_id: projectId,
+        limit: 5,
+      })
+      setSimilarIssues(res.data || [])
+      if (!res.data?.length) {
+        toast("No similar issues found")
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to find similar issues")
+    } finally {
+      setSimilarLoading(false)
+    }
+  }
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true)
     try {
@@ -109,6 +137,7 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
       await api.post("/issues/", payload)
       setOpen(false)
       form.reset()
+      setSimilarIssues([])
       onIssueCreated()
       toast.success("Issue created")
     } catch (err) {
@@ -225,7 +254,7 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
               )}
             />
 
-            <div className="flex justify-end">
+            <div className="flex gap-2 justify-end">
               <Button
                 type="button"
                 variant="outline"
@@ -237,7 +266,32 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
                 <Wand2 className="mr-2 h-3 w-3" />
                 {triageLoading ? "Analyzing..." : "AI Auto-Triage"}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleFindSimilar}
+                disabled={similarLoading}
+              >
+                {similarLoading ? "Searching..." : "Find Similar"}
+              </Button>
             </div>
+
+            {similarIssues.length > 0 && (
+              <div className="border rounded-md p-3 bg-muted/20">
+                <div className="text-sm font-medium mb-2">Possible duplicates</div>
+                <div className="space-y-2">
+                  {similarIssues.map((issue) => (
+                    <div key={issue.id} className="text-sm">
+                      <div className="font-medium">{issue.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {issue.status} • {issue.priority} • {issue.id.slice(0, 8)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <DialogFooter>
               <Button type="submit" disabled={loading} className="w-full">

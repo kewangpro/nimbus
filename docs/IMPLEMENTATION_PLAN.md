@@ -171,4 +171,11 @@
 *   [x] **Layout:** Refined Calendar/Board spacing to be consistent and responsive.
 
 
+---
+
+## Phase 8: AI Enhancements (In Progress)
+
+*   [x] **Similar Issues:** Endpoint and UI to detect likely duplicates during create.
+*   [x] **Issue Summaries:** Per-issue AI summary with next steps.
+*   [ ] **Summary Caching:** Add background refresh strategy and invalidation metrics.
 

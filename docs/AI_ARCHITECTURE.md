@@ -24,6 +24,17 @@ CREATE TABLE issue_embeddings (
 );
 ```
 
+Issue summaries are cached to avoid regenerating unchanged content.
+```sql
+CREATE TABLE issue_summaries (
+    issue_id UUID PRIMARY KEY REFERENCES issues(id) ON DELETE CASCADE,
+    summary TEXT NOT NULL,
+    next_steps TEXT NOT NULL, -- newline-delimited list
+    content_hash VARCHAR(64) NOT NULL,
+    last_updated TIMESTAMP DEFAULT NOW()
+);
+```
+
 ## 4. AI Feature Implementation
 
 ### 4.1 Auto-Triage (Single Issue)
@@ -43,6 +54,14 @@ CREATE TABLE issue_embeddings (
 
 ### 4.4 Semantic Search (Vector)
 *   **SQL:** Uses `pgvector` cosine distance (`<=>`) to rank results based on user query embeddings.
+
+### 4.5 Similar Issues (Duplicate Detection)
+*   **Logic:** Embeds a draft title/description and returns nearest issues.
+*   **Use Case:** Show likely duplicates during issue creation.
+
+### 4.6 Issue Summaries
+*   **Logic:** Generates a concise summary + next steps for a single issue.
+*   **Storage:** Stored per issue with content hash to avoid redundant regeneration.
 
 ## 5. Controls & Performance
 *   **Async:** All AI calls are made using `ollama.AsyncClient`.

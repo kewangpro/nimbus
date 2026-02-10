@@ -36,9 +36,15 @@
 *   `POST /ai/triage`
     *   **Body:** `{ "title": "...", "description": "...", "issue_id": "uuid?" }`
     *   **Response:** `{ "priority": "...", "labels": [...] }`
+*   `POST /ai/similar`
+    *   **Body:** `{ "title": "...", "description": "...", "project_id": "uuid?", "exclude_issue_id": "uuid?", "limit": 5 }`
+    *   **Response:** List of Issues (ranked by semantic similarity).
 *   `POST /ai/search`
     *   **Body:** `{ "query": "...", "limit": 5 }`
     *   **Response:** List of Issues (ranked by semantic similarity).
+*   `POST /ai/summary`
+    *   **Body:** `{ "issue_id": "uuid", "force": false }`
+    *   **Response:** `{ "issue_id": "uuid", "summary": "...", "next_steps": ["..."] }`
 *   `POST /ai/plan`
     *   **Body:** `{ "text": "Raw natural language plan..." }`
     *   **Response:** `List[PlannedIssue]` (suggested tasks).

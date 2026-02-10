@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, date, time, timezone
 
 from app.api import deps
 from app.core import ai
-from app.crud import crud_embedding, crud_issue
+from app.crud import crud_embedding, crud_issue, crud_issue_summary
 from app.schemas.issue import Issue, IssuePriority, IssueStatus
 
 router = APIRouter()
@@ -38,6 +38,22 @@ class PlannedIssue(BaseModel):
 class ScheduleResponse(BaseModel):
     scheduled_count: int
     message: str
+
+class SimilarRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    limit: int = 5
+    project_id: Optional[str] = None
+    exclude_issue_id: Optional[str] = None
+
+class SummaryRequest(BaseModel):
+    issue_id: UUID
+    force: bool = False
+
+class SummaryResponse(BaseModel):
+    issue_id: UUID
+    summary: str
+    next_steps: List[str]
 
 @router.post("/schedule", response_model=ScheduleResponse)
 async def auto_schedule(
@@ -292,6 +308,111 @@ async def semantic_search(
             break
 
     return issues
+
+@router.post("/similar", response_model=List[Issue])
+async def find_similar_issues(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: SimilarRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Find issues similar to the provided title/description.
+    """
+    base_text = f"{request.title} {request.description or ''}".strip()
+    if not base_text:
+        raise HTTPException(status_code=400, detail="Title or description required")
+
+    embedding = await ai.generate_embedding(base_text)
+    if not embedding:
+        raise HTTPException(status_code=500, detail="Failed to generate embedding")
+
+    fetch_limit = max(10, request.limit * 5)
+    similar_embeddings = await crud_embedding.search_similar(
+        db, embedding=embedding, limit=fetch_limit
+    )
+
+    issues: list[Issue] = []
+    for emb in similar_embeddings:
+        issue = await crud_issue.get(db, id=emb.issue_id)
+        if not issue:
+            continue
+        if request.exclude_issue_id and str(issue.id) == request.exclude_issue_id:
+            continue
+        if request.project_id and str(issue.project_id) != request.project_id:
+            continue
+        if getattr(current_user, "role", None) == "client" and issue.owner_id != current_user.id:
+            continue
+        issues.append(issue)
+        if len(issues) >= request.limit:
+            break
+
+    return issues
+
+@router.post("/summary", response_model=SummaryResponse)
+async def summarize_issue(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: SummaryRequest,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Generate or return an AI summary for an issue.
+    """
+    issue = await crud_issue.get(db, id=request.issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    if getattr(current_user, "role", None) == "client" and issue.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    full_text = f"{issue.title} {issue.description or ''}"
+    content_hash = crud_issue.get_content_hash(full_text)
+
+    existing = await crud_issue_summary.get_by_issue_id(db, issue.id)
+    if existing and existing.content_hash == content_hash and not request.force:
+        return {
+            "issue_id": issue.id,
+            "summary": existing.summary,
+            "next_steps": [s for s in existing.next_steps.split("\n") if s.strip()],
+        }
+
+    prompt = f"""
+    Summarize this issue for a teammate. Provide a short summary and 3-5 concrete next steps.
+    Return STRICT JSON only:
+    {{ "summary": "...", "next_steps": ["...", "..."] }}
+
+    Title: {issue.title}
+    Description: {issue.description or ""}
+    """
+
+    response = await ai.generate_completion(prompt, system_prompt="You are a concise project assistant. JSON only.")
+    if not response:
+        raise HTTPException(status_code=500, detail="Failed to generate summary")
+
+    import json
+    try:
+        clean_json = response.replace("```json", "").replace("```", "").strip()
+        data = json.loads(clean_json)
+        summary = data.get("summary", "").strip()
+        next_steps = data.get("next_steps", [])
+        if not isinstance(next_steps, list):
+            next_steps = []
+        next_steps = [str(step).strip() for step in next_steps if str(step).strip()]
+        if not summary:
+            raise ValueError("Empty summary")
+    except Exception as e:
+        print(f"Summary parse error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse summary")
+
+    await crud_issue_summary.upsert(
+        db,
+        issue_id=issue.id,
+        summary=summary,
+        next_steps="\n".join(next_steps),
+        content_hash=content_hash,
+    )
+
+    return {"issue_id": issue.id, "summary": summary, "next_steps": next_steps}
 
 @router.post("/triage", response_model=TriageResponse)
 async def auto_triage(

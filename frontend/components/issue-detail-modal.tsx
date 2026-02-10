@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { format, parseISO } from "date-fns"
 import { api } from "@/lib/api"
-import { Issue, IssueStatus, IssuePriority, User } from "@/types"
+import { Issue, IssueStatus, IssuePriority, User, IssueSummary } from "@/types"
 import { isOverdue } from "@/lib/utils"
 import { useProject } from "@/components/project-provider"
 import { useTimezone } from "@/components/timezone-provider"
@@ -53,6 +53,8 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
     const [assigneeId, setAssigneeId] = useState<string>("")
 
     const [users, setUsers] = useState<User[]>([])
+    const [aiSummary, setAiSummary] = useState<IssueSummary | null>(null)
+    const [summaryLoading, setSummaryLoading] = useState(false)
 
     // Fetch users on open
     useEffect(() => {
@@ -75,6 +77,7 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
         setDueDate(issue.due_date ? formatInTimezone(issue.due_date, "yyyy-MM-dd") : "")
         setAssigneeId(issue.assignee_id || "")
         setCurrentIssueId(issue.id)
+        setAiSummary(null)
     }
 
     const handleSave = async () => {
@@ -152,6 +155,20 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
         }
     }
 
+    const handleGenerateSummary = async () => {
+        if (!issue) return
+        setSummaryLoading(true)
+        try {
+            const res = await api.post("/ai/summary", { issue_id: issue.id })
+            setAiSummary(res.data)
+        } catch (err) {
+            console.error(err)
+            toast.error("Failed to generate summary")
+        } finally {
+            setSummaryLoading(false)
+        }
+    }
+
     if (!issue) return null
 
     const overdue = isOverdue(issue, timezone)
@@ -161,7 +178,7 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] h-[85vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <div className="flex items-center justify-between pr-8">
                         <DialogTitle className="text-xl flex items-center gap-2">
@@ -204,7 +221,7 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                     </div>
                 )}
 
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-4 py-4 overflow-y-auto pr-2 flex-1">
                     <div className="grid grid-cols-2 gap-4">
                         {/* Project Selector */}
                         <div className="space-y-2">
@@ -309,6 +326,42 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                                 {description || <span className="text-muted-foreground italic">No description provided. Click to add one.</span>}
                             </div>
                         )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label>AI Summary</Label>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleGenerateSummary}
+                                disabled={summaryLoading}
+                            >
+                                {summaryLoading ? "Summarizing..." : "Generate Summary"}
+                            </Button>
+                        </div>
+                        <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[140px] max-h-[200px] overflow-y-auto">
+                            {aiSummary ? (
+                                <>
+                                    <div>{aiSummary.summary}</div>
+                                    {aiSummary.next_steps?.length > 0 && (
+                                        <div>
+                                            <div className="text-xs font-medium text-muted-foreground mb-1">Next steps</div>
+                                            <div className="space-y-1">
+                                                {aiSummary.next_steps.map((step, idx) => (
+                                                    <div key={idx} className="text-sm">- {step}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-xs text-muted-foreground">
+                                    Generate a concise summary and next steps for this issue.
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 

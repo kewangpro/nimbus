@@ -25,6 +25,12 @@ export interface Label {
   name: string;
 }
 
+export interface IssueSummary {
+  issue_id: string;
+  summary: string;
+  next_steps: string[];
+}
+
 export interface Issue {
   id: string;
   title: string;
