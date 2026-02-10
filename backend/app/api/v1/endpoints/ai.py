@@ -1,4 +1,5 @@
 from typing import Any, List, Optional
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -18,6 +19,7 @@ class SearchRequest(BaseModel):
 class TriageRequest(BaseModel):
     title: str
     description: str
+    issue_id: Optional[UUID] = None
 
 class TriageResponse(BaseModel):
     priority: IssuePriority
@@ -273,21 +275,28 @@ async def semantic_search(
     if not embedding:
         raise HTTPException(status_code=500, detail="Failed to generate embedding")
     
+    fetch_limit = max(10, request.limit * 5)
     similar_embeddings = await crud_embedding.search_similar(
-        db, embedding=embedding, limit=request.limit
+        db, embedding=embedding, limit=fetch_limit
     )
-    
+
     issues = []
     for emb in similar_embeddings:
         issue = await crud_issue.get(db, id=emb.issue_id)
-        if issue:
-            issues.append(issue)
-            
+        if not issue:
+            continue
+        if getattr(current_user, "role", None) == "client" and issue.owner_id != current_user.id:
+            continue
+        issues.append(issue)
+        if len(issues) >= request.limit:
+            break
+
     return issues
 
 @router.post("/triage", response_model=TriageResponse)
 async def auto_triage(
     *,
+    db: AsyncSession = Depends(deps.get_db),
     request: TriageRequest,
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
@@ -322,9 +331,15 @@ async def auto_triage(
         if priority not in IssuePriority.__members__:
             priority = "MEDIUM"
             
+        labels = data.get("labels", [])
+
+        if request.issue_id and labels:
+            from app.crud import crud_label
+            await crud_label.set_issue_labels(db, request.issue_id, labels)
+
         return {
             "priority": IssuePriority[priority],
-            "labels": data.get("labels", [])
+            "labels": labels
         }
     except Exception as e:
         print(f"Triage parse error: {e}")

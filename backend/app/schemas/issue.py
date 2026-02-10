@@ -5,6 +5,7 @@ from datetime import datetime
 from app.models.issue import IssueStatus, IssuePriority
 from app.schemas.project import Project
 from app.schemas.user import User
+from app.schemas.label import Label
 
 class IssueBase(BaseModel):
     title: str
@@ -16,12 +17,14 @@ class IssueBase(BaseModel):
 
 class IssueCreate(IssueBase):
     project_id: Optional[UUID] = None # Optional for API, default handled by backend if missing
+    labels: Optional[list[str]] = None
 
 class IssueUpdate(IssueBase):
     title: Optional[str] = None
     status: Optional[IssueStatus] = None
     priority: Optional[IssuePriority] = None
     project_id: Optional[UUID] = None
+    labels: Optional[list[str]] = None
 
 class IssueInDBBase(IssueBase):
     id: UUID
@@ -36,3 +39,4 @@ class IssueInDBBase(IssueBase):
 class Issue(IssueInDBBase):
     project: Optional[Project] = None
     assignee: Optional[User] = None
+    labels: Optional[list[Label]] = None

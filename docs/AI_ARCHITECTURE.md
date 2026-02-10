@@ -1,7 +1,7 @@
 # AI Architecture Strategy: Nimbus (Local AI)
 
 ## 1. Overview
-The AI layer in Nimbus is designed to be **additive**, meaning the core system functions perfectly without it. Intelligence is applied asynchronously to enhance data using **local LLMs** via Ollama, ensuring privacy and zero cost.
+The AI layer in Nimbus is designed to be **additive**, meaning the core system functions perfectly without it. Intelligence is applied asynchronously to enhance data using **local LLMs** via Ollama, ensuring privacy and zero cost. Long-running AI tasks are processed by a lightweight Redis-backed worker.
 
 ## 2. Models & Providers (Ollama)
 *   **Provider:** Ollama (Local API at `http://localhost:11434`)
@@ -48,3 +48,4 @@ CREATE TABLE issue_embeddings (
 *   **Async:** All AI calls are made using `ollama.AsyncClient`.
 *   **Debounce:** Local state updates are immediate; vector updates happen on save.
 *   **Fallbacks:** If Ollama is offline, AI endpoints return errors and should be treated as unavailable (no keyword-only fallback yet).
+*   **Background Jobs:** Embedding backfills run via the worker to avoid blocking the API.

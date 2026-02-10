@@ -18,13 +18,14 @@
     *   **Query Params:** `project_id`, `assignee_id`
     *   **Response:** `List[IssueSchema]`
 *   `POST /issues`
-    *   **Body:** `{ "title": "...", "description": "...", "priority": "...", "due_date": "..." }`
+    *   **Body:** `{ "title": "...", "description": "...", "priority": "...", "due_date": "...", "labels": ["bug","backend"] }`
 *   `PATCH /issues/{id}`
-    *   **Body:** `{ "status": "DONE", ... }` (Partial update)
+    *   **Body:** `{ "status": "DONE", "labels": ["bug","backend"], ... }` (Partial update)
     *   **Note:** Triggers WebSocket event `ISSUE_UPDATED`.
 *   `DELETE /issues/{id}`
 *   `POST /issues/backfill`
-    *   **Description:** Manually trigger vector embedding generation for all issues.
+    *   **Description:** Enqueues a background job to generate vector embeddings for all issues.
+    *   **Response:** `{ "message": "Backfill job queued", "job_id": "uuid" }`
 
 ## 3. Projects & Workspaces
 *   `GET /projects`
@@ -33,7 +34,7 @@
 
 ## 4. AI & Intelligence (Phase 3 & 5)
 *   `POST /ai/triage`
-    *   **Body:** `{ "title": "...", "description": "..." }`
+    *   **Body:** `{ "title": "...", "description": "...", "issue_id": "uuid?" }`
     *   **Response:** `{ "priority": "...", "labels": [...] }`
 *   `POST /ai/search`
     *   **Body:** `{ "query": "...", "limit": 5 }`

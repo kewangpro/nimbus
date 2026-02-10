@@ -4,7 +4,7 @@
 Nimbus is composed of three Dockerized services:
 1.  **Frontend:** Next.js (Node.js runtime).
 2.  **Backend:** FastAPI (Python runtime).
-3.  **Worker:** Not implemented (AI runs inline in the API service).
+3.  **Worker:** Background AI jobs (embeddings backfill).
 
 Supporting Infrastructure:
 *   **Database:** PostgreSQL 15+ (Requires `pgvector` extension).
@@ -35,7 +35,8 @@ NEXT_PUBLIC_WS_URL=wss://api.nimbus.app/api/v1/ws
 Best for testing or small internal tools.
 1.  Ensure Docker and Ollama are installed on the host.
 2.  Run `docker compose up --build -d`.
-3.  Frontend available at `localhost:3000`, API at `localhost:8000`.
+3.  Run migrations: `docker compose exec backend alembic upgrade head`.
+4.  Frontend available at `localhost:3000`, API at `localhost:8000`.
 4.  *Note:* The backend connects to Ollama via `host.docker.internal`.
 
 ### Option B: Cloud PaaS (Recommended for Prod)

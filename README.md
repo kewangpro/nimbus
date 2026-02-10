@@ -71,6 +71,17 @@ uvicorn app.main:app --reload
 ```
 API Documentation: `http://localhost:8000/docs`
 
+Start the async worker for AI jobs (embeddings backfill, etc.):
+```bash
+python -m app.worker
+```
+
+If you prefer Docker for backend + worker:
+```bash
+docker compose up -d backend worker
+docker compose exec backend alembic upgrade head
+```
+
 ### 3. Frontend Setup
 ```bash
 cd frontend
@@ -88,6 +99,7 @@ To test AI features:
 1.  **Planner:** Click "AI Plan" in the header and type your project thoughts.
 2.  **Schedule:** Go to "Calendar" tab and click "AI Schedule" to organize your week.
 3.  **Search:** Click "Smart Search..." and find issues by meaning.
+4.  **Triage Labels (API):** `POST /api/v1/ai/triage` with `issue_id` to persist labels.
 
 ## 📚 Documentation
 

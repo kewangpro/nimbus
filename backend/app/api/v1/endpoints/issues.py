@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
-from app.crud import crud_issue, crud_embedding
+from app.crud import crud_issue
 from app.schemas.issue import Issue, IssueCreate, IssueUpdate
 from app.models.user import User
 from app.core.socket import manager
-from app.core import ai
+from app.core import jobs
 import json
 
 router = APIRouter()
@@ -21,18 +21,8 @@ async def backfill_embeddings(
     """
     Backfill embeddings for all issues.
     """
-    issues = await crud_issue.get_multi(db, limit=10000) # Fetch all (limit high)
-    count = 0
-    for issue in issues:
-        full_text = f"{issue.title} {issue.description or ''}"
-        content_hash = crud_issue.get_content_hash(full_text) # Access helper
-        embedding = await ai.generate_embedding(full_text)
-        if embedding:
-            await crud_embedding.create_or_update(
-                db, issue_id=issue.id, embedding=embedding, content_hash=content_hash
-            )
-            count += 1
-    return {"message": f"Backfilled {count} issues"}
+    job_id = await jobs.enqueue_job(jobs.JOB_BACKFILL_EMBEDDINGS, {"requested_by": str(current_user.id)})
+    return {"message": "Backfill job queued", "job_id": job_id}
 
 @router.get("/", response_model=List[Issue])
 async def read_issues(

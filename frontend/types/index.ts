@@ -20,6 +20,11 @@ export interface Project {
   created_at: string;
 }
 
+export interface Label {
+  id: string;
+  name: string;
+}
+
 export interface Issue {
   id: string;
   title: string;
@@ -31,6 +36,7 @@ export interface Issue {
   owner_id: string;
   project_id: string;
   project?: Project;
+  labels?: Label[];
   created_at: string;
   updated_at?: string;
   due_date?: string;

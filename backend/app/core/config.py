@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://nimbus:nimbus@db:5432/nimbus_db"
     
     # Redis
-    REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     # MinIO / S3
     MINIO_ENDPOINT: str = "localhost:9000"

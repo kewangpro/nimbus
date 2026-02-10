@@ -6,6 +6,7 @@ import uuid
 import enum
 
 from app.db.base import Base
+from app.models.label import issue_labels
 
 class IssueStatus(str, enum.Enum):
     TODO = "todo"
@@ -40,3 +41,4 @@ class Issue(Base):
     # Relationships
     assignee = relationship("User", foreign_keys=[assignee_id])
     project = relationship("Project", back_populates="issues")
+    labels = relationship("Label", secondary=issue_labels, back_populates="issues")

@@ -6,15 +6,21 @@ from sqlalchemy.future import select
 from app.models.issue import Issue
 from app.schemas.issue import IssueCreate, IssueUpdate
 from app.core import ai
-from app.crud import crud_embedding, crud_project
+from app.crud import crud_embedding, crud_project, crud_label
 
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 def get_content_hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 async def get(db: AsyncSession, id: UUID) -> Optional[Issue]:
-    result = await db.execute(select(Issue).options(joinedload(Issue.project)).where(Issue.id == id))
+    result = await db.execute(
+        select(Issue).options(
+            joinedload(Issue.project),
+            joinedload(Issue.assignee),
+            selectinload(Issue.labels),
+        ).where(Issue.id == id)
+    )
     return result.scalars().first()
 
 async def get_multi(
@@ -22,7 +28,8 @@ async def get_multi(
 ) -> List[Issue]:
     query = select(Issue).options(
         joinedload(Issue.project),
-        joinedload(Issue.assignee)
+        joinedload(Issue.assignee),
+        selectinload(Issue.labels)
     ).offset(skip).limit(limit)
     
     if owner_id:
@@ -61,6 +68,9 @@ async def create(db: AsyncSession, *, obj_in: IssueCreate, owner_id: UUID) -> Is
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
+
+    if obj_in.labels:
+        await crud_label.set_issue_labels(db, db_obj.id, obj_in.labels)
     # Generate Embedding
     full_text = f"{db_obj.title} {db_obj.description or ''}"
     content_hash = get_content_hash(full_text)
@@ -78,6 +88,7 @@ async def update(
     db: AsyncSession, *, db_obj: Issue, obj_in: IssueUpdate
 ) -> Issue:
     update_data = obj_in.model_dump(exclude_unset=True)
+    labels = update_data.pop("labels", None)
     for field, value in update_data.items():
         setattr(db_obj, field, value)
     db.add(db_obj)
@@ -93,6 +104,9 @@ async def update(
             await crud_embedding.create_or_update(
                 db, issue_id=db_obj.id, embedding=embedding, content_hash=content_hash
             )
+
+    if labels is not None:
+        await crud_label.set_issue_labels(db, db_obj.id, labels)
 
     # Return refreshed object with relationships
     return await get(db, db_obj.id)
