@@ -468,6 +468,13 @@ async def ai_query_to_filters(
     - overdue: true/false or null
     - unscheduled: true/false or null
 
+    Examples:
+    - "urgent items" -> {{ "priority": "URGENT" }}
+    - "high priority overdue" -> {{ "priority": "HIGH", "overdue": true }}
+    - "done tasks" -> {{ "status": "DONE" }}
+    - "unscheduled work" -> {{ "unscheduled": true }}
+    - "urgent for Alice" -> {{ "priority": "URGENT", "assignee_id": "<alice_id>" }}
+
     Projects:
     {projects_text}
 
@@ -501,6 +508,10 @@ async def ai_query_to_filters(
     priority = _normalize_enum(data.get("priority"), IssuePriority)
     overdue = data.get("overdue")
     unscheduled = data.get("unscheduled")
+
+    if status in [IssueStatus.DONE, IssueStatus.CANCELED]:
+        overdue = None
+        unscheduled = None
 
     if getattr(current_user, "role", None) == "client":
         assignee_id = None

@@ -357,12 +357,13 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                             <Label>AI Summary</Label>
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="secondary"
                                 size="sm"
                                 onClick={handleGenerateSummary}
                                 disabled={summaryLoading}
+                                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
                             >
-                                {summaryLoading ? "Summarizing..." : "Generate Summary"}
+                                {summaryLoading ? "Summarizing..." : "📝 Generate Summary"}
                             </Button>
                         </div>
                         <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[140px] max-h-[200px] overflow-y-auto">
@@ -393,12 +394,13 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                             <Label>Dependencies</Label>
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="secondary"
                                 size="sm"
                                 onClick={handleDetectDependencies}
                                 disabled={dependencyLoading}
+                                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
                             >
-                                {dependencyLoading ? "Detecting..." : "Detect Dependencies"}
+                                {dependencyLoading ? "Detecting..." : "🔗 Detect Dependencies"}
                             </Button>
                         </div>
                         <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[120px] max-h-[200px] overflow-y-auto">

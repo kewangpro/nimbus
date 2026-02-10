@@ -197,8 +197,8 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
                         onClick={handleAutoSchedule}
                         disabled={scheduling}
                     >
-                        {scheduling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                        AI Schedule
+                        {scheduling && <Loader2 className="h-3 w-3 animate-spin" />}
+                        🗓️ AI Schedule
                     </Button>
                     <Button variant="outline" size="icon" onClick={fetchIssues}>
                         <RefreshCw className="h-4 w-4" />

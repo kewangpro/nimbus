@@ -50,9 +50,8 @@ export function AISearch() {
     <>
         <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-            <Button variant="outline" className="w-full justify-start text-muted-foreground sm:w-64">
-            <Search className="mr-2 h-4 w-4" />
-            Smart Search...
+            <Button variant="secondary" className="w-full justify-start gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 sm:w-64">
+            🔎 AI Search
             </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[600px]">

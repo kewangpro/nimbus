@@ -257,23 +257,24 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
             <div className="flex gap-2 justify-end">
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={handleAutoTriage}
                 disabled={triageLoading}
-                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
               >
                 <Wand2 className="mr-2 h-3 w-3" />
-                {triageLoading ? "Analyzing..." : "AI Auto-Triage"}
+                {triageLoading ? "Analyzing..." : "✨ AI Auto-Triage"}
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={handleFindSimilar}
                 disabled={similarLoading}
+                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
               >
-                {similarLoading ? "Searching..." : "Find Similar"}
+                {similarLoading ? "Searching..." : "🧭 Find Similar"}
               </Button>
             </div>
 

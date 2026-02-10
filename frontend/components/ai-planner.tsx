@@ -137,8 +137,7 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button variant="secondary" className="gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200">
-                    <BrainCircuit className="h-4 w-4" />
-                    AI Plan
+                    🧠 AI Plan
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-hidden flex flex-col">
@@ -213,9 +212,9 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
 
                 <DialogFooter>
                     {step === 'input' ? (
-                        <Button onClick={handleAnalyze} disabled={loading || !input.trim()}>
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
-                            {loading ? "Analyzing..." : "Generate Plan"}
+                        <Button onClick={handleAnalyze} disabled={loading || !input.trim()} className="gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200">
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {loading ? "Analyzing..." : "✨ Generate Plan"}
                         </Button>
                     ) : (
                         <div className="flex gap-2 w-full items-center justify-between">

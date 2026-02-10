@@ -168,8 +168,14 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
         />
-        <Button type="button" variant="outline" onClick={handleAiFilter} disabled={filterLoading}>
-          {filterLoading ? "Filtering..." : "AI Filter"}
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleAiFilter}
+          disabled={filterLoading}
+          className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
+        >
+          {filterLoading ? "Filtering..." : "🔎 AI Filter"}
         </Button>
         {filterParams && (
           <Button type="button" variant="ghost" onClick={handleClearFilter}>
