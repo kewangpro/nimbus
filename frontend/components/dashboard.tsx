@@ -139,7 +139,7 @@ export function Dashboard({ user, logout }: DashboardProps) {
                             <UserSettingsModal user={user} onUpdate={() => window.location.reload()} />
                             <AIPlanner onIssuesCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
                             {viewMode === 'project' && project && (
-                                <AIClientUpdate projectId={project.id} />
+                                <AIClientUpdate key={project.id} projectId={project.id} />
                             )}
                             <AISearch />
                             <CreateIssueDialog onIssueCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />

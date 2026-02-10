@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +21,10 @@ export function AIClientUpdate({ projectId }: AIClientUpdateProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [updateText, setUpdateText] = useState("")
+
+  useEffect(() => {
+    setUpdateText("")
+  }, [projectId])
 
   const handleGenerate = async () => {
     setLoading(true)
@@ -43,11 +47,11 @@ export function AIClientUpdate({ projectId }: AIClientUpdateProps) {
       <DialogTrigger asChild>
         <Button variant="outline">Client Update</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] h-[75vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Client Update Draft</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-3 overflow-y-auto pr-2 flex-1">
           <Button onClick={handleGenerate} disabled={loading}>
             {loading ? "Generating..." : "Generate Update"}
           </Button>
