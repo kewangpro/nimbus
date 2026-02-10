@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { AIButton } from "@/components/ai-button"
 import {
   Dialog,
   DialogContent,
@@ -45,22 +46,21 @@ export function AIClientUpdate({ projectId }: AIClientUpdateProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="secondary" className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200">
+        <AIButton>
           🧾 Client Update
-        </Button>
+        </AIButton>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] h-[75vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Client Update Draft</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 overflow-y-auto pr-2 flex-1">
-          <Button
+          <AIButton
             onClick={handleGenerate}
             disabled={loading}
-            className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
           >
             {loading ? "Generating..." : "🧾 Generate Update"}
-          </Button>
+          </AIButton>
           <Textarea value={updateText} readOnly className="min-h-[240px]" />
         </div>
       </DialogContent>

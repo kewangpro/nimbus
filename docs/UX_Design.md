@@ -8,6 +8,7 @@
 ## 2. Visual Style Guide
 *   **Backgrounds:** `#0F1115` (Dark), `#FFFFFF` (Light)
 *   **AI Accent:** Purple shades (`#A371F7`) to indicate intelligence-powered features.
+*   **AI Buttons:** Consistent purple styling with emoji labels for all AI actions.
 *   **Status Colors:**
     *   **Todo:** Blue (`bg-blue-50`)
     *   **In Progress:** Yellow (`bg-yellow-50`)

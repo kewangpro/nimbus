@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { api } from "@/lib/api"
 import { IssueStatus, IssuePriority } from "@/types"
 import { Button } from "@/components/ui/button"
+import { AIButton } from "@/components/ai-button"
 import {
     Dialog,
     DialogContent,
@@ -136,9 +137,9 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="secondary" className="gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200">
+                <AIButton className="gap-2">
                     🧠 AI Plan
-                </Button>
+                </AIButton>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-hidden flex flex-col">
                 <DialogHeader>
@@ -212,10 +213,10 @@ export function AIPlanner({ onIssuesCreated, projectId, userId }: AIPlannerProps
 
                 <DialogFooter>
                     {step === 'input' ? (
-                        <Button onClick={handleAnalyze} disabled={loading || !input.trim()} className="gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200">
+                        <AIButton onClick={handleAnalyze} disabled={loading || !input.trim()} className="gap-2">
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {loading ? "Analyzing..." : "✨ Generate Plan"}
-                        </Button>
+                        </AIButton>
                     ) : (
                         <div className="flex gap-2 w-full items-center justify-between">
                             <div className="flex items-center gap-2">

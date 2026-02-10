@@ -7,6 +7,7 @@ import { api } from "@/lib/api"
 import { Issue } from "@/types"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { AIButton } from "@/components/ai-button"
 import {
   Dialog,
   DialogContent,
@@ -50,9 +51,9 @@ export function AISearch() {
     <>
         <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-            <Button variant="secondary" className="w-full justify-start gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 sm:w-64">
+            <AIButton className="w-full justify-start gap-2 sm:w-64">
             🔎 AI Search
-            </Button>
+            </AIButton>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
@@ -80,7 +81,15 @@ export function AISearch() {
                             <CardHeader className="p-4 pb-2">
                                 <div className="flex justify-between items-start">
                                     <CardTitle className="text-sm font-medium">{issue.title}</CardTitle>
-                                    <Badge variant="outline">{issue.status}</Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline">{issue.status}</Badge>
+                                        <Badge variant="secondary" className={
+                                            issue.priority === "urgent" ? "text-red-600" :
+                                            issue.priority === "high" ? "text-orange-500" : ""
+                                        }>
+                                            {issue.priority}
+                                        </Badge>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-0">

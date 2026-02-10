@@ -6,6 +6,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { api } from "@/lib/api"
 import { Issue, IssueStatus, IssuePriority } from "@/types"
 import { Button } from "@/components/ui/button"
+import { AIButton } from "@/components/ai-button"
 import { Wand2, Loader2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { IssueDetailModal } from "@/components/issue-detail-modal"
@@ -190,16 +191,15 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Button
-                        variant="secondary"
+                    <AIButton
                         size="sm"
-                        className="gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
+                        className="gap-2"
                         onClick={handleAutoSchedule}
                         disabled={scheduling}
                     >
                         {scheduling && <Loader2 className="h-3 w-3 animate-spin" />}
                         🗓️ AI Schedule
-                    </Button>
+                    </AIButton>
                     <Button variant="outline" size="icon" onClick={fetchIssues}>
                         <RefreshCw className="h-4 w-4" />
                     </Button>

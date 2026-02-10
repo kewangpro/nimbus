@@ -17,6 +17,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { AIButton } from "@/components/ai-button"
 import {
     Select,
     SelectContent,
@@ -355,16 +356,14 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <Label>AI Summary</Label>
-                            <Button
+                            <AIButton
                                 type="button"
-                                variant="secondary"
                                 size="sm"
                                 onClick={handleGenerateSummary}
                                 disabled={summaryLoading}
-                                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
                             >
                                 {summaryLoading ? "Summarizing..." : "📝 Generate Summary"}
-                            </Button>
+                            </AIButton>
                         </div>
                         <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[140px] max-h-[200px] overflow-y-auto">
                             {aiSummary ? (
@@ -392,16 +391,14 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <Label>Dependencies</Label>
-                            <Button
+                            <AIButton
                                 type="button"
-                                variant="secondary"
                                 size="sm"
                                 onClick={handleDetectDependencies}
                                 disabled={dependencyLoading}
-                                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
                             >
                                 {dependencyLoading ? "Detecting..." : "🔗 Detect Dependencies"}
-                            </Button>
+                            </AIButton>
                         </div>
                         <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[120px] max-h-[200px] overflow-y-auto">
                             {dependencies.length > 0 ? (

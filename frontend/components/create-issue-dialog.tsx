@@ -7,6 +7,7 @@ import * as z from "zod"
 import { api } from "@/lib/api"
 import { IssueStatus, IssuePriority, Issue } from "@/types"
 import { Button } from "@/components/ui/button"
+import { AIButton } from "@/components/ai-button"
 import {
   Dialog,
   DialogContent,
@@ -255,27 +256,23 @@ export function CreateIssueDialog({ onIssueCreated, projectId, userId }: CreateI
             />
 
             <div className="flex gap-2 justify-end">
-              <Button
+              <AIButton
                 type="button"
-                variant="secondary"
                 size="sm"
                 onClick={handleAutoTriage}
                 disabled={triageLoading}
-                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
               >
                 <Wand2 className="mr-2 h-3 w-3" />
                 {triageLoading ? "Analyzing..." : "✨ AI Auto-Triage"}
-              </Button>
-              <Button
+              </AIButton>
+              <AIButton
                 type="button"
-                variant="secondary"
                 size="sm"
                 onClick={handleFindSimilar}
                 disabled={similarLoading}
-                className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
               >
                 {similarLoading ? "Searching..." : "🧭 Find Similar"}
-              </Button>
+              </AIButton>
             </div>
 
             {similarIssues.length > 0 && (

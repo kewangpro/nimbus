@@ -18,6 +18,7 @@ import { AlertCircle, ChevronUp, ChevronDown, HelpCircle, UserMinus } from "luci
 import { useTimezone } from "@/components/timezone-provider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { AIButton } from "@/components/ai-button"
 import { toast } from "sonner"
 
 interface IssueListProps {
@@ -168,15 +169,13 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
         />
-        <Button
+        <AIButton
           type="button"
-          variant="secondary"
           onClick={handleAiFilter}
           disabled={filterLoading}
-          className="text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
         >
           {filterLoading ? "Filtering..." : "🔎 AI Filter"}
-        </Button>
+        </AIButton>
         {filterParams && (
           <Button type="button" variant="ghost" onClick={handleClearFilter}>
             Clear

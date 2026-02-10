@@ -17,6 +17,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **🔎 AI Filters:** Convert natural language into structured filters in List view.
     *   **🧾 Client Updates:** Drafts weekly client updates per project.
     *   **🔗 Dependency Detection:** Suggests issue dependencies from project context.
+    *   **Unified AI Buttons:** Consistent AI button styling across the app.
     *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-embed-text`.
 *   **Interactive Views:**
     *   **Dynamic Sprint Plan (My Calendar):** A user-centric timeline showing all tasks assigned to you across **all projects**. Features horizontal scrolling, auto-adjusting range, and toggles for "Show Weekends" and "Show Completed".
