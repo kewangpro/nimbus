@@ -9,6 +9,8 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
     role: str = "member"
     timezone: Optional[str] = "UTC"
+    email_automation_enabled: Optional[bool] = True
+
 
 class UserCreate(UserBase):
     password: str
@@ -27,12 +29,16 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[str] = None
     timezone: Optional[str] = None
+    email_automation_enabled: Optional[bool] = None
+
 
 class UserSelfUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     password: Optional[str] = None
     timezone: Optional[str] = None
+    email_automation_enabled: Optional[bool] = None
+
 
 class UserInDBBase(UserBase):
     id: Optional[UUID] = None

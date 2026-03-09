@@ -11,7 +11,11 @@ import { AISearch } from "@/components/ai-search"
 import { AIPlanner } from "@/components/ai-planner"
 import { AIClientUpdate } from "@/components/ai-client-update"
 import { CalendarView } from "@/components/calendar-view"
+import { EmailInboxModal } from "@/components/email-inbox-modal"
+
 import { User } from "@/types"
+
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { useProject } from "@/components/project-provider"
@@ -141,8 +145,12 @@ export function Dashboard({ user, logout }: DashboardProps) {
                             {viewMode === 'project' && project && (
                                 <AIClientUpdate key={project.id} projectId={project.id} />
                             )}
+                            {viewMode === 'project' && project?.name === 'Email' && (
+                                <EmailInboxModal />
+                            )}
                             <AISearch />
                             <CreateIssueDialog onIssueCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
+
                         </div>
                     </header>
 
@@ -158,6 +166,8 @@ export function Dashboard({ user, logout }: DashboardProps) {
                                             <TabsTrigger value="board">Board</TabsTrigger>
                                             <TabsTrigger value="list">List</TabsTrigger>
                                         </TabsList>
+
+
                                     </div>
                                 </div>
 
@@ -167,6 +177,8 @@ export function Dashboard({ user, logout }: DashboardProps) {
                                 <TabsContent value="list" className="flex-1 overflow-auto mt-0">
                                     <IssueList refreshTrigger={refreshKey} projectId={project.id} />
                                 </TabsContent>
+
+
                             </Tabs>
                         ) : (
                             <div className="flex h-full items-center justify-center text-muted-foreground">

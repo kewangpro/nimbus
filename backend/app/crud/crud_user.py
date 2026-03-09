@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import List, Optional, Union
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi.encoders import jsonable_encoder
@@ -61,3 +63,43 @@ async def authenticate(
     if not verify_password(password, user.hashed_password):
         return None
     return user
+
+async def create_or_update_oauth(
+    db: AsyncSession,
+    *,
+    email: str,
+    full_name: str,
+    provider: str,
+    oauth_id: str,
+    access_token: str,
+    refresh_token: Optional[str] = None,
+    expires_at: Optional[datetime] = None
+) -> User:
+    user = await get_by_email(db, email=email)
+    if user:
+        user.oauth_provider = provider
+        user.oauth_id = oauth_id
+        user.oauth_access_token = access_token
+        if refresh_token:
+            user.oauth_refresh_token = refresh_token
+        if expires_at:
+            user.oauth_token_expires_at = expires_at
+        if not user.full_name:
+            user.full_name = full_name
+    else:
+        user = User(
+            email=email,
+            full_name=full_name,
+            oauth_provider=provider,
+            oauth_id=oauth_id,
+            oauth_access_token=access_token,
+            oauth_refresh_token=refresh_token,
+            oauth_token_expires_at=expires_at,
+            is_active=True,
+        )
+        db.add(user)
+    
+    await db.commit()
+    await db.refresh(user)
+    return user
+

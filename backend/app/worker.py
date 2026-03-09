@@ -4,8 +4,10 @@ import json
 from redis.asyncio import Redis
 
 from app.core.config import settings
-from app.core.jobs import QUEUE_NAME, JOB_BACKFILL_EMBEDDINGS
+from app.core.jobs import QUEUE_NAME, JOB_BACKFILL_EMBEDDINGS, JOB_POLL_EMAILS
 from app.core import ai
+from app.core.email_polling import poll_emails
+
 from app.crud import crud_embedding, crud_issue
 from app.db.session import AsyncSessionLocal
 
@@ -46,6 +48,13 @@ async def _process_job(raw: str) -> None:
         total = await _backfill_embeddings()
         print(f"Backfill completed. Updated {total} issues.")
         return
+
+    if job_type == JOB_POLL_EMAILS:
+        async with AsyncSessionLocal() as db:
+            await poll_emails(db)
+        print("Email polling completed.")
+        return
+
 
     print(f"Unknown job type: {job_type}")
 

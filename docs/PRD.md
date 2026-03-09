@@ -1,54 +1,76 @@
-# Product Requirements Document (PRD): "Nimbus" - Next-Gen Project Management System
+# Product Requirements Document (PRD): Nimbus — AI-Native Project Management
 
 ## 1. Introduction
+
 ### 1.1 Purpose
-The purpose of this document is to define the requirements for **Nimbus**, a comprehensive project management platform designed to replace legacy tools like Jira and streamline workflows like Linear. Nimbus is a production-grade system supporting full lifecycle software development, with a strong emphasis on collaboration and local AI-driven efficiency.
+**Nimbus** is a production-grade project management platform designed to replace legacy tools like Jira/Linear. It combines a real-time Kanban board, semantic AI features, and deep email integration into a single, cohesive product.
 
 ### 1.2 Vision
-To build an **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plugin, Nimbus uses AI as the underlying engine to understand project context, automate planning, and interface with users via natural language.
+An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plugin, Nimbus uses AI as the underlying engine — automating planning, triaging issues, and converting emails into tasks automatically.
 
 ### 1.3 Market Comparison
-| Feature | Jira | Linear | Nimbus |
+| Feature | Jira | Linear | **Nimbus** |
 | :--- | :--- | :--- | :--- |
-| **Primary Focus** | Enterprise configuration | Developer velocity | **Local AI Automation & Context** |
-| **Data Entry** | Manual Forms | Fast Forms | **Natural Language / AI Planning** |
-| **Search** | Keyword / JQL | Fast Keyword | **Semantic / Vector Search** |
-| **AI Integration** | Bolt-on | Minimal | **Core Architecture (Local Ollama)** |
+| **Primary Focus** | Enterprise config | Developer velocity | **Local AI + Email Automation** |
+| **Data Entry** | Manual forms | Fast forms | **Natural Language + Email** |
+| **Search** | Keyword / JQL | Fast keyword | **Semantic / Vector search** |
+| **AI Integration** | Bolt-on | Minimal | **Core architecture (Local Ollama)** |
+| **Email Integration** | None | None | **SSO-linked IMAP inbox** |
+
+---
 
 ## 2. Core Features & Functional Requirements
 
-### 3.1 Project Management
-*   **Projects:** Container for issues.
-*   **Default Project:** System initializes with a "General" project.
-*   **Association:** Every issue belongs to exactly one project.
-*   **Context:** Users can switch between projects to filter their view.
+### 2.1 Project Management
+*   **Projects:** Container for issues. Every issue belongs to exactly one project.
+*   **Auto-Created Projects:** On first login, Nimbus automatically creates two projects:
+    *   **General** — Default workspace for all issues.
+    *   **Email** — Connected to the user's SSO inbox for email-to-task automation.
+*   **Context Switching:** Users switch between projects to filter Board/List views.
 
-### 3.2 Story Tracking & Issue Management
-*   **Views:**
-    *   **Kanban Board:** Visual status columns with real-time drag-and-drop.
-    *   **5-Day Sprint View:** Focused productivity timeline for the week with drag-and-drop rescheduling.
-    *   **List View:** Fast review for bulk updates.
-*   **Management:** Comprehensive Issue Detail modal for editing and deletion.
+### 2.2 Issue Tracking
+*   **Kanban Board:** Drag-and-drop with real-time WebSocket updates.
+*   **List View:** Sortable, filterable, high-density table.
+*   **My Calendar:** User-centric 5-day sprint timeline showing all assigned tasks across all projects.
+*   **Visual Indicators:** Overdue (red), unassigned (blue), unscheduled (amber).
 
-### 3.3 User Roles & Client Access (RBAC)
+### 2.3 SSO & Email Integration
+*   **Single Sign-On:** Login via Google or Outlook (OAuth2 PKCE).
+*   **Email Inbox:** View the last 3 days of inbox emails from within Nimbus ("View Inbox" in the Email project).
+*   **Manual Task Creation:** Convert any email to a task with one click. Task is automatically assigned to the logged-in user.
+*   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for new unseen emails every minute.
+
+### 2.4 AI-Native Core (Local Ollama)
+*   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
+*   **AI Scheduler:** Distributes open/overdue tasks across the next 5 business days (Mon-Fri only).
+*   **Smart Search:** Semantic search using `pgvector` cosine distance.
+*   **Auto-Triage:** Suggests issue priority using `gemma3`.
+*   **Similar Issues:** Detects likely duplicates during issue creation.
+*   **Issue Summaries:** Generates per-issue AI summaries with next steps.
+*   **AI Filters:** Natural language to structured issue filters.
+*   **Client Updates:** Drafts weekly client-facing status updates per project.
+*   **Dependency Detection:** Identifies and persists issue dependencies.
+
+### 2.5 User Roles & Access
 *   **Roles:** Admin, Member, Client.
-*   **Client Portal:** A restricted, simplified view where clients only see issues relevant to them.
+*   **Client Portal:** Restricted view showing only relevant client issues.
 
-### 3.3 AI-Native Core (Local Ollama)
-*   **AI Project Planner:** Extracts actionable tasks from unstructured text input.
-*   **AI Scheduler:** Auto-assigns due dates to balance workload. strictly adhering to business days (Mon-Fri) and skipping weekends.
-*   **Smart Search:** Semantic search using vector embeddings with auto-recovery for missing indices.
-*   **Auto-Triage:** Automatic priority suggestions.
+### 2.6 File Storage
+*   **Attachments:** MinIO (S3-compatible) for secure file uploads.
 
-### 3.4 File Storage
-*   **Attachments:** Full support for file uploads via MinIO.
+---
 
-## 4. Technical Architecture
-*   **Frontend:** Next.js 16, Tailwind, Shadcn/UI, React Query.
-*   **Backend:** FastAPI (Python), SQLAlchemy (Async).
-*   **Database:** PostgreSQL with `pgvector` & Redis.
+## 3. Technical Architecture
+*   **Frontend:** Next.js 15 (Stable), Tailwind CSS, Shadcn/UI, React Query.
+*   **Backend:** FastAPI (Python), SQLAlchemy (Async), Alembic.
+*   **Database:** PostgreSQL 16 with `pgvector`.
+*   **Infrastructure:** Docker Compose, Redis, MinIO.
 *   **AI Engine:** Local Ollama (`gemma3`, `nomic-embed-text`).
+*   **Email:** IMAP/XOAUTH2 via `aioimaplib` using SSO tokens.
 
-## 5. Non-Functional Requirements
-*   **Performance:** Dashboard load under 1.5s; Real-time sync <200ms.
-*   **Privacy:** All AI processing happens locally on the host machine.
+---
+
+## 4. Non-Functional Requirements
+*   **Performance:** Dashboard load < 1.5s; real-time sync < 200ms.
+*   **Privacy:** All AI processing runs locally on the host machine via Ollama. No data leaves the user's environment.
+*   **Reliability:** OAuth tokens are automatically refreshed. Email polling recovers gracefully on transient failures.

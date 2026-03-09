@@ -27,15 +27,18 @@ export const setAuthToken = (token: string) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Clear token and redirect to login
+    if (error.response && [401, 403, 404].includes(error.response.status)) {
+      // Clear token and redirect to login if session is invalid or user was purged
       delete api.defaults.headers.common['Authorization'];
       if (typeof window !== 'undefined' && typeof window.localStorage?.removeItem === 'function') {
         window.localStorage.removeItem('token');
-        // Optional: Redirect to login page
-        // window.location.href = '/login'; 
+        // If we are not already on login/register, redirect
+        if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
   }
 );
+

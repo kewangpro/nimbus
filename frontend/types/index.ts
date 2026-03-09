@@ -53,4 +53,6 @@ export interface User {
   email: string;
   full_name: string;
   timezone?: string;
+  email_automation_enabled?: boolean;
 }
+

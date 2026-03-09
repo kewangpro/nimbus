@@ -1,4 +1,5 @@
-from typing import List, Union
+from typing import List, Union, Optional
+
 from pydantic import AnyHttpUrl, validator
 from pydantic_settings import BaseSettings
 
@@ -31,6 +32,16 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = "minioadmin"
     MINIO_SECURE: bool = False
     MINIO_BUCKET: str = "nimbus-attachments"
+    
+    # OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    MICROSOFT_CLIENT_ID: Optional[str] = None
+    MICROSOFT_CLIENT_SECRET: Optional[str] = None
+    
+    # This should be the base URL of your backend (e.g. http://localhost:8000)
+    BACKEND_URL: str = "http://localhost:8000"
+
 
     class Config:
         case_sensitive = True

@@ -20,3 +20,12 @@ frontend/yarn-error.log*
 .DS_Store
 Thumbs.db
 *.swp
+
+# IDEs
+.vscode/
+.idea/
+backend/.vscode/
+backend/.idea/
+frontend/.vscode/
+frontend/.idea/
+

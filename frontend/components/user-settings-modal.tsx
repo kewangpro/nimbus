@@ -23,6 +23,9 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Settings } from "lucide-react"
 import { toast } from "sonner"
 import { useTimezone } from "@/components/timezone-provider"
+import { Switch } from "@/components/ui/switch"
+
+
 
 // Common timezones
 const TIMEZONES = [
@@ -50,12 +53,18 @@ export function UserSettingsModal({ user, onUpdate }: UserSettingsModalProps) {
     const [loading, setLoading] = useState(false)
     const { timezone, setTimezone } = useTimezone()
     const [selectedTimezone, setSelectedTimezone] = useState(user?.timezone || timezone)
+    const [emailAutomation, setEmailAutomation] = useState(user?.email_automation_enabled ?? true)
+
 
     const handleSave = async () => {
         setLoading(true)
         try {
-            await api.patch("/users/me", { timezone: selectedTimezone })
+            await api.patch("/users/me", {
+                timezone: selectedTimezone,
+                email_automation_enabled: emailAutomation
+            })
             setTimezone(selectedTimezone) // Update context immediately
+
             toast.success("Settings updated")
             onUpdate() // Trigger parent refresh (to update user object)
             setOpen(false)
@@ -112,7 +121,25 @@ export function UserSettingsModal({ user, onUpdate }: UserSettingsModalProps) {
                             All dates and times will be displayed in this timezone.
                         </p>
                     </div>
+
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-primary/5">
+                        <div className="space-y-0.5">
+                            <Label htmlFor="email-automation" className="text-sm font-medium">
+                                Email-to-Task Automation
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                Automatically convert emails to tasks.
+                            </p>
+                        </div>
+                        <Switch
+                            id="email-automation"
+                            checked={emailAutomation}
+                            onCheckedChange={(checked: boolean) => setEmailAutomation(checked)}
+                        />
+                    </div>
+
                 </div>
+
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
                     <Button onClick={handleSave} disabled={loading}>

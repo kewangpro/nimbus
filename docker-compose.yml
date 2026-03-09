@@ -10,12 +10,19 @@ services:
       - DATABASE_URL=postgresql+asyncpg://nimbus:nimbus@db:5432/nimbus_db
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=changethisinproduction
-      - BACKEND_CORS_ORIGINS=http://localhost:3001
+      - BACKEND_CORS_ORIGINS=["http://localhost:3100"]
+      - BACKEND_URL=http://localhost:8000
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_SECURE=False
       - OLLAMA_HOST=http://host.docker.internal:11434
+    env_file:
+      - ./backend/.env
+
+
+
+
     depends_on:
       - db
       - redis

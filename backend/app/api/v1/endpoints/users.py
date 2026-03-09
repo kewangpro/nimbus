@@ -21,36 +21,8 @@ async def read_users(
     users = await crud_user.get_multi(db, skip=skip, limit=limit)
     return users
 
-@router.post("/", response_model=User)
-async def create_user(
-    *,
-    db: AsyncSession = Depends(deps.get_db),
-    user_in: UserCreatePublic,
-) -> Any:
-    """
-    Create new user.
-    """
-    user = await crud_user.get_by_email(db, email=user_in.email)
-    if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this username already exists in the system.",
-        )
-    user = await crud_user.create(
-        db,
-        obj_in=UserCreate(
-            email=user_in.email,
-            password=user_in.password,
-            full_name=user_in.full_name,
-            is_superuser=False,
-            role="member",
-            is_active=True,
-            timezone=user_in.timezone or "UTC",
-        ),
-    )
-    return user
-
 @router.get("/me", response_model=User)
+
 async def read_user_me(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:

@@ -2,18 +2,29 @@
 
 ## Overview
 *   **Base URL:** `/api/v1`
-*   **Documentation:** Auto-generated Swagger UI at `/docs` (when running locally).
-*   **Auth:** OAuth2 with Password Flow (Bearer Token).
+*   **Swagger UI:** Available at `http://localhost:8000/docs` when running locally.
+*   **Auth:** SSO (Google / Outlook OAuth2). All endpoints require a valid Bearer token (`Authorization: Bearer <token>`).
 
 ## 1. Authentication
-*   `POST /auth/access-token`
-    *   **Body:** `username`, `password` (OAuth2 Password flow)
-    *   **Response:** `{ "access_token": "jwt...", "token_type": "bearer" }`
-*   `POST /users`
-    *   **Body:** `{ "email": "...", "password": "...", "full_name": "...", "timezone": "..." }`
-    *   **Notes:** Public signup endpoint.
+*   `GET /auth/login/{provider}`
+    *   **Description:** Redirects browser to Google or Microsoft SSO login.
+    *   **Providers:** `gmail`, `outlook`.
+*   `GET /auth/callback/{provider}`
+    *   **Description:** OAuth2 callback handler. Redirects to frontend with `?token=<jwt>`. On first login, auto-creates **"General"** and **"Email"** projects for the user.
 
-## 2. Issues (Core)
+## 2. Email & Inbox (SSO-Linked)
+*   `GET /email-oauth/inbox`
+    *   **Auth:** Requires user to have a linked SSO account.
+    *   **Description:** Fetches emails from the **last 3 days** via IMAP/XOAUTH2. Uses raw `protocol.execute` to ensure Outlook compatibility (bypasses `aioimaplib`'s UTF-8 charset injection).
+    *   **Response:** `List[dict]` — up to 20 emails, newest first. Each item: `{ id, subject, from, date, snippet }`.
+*   `POST /email-oauth/create-task-from-email`
+    *   **Body:** `{ "subject": "...", "snippet": "..." }`
+    *   **Description:** AI-powered task creation from an email. Creates the issue in the user's **"Email"** project, **auto-assigned to the current user**.
+    *   **Response:** `{ "status": "success", "issue_id": "uuid" }`
+
+## 3. Issues (Core)
+
+
 *   `GET /issues`
     *   **Query Params:** `project_id`, `assignee_id`, `status`, `priority`, `overdue`, `unscheduled`
     *   **Response:** `List[IssueSchema]`
@@ -29,12 +40,14 @@
     *   **Description:** Enqueues a background job to generate vector embeddings for all issues.
     *   **Response:** `{ "message": "Backfill job queued", "job_id": "uuid" }`
 
-## 3. Projects & Workspaces
+## 4. Projects & Workspaces
+
 *   `GET /projects`
 *   `POST /projects`
 *   `GET /users/me`
 
-## 4. AI & Intelligence (Phase 3 & 5)
+## 5. AI & Intelligence
+
 *   `POST /ai/triage`
     *   **Body:** `{ "title": "...", "description": "...", "issue_id": "uuid?" }`
     *   **Response:** `{ "priority": "...", "labels": [...] }`
@@ -63,12 +76,14 @@
     *   **Description:** Auto-assigns due dates only for open tasks that are unscheduled or past due, distributing them across the next 5 weekdays to optimize productivity and prevent burnout.
     *   **Response:** `{ "scheduled_count": int, "message": "..." }`
 
-## 5. File Storage
+## 6. File Storage
+
 *   `POST /uploads`
     *   **Form Data:** `file`
     *   **Response:** `{ "url": "https://minio.../file.png" }`
 
-## 6. Real-time (WebSocket)
+## 7. Real-time (WebSocket)
+
 *   `WS /ws/{client_id}` (full path: `/api/v1/ws/{client_id}`)
     *   **Events:**
         *   `{"type": "ISSUE_CREATED", "data": "uuid"}`

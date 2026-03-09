@@ -9,6 +9,7 @@ from app.core.config import settings
 
 QUEUE_NAME = "nimbus:jobs"
 JOB_BACKFILL_EMBEDDINGS = "backfill_embeddings"
+JOB_POLL_EMAILS = "poll_emails"
 
 
 def _redis_client() -> Redis:

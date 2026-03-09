@@ -18,10 +18,31 @@ async def read_projects(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Retrieve projects.
+    Retrieve projects for the current user. Ensures 'General' and 'Email' exist.
     """
-    projects = await crud_project.get_multi(db, skip=skip, limit=limit)
+    from sqlalchemy import select
+    from app.models.project import Project as ProjectModel
+    
+    # 1. Ensure "General" and "Email" projects exist for this user
+    async def ensure_project(name: str):
+        p_query = select(ProjectModel).where(ProjectModel.owner_id == current_user.id, ProjectModel.name == name)
+        p_result = await db.execute(p_query)
+        p = p_result.scalars().first()
+        if not p:
+            print(f"INFO: Creating missing {name} project for user {current_user.email}")
+            p_in = ProjectCreate(name=name, description=f"Your {name.lower()} workspace")
+            p = await crud_project.create(db, obj_in=p_in, owner_id=current_user.id)
+        return p
+
+    await ensure_project("General")
+    await ensure_project("Email")
+
+    # 2. Fetch all projects for this user
+    query = select(ProjectModel).where(ProjectModel.owner_id == current_user.id).offset(skip).limit(limit)
+    result = await db.execute(query)
+    projects = result.scalars().all()
     return projects
+
 
 @router.post("/", response_model=Project)
 async def create_project(

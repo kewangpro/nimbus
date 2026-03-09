@@ -30,6 +30,16 @@ Nimbus is a modern, high-performance project management tool designed to replace
 *   **Visual Management:**
     *   **Smart Indicators:** Automatically highlights tasks that are **Overdue (Red)**, **Unassigned (Blue)**, or **Unscheduled (Amber)**.
     *   **Assignee Avatars:** See who is working on what at a glance.
+*   **SSO & Email Integration:** 🔐
+    *   **Single Sign-On:** Login seamlessly with **Google** or **Outlook**.
+    *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project and an **"Email"** project for you.
+    *   **Email-to-Task Mastery:**
+        *   **Automation:** Toggle automatic task generation in your User Settings.
+        *   **Manual Inbox:** View your actual SSO inbox from the "Email" project and manually convert emails into tasks with one click. Tasks are **auto-assigned to you**.
+
+    ![Email Inbox](docs/screenshots/email.png)
+
+
 *   **Real-time Collaboration:** Live updates via WebSockets ensure your team is always in sync.
 *   **Issue Management:**
     *   **Detail View:** Comprehensive modal for editing issues with quick actions ("Do Today", "Complete") for overdue tasks.
@@ -39,7 +49,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
 
 ## 🛠️ Tech Stack
 
-*   **Frontend:** Next.js 16, Tailwind CSS, Shadcn/UI, React Query.
+*   **Frontend:** Next.js 15 (Stable), Tailwind CSS, Shadcn/UI, React Query.
 *   **Backend:** FastAPI (Python), SQLAlchemy (Async), Alembic.
 *   **Database:** PostgreSQL with `pgvector`.
 *   **Infrastructure:** Docker Compose, Redis, MinIO.
@@ -92,10 +102,10 @@ docker compose exec backend alembic upgrade head
 ```bash
 cd frontend
 npm install
-PORT=3000 npm run dev
+PORT=3100 npm run dev
 ```
-App: `http://localhost:3000`
-If port 3000 is in use, pick another port (e.g. `PORT=3001`).
+App: `http://localhost:3100`
+If port 3100 is in use, pick another port (e.g. `PORT=3101`).
 
 ## 🧠 AI Configuration
 Ensure **Ollama** is running on your host machine at `http://localhost:11434` (default).
@@ -121,15 +131,7 @@ To test AI features:
 *   [UX Design](docs/UX_Design.md)
 *   [Deployment Guide](docs/DEPLOYMENT.md)
 
-## 🔧 Administrative Tasks
+##  License
 
-### Reset User Password
-To manually reset a user's password, run the following command from the `backend/` directory:
-
-```bash
-python reset_password.py <email> <new_password>
-```
-
-## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

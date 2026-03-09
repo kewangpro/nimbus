@@ -1,183 +1,124 @@
 # Implementation Plan: Nimbus (FastAPI + Next.js)
 
 ## Overview
-**Strategy:** "Core Mechanics First." We will build a lightning-fast, real-time project management tool first. AI features will *only* be implemented after the core UX (optimistic updates, drag-and-drop) is validated as buttery smooth.
+**Strategy:** "Core Mechanics First." Build a lightning-fast, real-time project management tool first. AI and integrations are layered on top once the core UX is validated.
 
 ### Tech Stack
-*   **Frontend:** Next.js 16, Tailwind, Shadcn/UI, React Query (for Optimistic UI).
-*   **Backend:** FastAPI, SQLAlchemy (Async), Redis (Real-time).
-*   **Database:** PostgreSQL.
-*   **Infrastructure:** Docker Compose.
-*   **AI (Local):** Ollama (`gemma3` for chat/triage, `nomic-embed-text` for embeddings).
+*   **Frontend:** Next.js 15 (Stable), Tailwind CSS, Shadcn/UI, React Query.
+*   **Backend:** FastAPI, SQLAlchemy (Async), Alembic, Redis.
+*   **Database:** PostgreSQL 16 with `pgvector`.
+*   **Infrastructure:** Docker Compose, MinIO.
+*   **AI (Local):** Ollama (`gemma3`, `nomic-embed-text`).
 
 ---
 
-## Phase 1: Foundation (The Skeleton) ✅
-**Goal:** A working Monorepo with secure Auth and Database connections.
-
-### 1.1 Infrastructure
-*   [x] **Scaffold:** Root `frontend/` and `backend/`.
-*   [x] **Docker:** Postgres, Redis, MinIO (No pgvector yet - keep it light).
-*   [x] **Backend:** FastAPI setup + Alembic.
-*   [x] **Frontend:** Next.js setup + Shadcn/UI.
-
-### 1.2 Auth & Users
-*   [x] **API:** OAuth2 Login/Register endpoints.
-*   [x] **UI:** Login Page + Session management.
-*   [x] **Test:** Verify Auth flow works end-to-end.
+## Phase 1: Foundation ✅
+**Goal:** Working monorepo with secure Auth and Database connections.
+*   [x] Scaffold `frontend/` and `backend/` directories.
+*   [x] Dockerize Postgres, Redis, MinIO.
+*   [x] FastAPI setup + Alembic migrations.
+*   [x] Next.js setup + Shadcn/UI.
+*   [x] OAuth2 auth endpoints + login UI.
 
 ---
 
-## Phase 2: The "Linear" Experience (Performance Focus) ✅
-**Goal:** Validation. The app must feel instant.
-
-### 2.1 High-Performance Issue Tracking
-*   [x] **API:** Standard CRUD for Issues (Title, Desc, Status, Priority).
-*   [x] **Performance:** Ensure API response times are <50ms for standard reads.
-*   [x] **UI:** List View with Keyboard navigation (Arrow keys to select, Enter to edit).
-
-### 2.2 The Interactive Board
-*   [x] **UI:** Kanban Board using `@hello-pangea/dnd`.
-*   [x] **Optimistic UI:** React Query mutations must update the UI *immediately* before the server responds.
-*   [x] **Real-time:** WebSockets. When User A moves a card, User B sees it move instantly.
-
-### 2.3 🛑 VALIDATION CHECKPOINT
-*   *Before moving to AI:*
-    *   [x] Is Drag-and-Drop 60fps?
-    *   [x] Do updates feel instant?
-    *   [x] Is the board stable with 100+ items?
+## Phase 2: Core UX — The "Linear" Experience ✅
+**Goal:** App must feel instant. Validation before adding complexity.
+*   [x] CRUD for Issues (title, description, status, priority).
+*   [x] API response times < 50ms for reads.
+*   [x] Kanban Board with `@hello-pangea/dnd` (60fps drag-and-drop).
+*   [x] Optimistic UI via React Query mutations.
+*   [x] WebSocket real-time sync (multi-user).
+*   [x] List View with sortable columns and keyboard navigation.
 
 ---
 
-## Phase 3: The Intelligence Layer (Local AI with Ollama) ✅
-**Goal:** Now that the car handles well, we add the self-driving features using local LLMs.
-
-### 3.1 Vector Infrastructure
-*   [x] **DB:** Enable `pgvector` in Docker.
-*   [x] **Backfill:** Generate embeddings using `nomic-embed-text` via Ollama.
-
-### 3.2 "Magic" Features
-*   [x] **Auto-Triage:** API endpoint to suggest labels/priority using `gemma3`.
-*   [x] **Semantic Search:** Replace standard search with Vector Search ("Find that bug about the login crash").
-*   [x] **Context:** "Similar Issues" sidebar.
+## Phase 3: Intelligence Layer (Local AI) ✅
+**Goal:** Additive AI using local Ollama — no cloud dependence.
+*   [x] `pgvector` enabled in Docker.
+*   [x] Auto-embedding on issue create/update (`nomic-embed-text`).
+*   [x] **Auto-Triage:** Priority suggestions (`gemma3`).
+*   [x] **Semantic Search:** Vector cosine distance queries.
+*   [x] **Similar Issues:** Duplicate detection during creation.
 
 ---
 
 ## Phase 4: Expansion ✅
-*   [x] **File Storage:** MinIO integration.
-*   [x] **Client Portal:** External views.
+*   [x] MinIO file attachment support.
+*   [x] Client Portal (restricted, read-only external view).
 
 ---
 
 ## Phase 5: Advanced AI & Planning ✅
-**Goal:** Leverage AI for high-level project management and time organization.
-
-### 5.1 AI Planner
-*   [x] **API:** Endpoint to break down natural language plans into multiple structured issues.
-*   [x] **UI:** Dedicated dialog for plan input and task review.
-
-### 5.2 Time Management
-*   [x] **5-Day Sprint View:** Visual columns for the upcoming work week with drag-and-drop rescheduling.
-*   [x] **AI Schedule:** AI-powered prioritization and balanced workload distribution (3-5 tasks/day).
-*   [x] **Visual Status:** Color-coded tasks (Blue/Todo, Yellow/In Progress, Green/Done) in Calendar.
-*   [x] **Persistent UI:** "Show Completed" toggle preference saved in local storage.
+*   [x] **AI Project Planner:** Break down natural language into structured issues.
+*   [x] **AI Scheduler:** Distribute unscheduled/overdue tasks across next 5 business days.
+*   [x] **5-Day Sprint Calendar:** Visual per-user timeline with drag-and-drop rescheduling.
+*   [x] **AI Summary:** Per-issue summary with next steps (cached by content hash).
+*   [x] **AI Filters:** Natural language to structured issue filters (List View).
+*   [x] **Client Update Drafts:** Weekly status summaries for each project.
+*   [x] **Dependency Detection:** Identifies and stores issue-to-issue dependencies.
 
 ---
 
-## Phase 6: Refinement & Polish (Current) ✅
-**Goal:** Address usability feedback and ensure robust handling of real-world scenarios like overdue tasks and weekends.
-
-### 6.1 Calendar Evolution
-*   [x] **Dynamic Range:** Calendar view now expands to fit all relevant tasks (min 5 days).
-*   [x] **Smart Scheduling:** AI Scheduler now strictly respects business days (Mon-Fri only).
-*   [x] **Weekend Toggle:** Added "Show Weekends" toggle to filter view.
-*   [x] **Horizontal Scroll:** Responsive layout to handle dynamic day ranges.
-
-### 6.2 Overdue Task Management
-*   [x] **Visibility:** Red indicators/rows in Board, List, and Calendar views for past-due items.
-*   [x] **Actionable Detail:** "Do Today" and "Complete" buttons in Issue Detail modal.
-*   [x] **Auto-Adjust:** Calendar view auto-shifts start date to show overdue items.
-
-### 6.3 List View Enhancements
-
-*   [x] **Sorting:** Interactive column headers (ID, Title, Status, Priority, Due Date).
-
-*   [x] **Columns:** Added "Due Date" column.
-
-*   [x] **Smart Sort:** Overdue items automatically pinned to top.
-
-
+## Phase 6: Refinement & Polish ✅
+*   [x] Calendar range auto-expands to show all relevant tasks (min 5 days).
+*   [x] AI Scheduler strictly respects business days (Mon-Fri only).
+*   [x] "Show Weekends" toggle persisted in local storage.
+*   [x] Overdue task indicators (red) across Board, List, and Calendar.
+*   [x] "Do Today" and "Complete" quick actions in Issue Detail modal.
+*   [x] Global timezone support (user-configurable, stored as UTC).
 
 ---
 
-
-
-## Phase 7: Project Architecture (Completed) ✅
-
-**Goal:** Transition from a single-board system to a multi-project workspace.
-
-
-
-### 7.1 Data Model
-
-*   [x] **Projects:** Added `Project` entity and `issues.project_id` foreign key.
-
-*   [x] **Migration:** Backfilled existing issues to a default "General" project.
-
-*   [x] **API:** CRUD endpoints for Projects.
-
-
-
-### 7.2 Multi-Context UI
-
-
-
-*   [x] **Sidebar:** Implemented persistent sidebar for navigation.
-
-
-
-*   [x] **My Calendar:** Refactored Calendar to be user-centric (Global) rather than project-centric.
-
-
-
-*   [x] **Project Workspace:** Board and List views are now filtered by the selected project.
-
-
-
-*   [x] **Creation Flow:** New issues auto-assign to the user and the active project.
-
-
-
-
-
-
-
-### 7.3 Visual Polish & Workflows
-
-
-
-*   [x] **Assignees:** Added "Assign To" workflow in detail view and avatar display in Board/List.
-
-
-
-*   [x] **Scheduling:** Added date picker to Detail view and creation dialog.
-
-
-
-*   [x] **Visual Signals:** Added consistent highlighting for Overdue, Unassigned, and Unscheduled tasks.
-
-
-
-*   [x] **Layout:** Refined Calendar/Board spacing to be consistent and responsive.
-
+## Phase 7: Multi-Project Workspace ✅
+*   [x] `Project` entity + `issues.project_id` FK.
+*   [x] Persistent sidebar navigation.
+*   [x] My Calendar is global (all projects, current user's tasks).
+*   [x] Board/List filtered by selected project.
+*   [x] Assignee avatars, due date picker, visual signal system (overdue / unassigned / unscheduled).
 
 ---
 
-## Phase 8: AI Enhancements (In Progress)
+## Phase 8: AI Enhancements ✅
+*   [x] Similar Issues endpoint and UI integration.
+*   [x] Issue Summary with background caching and invalidation.
+*   [x] AI Filters for List View.
+*   [x] Client Update drafts.
+*   [x] Dependency extraction and persistence.
 
-*   [x] **Similar Issues:** Endpoint and UI to detect likely duplicates during create.
-*   [x] **Issue Summaries:** Per-issue AI summary with next steps.
-*   [x] **AI Filters:** Natural language filters for list views.
-*   [x] **Client Updates:** Draft client-facing weekly status summaries.
-*   [x] **Dependency Detection:** Extract and store issue dependencies.
-*   [ ] **Summary Caching:** Add background refresh strategy and invalidation metrics.
+---
+
+## Phase 9: SSO & Email Integration ✅
+**Goal:** Streamline authentication and automate task ingestion from personal email.
+
+### 9.1 SSO Authentication
+*   [x] OAuth2 flows for Google (Gmail) and Microsoft (Outlook).
+*   [x] User model with `oauth_provider`, `oauth_access_token`, `oauth_refresh_token`, `oauth_token_expires_at`.
+*   [x] Auto-refresh token on expiry.
+*   [x] Social login buttons on the frontend.
+
+### 9.2 Auto-Project Setup
+*   [x] On first login, automatically create **"General"** and **"Email"** projects.
+*   [x] "Email" project is the designated target for all email-generated tasks.
+
+### 9.3 Email Inbox (Manual)
+*   [x] `GET /email-oauth/inbox` — Fetches the last 3 days of emails via IMAP/XOAUTH2.
+*   [x] Outlook compatibility: uses raw `imap.protocol.execute(Command("SEARCH", ...))` to bypass `aioimaplib`'s UTF-8 charset injection which Outlook rejects (`BADCHARSET`).
+*   [x] Fetch response handles `bytearray` (Outlook) and `bytes` (Gmail) for email body.
+*   [x] `POST /email-oauth/create-task-from-email` — AI-powered manual task creation from any inbox email. Task is auto-assigned to the logged-in user.
+*   [x] "View Inbox" button in the Email project header opens an inbox modal.
+
+### 9.4 Email Automation (Background Polling)
+*   [x] `email_automation_enabled` toggle in User Settings (checkbox).
+*   [x] Background worker polls every 60 seconds for UNSEEN emails from the last 3 days.
+*   [x] `email_processor.extract_task()` extracts title, description, and priority using `gemma3`.
+*   [x] Created tasks are assigned to the inbox owner and placed in their "Email" project.
+*   [x] Graceful fallback: if `UNSEEN SINCE <date>` fails, retries with `UNSEEN` only.
+
+### 9.5 Cleanup & Quality
+*   [x] Removed legacy `EmailSettings` model, schemas, CRUD, and per-project settings UI.
+*   [x] Removed obsolete debug scripts (`check_db_state.py`, `cleanup_data.py`, etc.).
+*   [x] Fixed stale `EmailProvider` enum references and `.value` calls in `auth.py`.
+*   [x] Added `crud_user` and `crud_project` imports to `auth.py`.
+*   [x] Updated all test mocks to match new IMAP search protocol.
+*   [x] **All 7 tests passing.**
