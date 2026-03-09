@@ -9,8 +9,26 @@ from app.schemas.issue import IssueCreate
 from app.crud.crud_issue import create as create_issue
 from app.models.project import Project
 from sqlalchemy import select, and_
+import re
+from email.header import decode_header, make_header
 
 router = APIRouter()
+
+def _decode_header(raw: str | None) -> str:
+    """Decode RFC 2047 encoded email headers (e.g. =?utf-8?B?...?=)."""
+    if not raw:
+        return ""
+    try:
+        return str(make_header(decode_header(raw)))
+    except Exception:
+        return raw
+
+def _strip_html(text: str) -> str:
+    """Remove HTML tags and collapse whitespace for clean snippet display."""
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
 
 @router.get("/inbox", response_model=List[dict])
 async def get_inbox(
@@ -85,30 +103,34 @@ async def get_inbox(
 
 
             
-            # Simple snippet extraction
+            # Prefer text/plain part; fall back to stripping html
             body = ""
             if msg.is_multipart():
                 for part in msg.walk():
-                    if part.get_content_type() == "text/plain":
+                    ct = part.get_content_type()
+                    if ct == "text/plain":
                         payload = part.get_payload(decode=True)
                         if payload:
-                            body = (payload.decode(errors='replace') if isinstance(payload, bytes) else payload)[:200]
+                            body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
                         break
-
+                    elif ct == "text/html" and not body:
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            body = _strip_html(payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
             else:
                 payload = msg.get_payload(decode=True)
                 if payload:
-                    body = (payload.decode(errors='replace') if isinstance(payload, bytes) else payload)[:200]
-
+                    raw_body = payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload
+                    body = raw_body if msg.get_content_type() == "text/plain" else _strip_html(raw_body)
 
             results.append({
                 "id": msg_id if isinstance(msg_id, str) else msg_id.decode(),
-
-                "subject": msg["Subject"] or "(No Subject)",
-                "from": msg["From"],
+                "subject": _decode_header(msg["Subject"]) or "(No Subject)",
+                "from": _decode_header(msg["From"]),
                 "date": msg["Date"],
-                "snippet": body
+                "snippet": body[:200]
             })
+
             
         await imap.logout()
         return results

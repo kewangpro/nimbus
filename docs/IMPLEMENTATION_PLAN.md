@@ -103,9 +103,13 @@
 
 ### 9.3 Email Inbox (Manual)
 *   [x] `GET /email-oauth/inbox` — Fetches the last 3 days of emails via IMAP/XOAUTH2.
-*   [x] Outlook compatibility: uses raw `imap.protocol.execute(Command("SEARCH", ...))` to bypass `aioimaplib`'s UTF-8 charset injection which Outlook rejects (`BADCHARSET`).
+*   [x] Outlook compatibility: uses raw `imap.protocol.execute(Command("SEARCH", ...))` to bypass `aioimaplib`'s UTF-8 charset injection.
 *   [x] Fetch response handles `bytearray` (Outlook) and `bytes` (Gmail) for email body.
-*   [x] `POST /email-oauth/create-task-from-email` — AI-powered manual task creation from any inbox email. Task is auto-assigned to the logged-in user.
+*   [x] `POST /email-oauth/create-task-from-email` — AI-powered manual task creation. Auto-assigned to user.
+*   [x] RFC 2047 subject/from decoding: `=?utf-8?B?...?=` encoded headers decoded to readable text.
+*   [x] HTML snippet stripping: regex strips HTML tags from marketing emails; prefers `text/plain` part.
+*   [x] Timezone-aware email dates: displayed in the user's configured timezone via `formatInTimezone()`.
+
 *   [x] "View Inbox" button in the Email project header opens an inbox modal.
 
 ### 9.4 Email Automation (Background Polling)

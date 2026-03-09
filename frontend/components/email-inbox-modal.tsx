@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
+import { useTimezone } from "@/components/timezone-provider"
+
 import {
     Dialog,
     DialogContent,
@@ -29,6 +31,18 @@ export function EmailInboxModal() {
     const [emails, setEmails] = useState<Email[]>([])
     const [loading, setLoading] = useState(false)
     const [processingId, setProcessingId] = useState<string | null>(null)
+    const { formatInTimezone } = useTimezone()
+
+
+    const formatEmailDate = (dateStr: string) => {
+        try {
+            const date = new Date(dateStr)
+            if (isNaN(date.getTime())) return dateStr
+            return formatInTimezone(date, "MMM d, yyyy h:mm a zzz")
+        } catch {
+            return dateStr
+        }
+    }
 
     const fetchInbox = async () => {
         setLoading(true)
@@ -102,7 +116,8 @@ export function EmailInboxModal() {
                                             <div className="space-y-1 min-w-0">
                                                 <h4 className="font-semibold text-sm truncate">{email.subject}</h4>
                                                 <p className="text-xs text-muted-foreground truncate">{email.from}</p>
-                                                <p className="text-[10px] text-muted-foreground/60">{email.date}</p>
+                                                <p className="text-[10px] text-muted-foreground/60">{formatEmailDate(email.date)}</p>
+
                                             </div>
                                             <Button
                                                 size="sm"
