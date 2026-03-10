@@ -56,14 +56,21 @@ async def process_email_source(db: AsyncSession, user: User):
         # XOAUTH2 Authentication
         auth_string = generate_xoauth2_string(email_address, token)
         response = await imap.protocol.execute(Command("AUTHENTICATE", imap.protocol.new_tag(), "XOAUTH2", auth_string))
+        logger.debug(f"AUTHENTICATE result for {email_address}: {response.result}, lines: {response.lines}")
         if response.result == "OK":
             imap.protocol.state = "AUTH"
         else:
-            logger.error(f"Auth failed for {email_address}: {response.result}")
-            await imap.logout()
+            # Log the full server error detail (Outlook often returns a base64 JSON error)
+            logger.error(f"XOAUTH2 AUTHENTICATE failed for {email_address}: result={response.result} lines={response.lines}")
+            # Don't call logout() — connection is still in NONAUTH, that would throw
+            # Try forcing a token refresh in case the token was silently revoked
+            logger.info(f"Forcing token refresh for {email_address} due to auth failure...")
+            user.oauth_token_expires_at = None  # invalidate so refresh_token_v2 will attempt refresh
+            await db.commit()
             return
-            
+
         await imap.select("INBOX")
+
         
         # Search for UNSEEN emails from last 3 days
         # Use protocol.execute directly to avoid aioimaplib injecting UTF-8 charset
@@ -150,9 +157,13 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
         
     if expires_at and expires_at > datetime.now(timezone.utc) + timedelta(minutes=5):
+        logger.debug(f"Token for {user.email} is still valid, expires at {expires_at}")
         return user.oauth_access_token
 
+    logger.info(f"Token for {user.email} is expired or expiring soon (expires_at={expires_at}), attempting refresh...")
+
     if not user.oauth_refresh_token:
+        logger.error(f"No refresh token stored for {user.email} — user must re-login via SSO to restore automation.")
         return None
 
     provider = user.oauth_provider
@@ -173,6 +184,7 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
             "grant_type": "refresh_token",
         }
     else:
+        logger.error(f"Unknown provider '{provider}' for {user.email}")
         return None
 
     async with httpx.AsyncClient() as client:
@@ -186,11 +198,15 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
                 
                 db.add(user)
                 await db.commit()
+                logger.info(f"Token refreshed successfully for {user.email}, expires in {expires_in}s")
                 return user.oauth_access_token
+            else:
+                logger.error(f"Token refresh HTTP {response.status_code} for {user.email}: {response.text[:300]}")
         except Exception as e:
             logger.error(f"Token refresh error for {user.email}: {e}")
             
     return None
+
 
 def generate_xoauth2_string(user: str, token: str) -> str:
     """
