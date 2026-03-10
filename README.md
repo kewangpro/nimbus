@@ -126,7 +126,27 @@ To test AI features:
 8.  **Client Update:** In project header, click "Client Update".
 9.  **Dependencies:** In Issue Detail, click "Detect Dependencies".
 
+## 🔌 MCP Server (Calendar & Tasks)
+Nimbus features a built-in **Model Context Protocol (MCP)** server, enabling external AI assistants to directly manage your calendar and sprint plan. This integration allows AI tools to:
+
+- **Sync Schedules**: Fetch all tasks with due dates to provide a comprehensive view of your upcoming week.
+- **Manage Deadlines**: Update task timelines and schedule new items directly from your AI's chat interface.
+- **Detailed Metadata**: Access full task descriptions, priority levels, and project assignments for better context.
+
+### Connection Info
+To connect an external tool, point your MCP client to the **SSE (Server-Sent Events)** endpoint:
+`http://localhost:8000/mcp/sse`
+
+### Available Tools
+- `list_calendar_events`: Fetches a list of all scheduled tasks within a timeframe.
+- `get_task_details`: Retrieves full metadata for a specific task ID.
+- `schedule_task`: Updates the due date of an existing task.
+- `create_calendar_task`: Adds a new task with an optional deadline to your General project.
+
+
+
 ## 📚 Documentation
+
 
 *   [Product Requirements (PRD)](docs/PRD.md)
 *   [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)

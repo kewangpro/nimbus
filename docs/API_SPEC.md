@@ -89,4 +89,12 @@
     *   **Events:**
         *   `{"type": "ISSUE_CREATED", "data": "uuid"}`
         *   `{"type": "ISSUE_UPDATED", "data": "uuid"}`
-        *   `{"type": "ISSUE_DELETED", "data": "uuid"}`
+## 8. MCP Server (Model Context Protocol)
+*   **SSE URL:** `GET /mcp/sse` (Full URL: `http://localhost:8000/mcp/sse`)
+*   **Description:** Implements the MCP SSE transport for external AI assistant integration.
+*   **Protocol:** [Model Context Protocol](https://modelcontextprotocol.io/)
+*   **Tools Provided:**
+    *   `list_calendar_events`: List scheduled issues.
+    *   `get_task_details`: Fetch full metadata for an issue.
+    *   `schedule_task`: Update issue due dates.
+    *   `create_calendar_task`: Create a new issue with a deadline.

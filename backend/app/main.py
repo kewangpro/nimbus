@@ -5,6 +5,8 @@ from app.core.config import settings
 from app.api.v1.api import api_router
 from app.core.storage import init_storage
 from app.core.jobs import enqueue_job, JOB_POLL_EMAILS
+from app.mcp.server import mcp
+
 
 async def schedule_email_polling():
     """Background task to enqueue email polling every minute"""
@@ -47,6 +49,14 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Mount MCP SSE transport
+app.mount("/mcp", mcp.sse_app())
+
+
+
+
+
 
 @app.get("/")
 async def root():
