@@ -35,16 +35,21 @@
 *   Shows all tasks assigned to the current user across **all projects**.
 *   Visual indicators: project context on each card, overdue highlights.
 
-**Project Workspace (Email Project)**
+**Project Workspace**
 *   **Board:** Kanban for workflow management.
 *   **List:** High-density sortable table.
-*   **"View Inbox" button** (Email project only): Opens the SSO Inbox modal.
 
-### 3.3 SSO Inbox Modal
-*   Accessible from the **Email project header** via the "View Inbox" button.
-*   Fetches the last **3 days** of emails from the user's linked SSO inbox (Gmail or Outlook).
-*   Each email shows: subject, sender, date, snippet.
-*   **"+ Task" button** on each email: Calls the AI to extract a structured task from the email, creates it in the Email project, and **auto-assigns it to the current user**.
+
+### 3.3 My Inbox View
+
+*   **Trigger:** "Inbox" button located in the **sidebar under "My Calendar"**.
+*   **Layout:** Primary view in the main pane (similar to My Calendar).
+*   **Content:** 
+    *   Responsive grid of recent emails (subject, from, date, snippet).
+    *   "Task" button on each email card.
+*   **Action:** Clicking "Task" uses AI to extract task details and creates it in the **"General"** project.
+
+
 *   **Refresh button** (↻) to re-fetch latest emails.
 *   Empty state: "No recent emails found. Your inbox is clear or SSO isn't fully linked."
 
@@ -90,15 +95,16 @@ Consistent across Board, List, and Calendar:
 ## 5. Key User Flows
 
 ### 5.1 "Email to Task" (Manual)
-1. User opens the **Email project** → clicks **"View Inbox"**.
+1. User clicks **"View Inbox"** in the sidebar (under My Calendar).
 2. Modal loads the last 3 days of inbox emails via SSO.
 3. User reviews an email, clicks **"+ Task"**.
-4. AI extracts task details; task is created in the Email project, assigned to the user.
+4. AI extracts task details; task is created in the **General** project, assigned to the user.
 
 ### 5.2 "Email to Task" (Automatic)
 1. User enables **"Email Automation"** in User Settings.
 2. System polls the inbox every minute for new unseen emails from the last 3 days.
-3. AI processes each email → creates a task in the Email project, assigned to the user.
+3. AI processes each email → creates a task in the **General** project, assigned to the user.
+
 
 ### 5.3 "Plan to Execution"
 1. User opens **AI Planner** → types a free-form project plan.

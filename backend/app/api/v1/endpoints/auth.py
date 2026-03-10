@@ -163,7 +163,8 @@ async def callback_oauth(
         await db.execute(orphan_query)
         await db.commit()
 
-        # 2. Ensure "General" and "Email" projects exist for this user
+        # 2. Ensure "General" project exists for this user
+
         async def ensure_project(name: str):
             p_query = select(ProjectModel).where(ProjectModel.owner_id == user.id, ProjectModel.name == name)
             p_result = await db.execute(p_query)
@@ -175,8 +176,8 @@ async def callback_oauth(
             return p
 
         general_project = await ensure_project("General")
-        email_project = await ensure_project("Email")
         # --- END AUTO SETUP ---
+
 
 
 

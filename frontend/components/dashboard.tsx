@@ -11,7 +11,7 @@ import { AISearch } from "@/components/ai-search"
 import { AIPlanner } from "@/components/ai-planner"
 import { AIClientUpdate } from "@/components/ai-client-update"
 import { CalendarView } from "@/components/calendar-view"
-import { EmailInboxModal } from "@/components/email-inbox-modal"
+import { EmailInboxView } from "@/components/email-inbox-view"
 
 import { User } from "@/types"
 
@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { useProject } from "@/components/project-provider"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
-import { CalendarDays, Layout, LogOut, Plus, FolderKanban } from "lucide-react"
+import { CalendarDays, Layout, LogOut, Plus, FolderKanban, Mail } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { TimezoneProvider } from "@/components/timezone-provider"
 import { UserSettingsModal } from "@/components/user-settings-modal"
@@ -30,7 +30,7 @@ interface DashboardProps {
     logout: () => void
 }
 
-type ViewMode = 'calendar' | 'project'
+type ViewMode = 'calendar' | 'project' | 'inbox'
 
 export function Dashboard({ user, logout }: DashboardProps) {
     const [refreshKey, setRefreshKey] = useState(0)
@@ -54,89 +54,98 @@ export function Dashboard({ user, logout }: DashboardProps) {
     }
 
     return (
-        <div className="flex h-screen bg-background">
-            {/* Sidebar */}
-            <div className="w-64 border-r flex flex-col bg-muted/10">
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                            <span className="text-primary-foreground font-bold">N</span>
-                        </div>
-                        Nimbus
-                    </h1>
-                </div>
+        <TimezoneProvider user={user}>
+            <div className="flex h-screen bg-background">
+                {/* Sidebar */}
+                <div className="w-64 border-r flex flex-col bg-muted/10">
+                    <div className="p-6">
+                        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                                <span className="text-primary-foreground font-bold">N</span>
+                            </div>
+                            Nimbus
+                        </h1>
+                    </div>
 
-                <div className="flex-1 px-4 space-y-6 overflow-y-auto">
-                    {/* My Views */}
-                    <div>
-                        <h3 className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            My Views
-                        </h3>
-                        <Button
-                            variant={viewMode === 'calendar' ? "secondary" : "ghost"}
-                            className="w-full justify-start"
-                            onClick={() => setViewMode('calendar')}
-                        >
-                            <CalendarDays className="mr-2 h-4 w-4" />
-                            My Calendar
+                    <div className="flex-1 px-4 space-y-6 overflow-y-auto">
+                        {/* My Views */}
+                        <div className="space-y-1">
+                            <h3 className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                My Views
+                            </h3>
+                            <Button
+                                variant={viewMode === 'calendar' ? "secondary" : "ghost"}
+                                className="w-full justify-start"
+                                onClick={() => setViewMode('calendar')}
+                            >
+                                <CalendarDays className="mr-2 h-4 w-4" />
+                                My Calendar
+                            </Button>
+                            <Button
+                                variant={viewMode === 'inbox' ? "secondary" : "ghost"}
+                                className="w-full justify-start"
+                                onClick={() => setViewMode('inbox')}
+                            >
+                                <Mail className="mr-2 h-4 w-4" />
+                                My Inbox
+                            </Button>
+
+                        </div>
+
+                        {/* Projects */}
+                        <div>
+                            <div className="flex items-center justify-between px-2 mb-2">
+                                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    Projects
+                                </h3>
+                                <CreateProjectDialog />
+                            </div>
+                            <div className="space-y-1">
+                                {projects.map(p => (
+                                    <Button
+                                        key={p.id}
+                                        variant={viewMode === 'project' && project?.id === p.id ? "secondary" : "ghost"}
+                                        className="w-full justify-start truncate"
+                                        onClick={() => {
+                                            setProject(p)
+                                            setViewMode('project')
+                                        }}
+                                    >
+                                        <FolderKanban className="mr-2 h-4 w-4 shrink-0" />
+                                        <span className="truncate">{p.name}</span>
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-4 border-t">
+                        <div className="flex items-center gap-2 px-2 mb-4">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                                {user?.full_name?.charAt(0) || "U"}
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                                <p className="text-sm font-medium truncate">{user?.full_name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                            </div>
+                        </div>
+                        <Button onClick={logout} variant="outline" className="w-full justify-start text-muted-foreground">
+                            <LogOut className="mr-2 h-4 w-4" /> Logout
                         </Button>
                     </div>
-
-                    {/* Projects */}
-                    <div>
-                        <div className="flex items-center justify-between px-2 mb-2">
-                            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                Projects
-                            </h3>
-                            <CreateProjectDialog />
-                        </div>
-                        <div className="space-y-1">
-                            {projects.map(p => (
-                                <Button
-                                    key={p.id}
-                                    variant={viewMode === 'project' && project?.id === p.id ? "secondary" : "ghost"}
-                                    className="w-full justify-start truncate"
-                                    onClick={() => {
-                                        setProject(p)
-                                        setViewMode('project')
-                                    }}
-                                >
-                                    <FolderKanban className="mr-2 h-4 w-4 shrink-0" />
-                                    <span className="truncate">{p.name}</span>
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
                 </div>
 
-                <div className="p-4 border-t">
-                    <div className="flex items-center gap-2 px-2 mb-4">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                            {user?.full_name?.charAt(0) || "U"}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                            <p className="text-sm font-medium truncate">{user?.full_name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                        </div>
-                    </div>
-                    <Button onClick={logout} variant="outline" className="w-full justify-start text-muted-foreground">
-                        <LogOut className="mr-2 h-4 w-4" /> Logout
-                    </Button>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* View Content */}
-                <TimezoneProvider user={user}>
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    {/* View Content */}
                     <header className="h-16 border-b px-8 flex items-center justify-between shrink-0 bg-background/50 backdrop-blur-sm">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className={viewMode === 'calendar' ? "text-foreground font-medium" : ""}>My Calendar</span>
+                            <span className={viewMode === 'calendar' ? "text-foreground font-medium" : ""}>
+                                {viewMode === 'calendar' ? "My Calendar" : viewMode === 'inbox' ? "Inbox" : "Workspace"}
+                            </span>
                             <span>/</span>
-                            {viewMode === 'project' && project ? (
+                            {viewMode === 'project' && project && (
                                 <span className="text-foreground font-medium">{project.name}</span>
-                            ) : (
-                                <span>Workspace</span>
                             )}
                         </div>
                         <div className="flex items-center gap-3">
@@ -145,10 +154,8 @@ export function Dashboard({ user, logout }: DashboardProps) {
                             {viewMode === 'project' && project && (
                                 <AIClientUpdate key={project.id} projectId={project.id} />
                             )}
-                            {viewMode === 'project' && project?.name === 'Email' && (
-                                <EmailInboxModal />
-                            )}
                             <AISearch />
+
                             <CreateIssueDialog onIssueCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
 
                         </div>
@@ -157,6 +164,8 @@ export function Dashboard({ user, logout }: DashboardProps) {
                     <main className="flex-1 overflow-hidden p-8 pt-6">
                         {viewMode === 'calendar' ? (
                             <CalendarView refreshTrigger={refreshKey} userId={user?.id} />
+                        ) : viewMode === 'inbox' ? (
+                            <EmailInboxView />
                         ) : project ? (
                             <Tabs defaultValue="board" className="h-full flex flex-col">
                                 <div className="flex justify-between items-center mb-4 shrink-0">
@@ -182,12 +191,14 @@ export function Dashboard({ user, logout }: DashboardProps) {
                             </Tabs>
                         ) : (
                             <div className="flex h-full items-center justify-center text-muted-foreground">
-                                Select a project to view details
+                                Select a view or project
                             </div>
                         )}
                     </main>
-                </TimezoneProvider>
+                </div>
             </div>
-        </div>
+        </TimezoneProvider>
     )
+
+
 }

@@ -32,10 +32,12 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Assignee Avatars:** See who is working on what at a glance.
 *   **SSO & Email Integration:** 🔐
     *   **Single Sign-On:** Login seamlessly with **Google** or **Outlook**.
-    *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project and an **"Email"** project for you.
+    *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project for you.
     *   **Email-to-Task Mastery:**
-        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses `gemma3` to extract structured tasks.
-        *   **Manual Inbox:** View your actual SSO inbox from the "Email" project and manually convert emails into tasks with one click. Tasks are **auto-assigned to you**.
+        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses `gemma3` to extract structured tasks into your **General** project.
+        *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)** as a primary view and manually convert emails into tasks. Tasks are automatically created in your **General** project and **assigned to you**.
+
+
         *   **Smart Display:** Email subjects and sender names are decoded (RFC 2047 / Base64), HTML-only emails show clean plain-text snippets, and all dates are shown in **your configured timezone**.
 
     ![Email Inbox](docs/screenshots/email.png)

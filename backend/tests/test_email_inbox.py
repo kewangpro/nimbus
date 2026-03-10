@@ -61,7 +61,8 @@ async def test_create_task_from_email(client: AsyncClient, db: AsyncSession, nor
     res = await db.execute(select(User).where(User.email == "user@example.com"))
     user = res.scalars().first()
 
-    project = Project(name="Email", owner_id=user.id)
+    project = Project(name="General", owner_id=user.id)
+
     db.add(project)
     await db.commit()
 

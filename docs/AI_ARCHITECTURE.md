@@ -121,7 +121,8 @@ CREATE TABLE issue_links (
 1. Background worker enqueues a poll job every 60 seconds.
 2. Query all users with `oauth_access_token IS NOT NULL AND email_automation_enabled = TRUE`.
 3. For each user: refresh token if needed → connect to IMAP → search `UNSEEN SINCE <3 days ago>`.
-4. For each email: extract task with `email_processor` → create issue in user's "Email" project → assign to user.
+4. For each email: extract task with `email_processor` → create issue in user's "General" project → assign to user.
+
 
 ---
 

@@ -33,9 +33,10 @@ async def test_poll_emails_user_flow(db: AsyncSession):
     await db.commit()
     await db.refresh(user)
 
-    # 2. Setup "Email" Project
+    # 2. Setup "General" Project
     project = Project(
-        name="Email",
+        name="General",
+
         owner_id=user.id
     )
     db.add(project)

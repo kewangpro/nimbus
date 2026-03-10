@@ -154,13 +154,9 @@ async def create_task_from_email(
     # Process with AI
     task_data = await email_processor.extract_task(subject, snippet)
     
-    # Find user's "Email" project
-    res = await db.execute(select(Project).where(and_(Project.owner_id == current_user.id, Project.name == "Email")))
+    # Find user's "General" project
+    res = await db.execute(select(Project).where(and_(Project.owner_id == current_user.id, Project.name == "General")))
     proj = res.scalars().first()
-    if not proj:
-        # Fallback to General
-        res = await db.execute(select(Project).where(and_(Project.owner_id == current_user.id, Project.name == "General")))
-        proj = res.scalars().first()
     
     if not proj:
         # Fallback to any project owned by user
@@ -169,6 +165,7 @@ async def create_task_from_email(
         
     if not proj:
         raise HTTPException(status_code=404, detail="No suitable project found to create task")
+
 
     issue_in = IssueCreate(
         title=task_data.get("title", subject),

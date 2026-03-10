@@ -19,7 +19,8 @@
     *   **Response:** `List[dict]` — up to 20 emails, newest first. Each item: `{ id, subject, from, date, snippet }`.
 *   `POST /email-oauth/create-task-from-email`
     *   **Body:** `{ "subject": "...", "snippet": "..." }`
-    *   **Description:** AI-powered task creation from an email. Creates the issue in the user's **"Email"** project, **auto-assigned to the current user**.
+    *   **Description:** AI-powered task creation from an email. Creates the issue in the user's **"General"** project, **auto-assigned to the current user**.
+
     *   **Response:** `{ "status": "success", "issue_id": "uuid" }`
 
 ## 3. Issues (Core)

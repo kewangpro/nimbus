@@ -18,12 +18,14 @@ async def read_projects(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Retrieve projects for the current user. Ensures 'General' and 'Email' exist.
+    Retrieve projects for the current user. Ensures 'General' exists.
     """
+
     from sqlalchemy import select
     from app.models.project import Project as ProjectModel
     
-    # 1. Ensure "General" and "Email" projects exist for this user
+    # 1. Ensure "General" project exists for this user
+
     async def ensure_project(name: str):
         p_query = select(ProjectModel).where(ProjectModel.owner_id == current_user.id, ProjectModel.name == name)
         p_result = await db.execute(p_query)
@@ -35,7 +37,7 @@ async def read_projects(
         return p
 
     await ensure_project("General")
-    await ensure_project("Email")
+
 
     # 2. Fetch all projects for this user
     query = select(ProjectModel).where(ProjectModel.owner_id == current_user.id).offset(skip).limit(limit)

@@ -122,13 +122,10 @@ async def process_email_source(db: AsyncSession, user: User):
                 # Process with AI
                 task_data = await email_processor.extract_task(subject, body)
                 if task_data:
-                    # Find user's "Email" project
-                    res = await db.execute(select(Project).where(and_(Project.owner_id == user.id, Project.name == "Email")))
+                    # Find user's "General" project
+                    res = await db.execute(select(Project).where(and_(Project.owner_id == user.id, Project.name == "General")))
                     proj = res.scalars().first()
-                    if not proj:
-                        # Fallback to General
-                        res = await db.execute(select(Project).where(and_(Project.owner_id == user.id, Project.name == "General")))
-                        proj = res.scalars().first()
+
                     
                     if proj:
                         issue_in = IssueCreate(
