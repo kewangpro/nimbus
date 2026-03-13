@@ -21,3 +21,4 @@ ollama>=0.3.0
 aioimaplib==1.0.1
 aiosqlite==0.19.0
 mcp[sdk]>=1.0.0
+pytest-cov>=4.1.0

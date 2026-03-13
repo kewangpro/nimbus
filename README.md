@@ -41,7 +41,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
         *   **Smart Display:** Email subjects and sender names are automatically decoded from **RFC 2047 (MIME encoded-word)** format. This ensures that emojis and special characters (like smart quotes) in subject lines appear correctly as human-readable text.
         *   **Clean Snippets:** HTML-only emails are processed to show clean plain-text snippets, and all dates are displayed in your **configured timezone**.
 
-    ![Email Inbox](docs/screenshots/email.png)
+        ![Email Inbox](docs/screenshots/email.png)
 
 
 
