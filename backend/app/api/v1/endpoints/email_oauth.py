@@ -14,7 +14,7 @@ from email.header import decode_header, make_header
 
 router = APIRouter()
 
-def _decode_header(raw: str | None) -> str:
+def _decode_header(raw: Optional[str]) -> str:
     """Decode RFC 2047 encoded email headers (e.g. =?utf-8?B?...?=)."""
     if not raw:
         return ""

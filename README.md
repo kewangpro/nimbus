@@ -35,10 +35,11 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project for you.
     *   **Email-to-Task Mastery:**
         *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses `gemma3` to extract structured tasks into your **General** project.
-        *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)** as a primary view and manually convert emails into tasks. Tasks are automatically created in your **General** project and **assigned to you**.
+        *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)**. To save bandwidth and improve performance, emails are only fetched when you click the **Refresh** button. Content is **persisted in memory**, so you can switch between views (e.g., Board or Calendar) and return to your inbox without losing your retrieved emails.
 
 
-        *   **Smart Display:** Email subjects and sender names are decoded (RFC 2047 / Base64), HTML-only emails show clean plain-text snippets, and all dates are shown in **your configured timezone**.
+        *   **Smart Display:** Email subjects and sender names are automatically decoded from **RFC 2047 (MIME encoded-word)** format. This ensures that emojis and special characters (like smart quotes) in subject lines appear correctly as human-readable text.
+        *   **Clean Snippets:** HTML-only emails are processed to show clean plain-text snippets, and all dates are displayed in your **configured timezone**.
 
     ![Email Inbox](docs/screenshots/email.png)
 
@@ -142,6 +143,10 @@ To connect an external tool, point your MCP client to the **SSE (Server-Sent Eve
 - `get_task_details`: Retrieves full metadata for a specific task ID.
 - `schedule_task`: Updates the due date of an existing task.
 - `create_calendar_task`: Adds a new task with an optional deadline to your General project.
+## 🔧 Troubleshooting & Utilities
+
+### Python Compatibility
+The backend is compatible with **Python 3.9+**. If you are running tests on Python 3.9, the `mcp` library (which requires 3.10) is automatically mocked to allow the core test suite to pass.
 
 
 

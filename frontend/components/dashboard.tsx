@@ -13,7 +13,7 @@ import { AIClientUpdate } from "@/components/ai-client-update"
 import { CalendarView } from "@/components/calendar-view"
 import { EmailInboxView } from "@/components/email-inbox-view"
 
-import { User } from "@/types"
+import { User, Email } from "@/types"
 
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -36,6 +36,10 @@ export function Dashboard({ user, logout }: DashboardProps) {
     const [refreshKey, setRefreshKey] = useState(0)
     const { project, projects, setProject } = useProject()
     const [viewMode, setViewMode] = useState<ViewMode>('calendar')
+    
+    // Persistent Inbox State
+    const [inboxEmails, setInboxEmails] = useState<Email[]>([])
+    const [hasFetchedInbox, setHasFetchedInbox] = useState(false)
 
     const handleWebSocketMessage = useCallback((data: unknown) => {
         const payload = data as { type: string }
@@ -165,7 +169,12 @@ export function Dashboard({ user, logout }: DashboardProps) {
                         {viewMode === 'calendar' ? (
                             <CalendarView refreshTrigger={refreshKey} userId={user?.id} />
                         ) : viewMode === 'inbox' ? (
-                            <EmailInboxView />
+                            <EmailInboxView 
+                                persistentEmails={inboxEmails} 
+                                setPersistentEmails={setInboxEmails}
+                                hasFetched={hasFetchedInbox}
+                                setHasFetched={setHasFetchedInbox}
+                            />
                         ) : project ? (
                             <Tabs defaultValue="board" className="h-full flex flex-col">
                                 <div className="flex justify-between items-center mb-4 shrink-0">

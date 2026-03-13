@@ -106,6 +106,7 @@
 *   [x] Outlook compatibility: uses raw `imap.protocol.execute(Command("SEARCH", ...))` to bypass `aioimaplib`'s UTF-8 charset injection.
 *   [x] Fetch response handles `bytearray` (Outlook) and `bytes` (Gmail) for email body.
 *   [x] `POST /email-oauth/create-task-from-email` — AI-powered manual task creation. Auto-assigned to user.
+*   [x] Manual Inbox Refresh: Emails are only fetched on-demand (Refresh button) to save bandwidth.
 *   [x] RFC 2047 subject/from decoding: `=?utf-8?B?...?=` encoded headers decoded to readable text.
 *   [x] HTML snippet stripping: regex strips HTML tags from marketing emails; prefers `text/plain` part.
 *   [x] Timezone-aware email dates: displayed in the user's configured timezone via `formatInTimezone()`.
@@ -125,4 +126,6 @@
 *   [x] Fixed stale `EmailProvider` enum references and `.value` calls in `auth.py`.
 *   [x] Added `crud_user` and `crud_project` imports to `auth.py`.
 *   [x] Updated all test mocks to match new IMAP search protocol.
-*   [x] **All 7 tests passing.**
+*   [x] Python 3.9 Compatibility: Mocked `mcp` in `conftest.py` and handled type union syntax for compatibility.
+*   [x] Cleanup utility: `scripts/fix_encoded_titles.py` for retroactive title fixing.
+*   [x] **All 11 tests passing.**

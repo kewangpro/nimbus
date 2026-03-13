@@ -6,17 +6,21 @@ import { useTimezone } from "@/components/timezone-provider"
 import { Button } from "@/components/ui/button"
 import { Loader2, Plus, CheckCircle2, RefreshCw, Mail } from "lucide-react"
 import { toast } from "sonner"
+import { Email } from "@/types"
 
-interface Email {
-    id: string
-    subject: string
-    from: string
-    date: string
-    snippet: string
+interface EmailInboxViewProps {
+    persistentEmails: Email[]
+    setPersistentEmails: (emails: Email[]) => void
+    hasFetched: boolean
+    setHasFetched: (fetched: boolean) => void
 }
 
-export function EmailInboxView() {
-    const [emails, setEmails] = useState<Email[]>([])
+export function EmailInboxView({ 
+    persistentEmails, 
+    setPersistentEmails, 
+    hasFetched, 
+    setHasFetched 
+}: EmailInboxViewProps) {
     const [loading, setLoading] = useState(false)
     const [processingId, setProcessingId] = useState<string | null>(null)
     const { formatInTimezone } = useTimezone()
@@ -35,7 +39,8 @@ export function EmailInboxView() {
         setLoading(true)
         try {
             const response = await api.get("/email-oauth/inbox")
-            setEmails(response.data)
+            setPersistentEmails(response.data)
+            setHasFetched(true)
         } catch (error) {
             console.error(error)
             toast.error("Failed to fetch inbox. Make sure SSO is connected.")
@@ -45,7 +50,7 @@ export function EmailInboxView() {
     }
 
     useEffect(() => {
-        fetchInbox()
+        // fetchInbox() // Removed auto-fetch as per user request
     }, [])
 
     const handleCreateTask = async (email: Email) => {
@@ -80,15 +85,29 @@ export function EmailInboxView() {
             </div>
 
             <div className="flex-1 overflow-hidden">
-                {loading && emails.length === 0 ? (
+                {loading && persistentEmails.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full space-y-4">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         <p className="text-sm text-muted-foreground">Fetching your emails...</p>
                     </div>
-                ) : emails.length > 0 ? (
+                ) : !hasFetched ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center space-y-4 border-2 border-dashed rounded-xl bg-muted/5">
+                        <div className="p-4 bg-primary/10 rounded-full">
+                            <Mail className="h-8 w-8 text-primary" />
+                        </div>
+                        <div className="space-y-2 max-w-[280px]">
+                            <p className="text-lg font-semibold">Inbox Ready</p>
+                            <p className="text-sm text-muted-foreground">Click the refresh button above to retrieve your latest emails.</p>
+                        </div>
+                        <Button onClick={fetchInbox} className="gap-2">
+                            <RefreshCw className="h-4 w-4" />
+                            Fetch Emails
+                        </Button>
+                    </div>
+                ) : persistentEmails.length > 0 ? (
                     <div className="h-full pr-4 overflow-y-auto custom-scrollbar">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {emails.map((email) => (
+                            {persistentEmails.map((email) => (
                                 <div key={email.id} className="p-4 border rounded-lg hover:border-primary/50 transition-colors bg-card flex flex-col justify-between h-full">
                                     <div className="space-y-4 flex-1">
                                         <div className="flex justify-between items-start gap-4">
@@ -127,6 +146,7 @@ export function EmailInboxView() {
                         </div>
                         <p className="text-sm font-medium">No recent emails found</p>
                         <p className="text-xs text-muted-foreground">Your inbox is clear or SSO isn't fully linked.</p>
+                        <Button variant="ghost" size="sm" onClick={fetchInbox} className="mt-2">Try Again</Button>
                     </div>
                 )}
             </div>

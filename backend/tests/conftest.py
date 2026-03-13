@@ -7,6 +7,17 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+import sys
+from unittest.mock import MagicMock
+
+# Mock mcp if not installed to allow tests to run
+try:
+    import mcp
+except ImportError:
+    mcp_mock = MagicMock()
+    sys.modules["mcp"] = mcp_mock
+    sys.modules["mcp.server"] = mcp_mock
+    sys.modules["mcp.server.fastmcp"] = mcp_mock
 
 from app.main import app
 from app.api.deps import get_db

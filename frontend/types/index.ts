@@ -56,3 +56,11 @@ export interface User {
   email_automation_enabled?: boolean;
 }
 
+export interface Email {
+  id: string;
+  subject: string;
+  from: string;
+  date: string;
+  snippet: string;
+}
+

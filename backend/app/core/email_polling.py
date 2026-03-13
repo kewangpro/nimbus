@@ -1,6 +1,7 @@
 import base64
 import aioimaplib
 import logging
+from email.header import decode_header, make_header
 from aioimaplib import Command
 import httpx
 from datetime import datetime, timedelta, timezone
@@ -15,6 +16,17 @@ from app.models.user import User
 from app.crud.crud_issue import create as create_issue
 
 logger = logging.getLogger(__name__)
+
+def decode_mime_header(s: Optional[str]) -> str:
+    """
+    Decodes RFC 2047 MIME encoded-word strings.
+    """
+    if not s:
+        return ""
+    try:
+        return str(make_header(decode_header(s)))
+    except Exception:
+        return s
 
 async def poll_emails(db: AsyncSession):
     """
@@ -103,7 +115,8 @@ async def process_email_source(db: AsyncSession, user: User):
                 msg = message_from_string(raw_email)
 
                 
-                subject = msg["Subject"] or "(No Subject)"
+                
+                subject = decode_mime_header(msg["Subject"] or "(No Subject)")
                 body = ""
                 if msg.is_multipart():
                     for part in msg.walk():
