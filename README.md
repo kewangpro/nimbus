@@ -50,6 +50,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Detail View:** Comprehensive modal for editing issues with quick actions ("Do Today", "Complete") for overdue tasks.
     *   **Persistent Preferences:** Remembers UI settings like the "Show Completed" and "Show Weekends" toggles across sessions.
 *   **Role-Based Access:** Distinct views for Admins, Members, and Clients.
+*   **Audit Logs:** Built-in auditing engine keeping track of workspace events and user actions securely. ([View events list](docs/AUDITS.md))
 *   **File Storage:** Secure attachment handling with MinIO (S3 compatible).
 
 ## 🛠️ Tech Stack
@@ -159,6 +160,7 @@ The backend is compatible with **Python 3.9+**. If you are running tests on Pyth
 *   [AI Architecture](docs/AI_ARCHITECTURE.md)
 *   [UX Design](docs/UX_Design.md)
 *   [Deployment Guide](docs/DEPLOYMENT.md)
+*   [Audit Logs Reference](docs/AUDITS.md)
 
 ##  License
 

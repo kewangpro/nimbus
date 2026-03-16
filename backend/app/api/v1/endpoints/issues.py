@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
-from app.crud import crud_issue, crud_issue_link
+from app.crud import crud_issue, crud_issue_link, crud_audit
 from app.schemas.issue import Issue, IssueCreate, IssueUpdate, IssueStatus, IssuePriority
 from app.models.user import User
 from app.core.socket import manager
@@ -69,6 +69,7 @@ async def create_issue(
     Create new issue.
     """
     issue = await crud_issue.create(db=db, obj_in=issue_in, owner_id=current_user.id)
+    await crud_audit.log_action(db, "issue.create", current_user.id, "issue", issue.id)
     await manager.broadcast(json.dumps({"type": "ISSUE_CREATED", "data": str(issue.id)}))
     return issue
 
@@ -102,6 +103,7 @@ async def update_issue(
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
     issue = await crud_issue.update(db=db, db_obj=issue, obj_in=issue_in)
+    await crud_audit.log_action(db, "issue.update", current_user.id, "issue", issue.id)
     await manager.broadcast(json.dumps({"type": "ISSUE_UPDATED", "data": str(issue.id)}))
     return issue
 
@@ -119,6 +121,7 @@ async def delete_issue(
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
     issue = await crud_issue.remove(db=db, id=id)
+    await crud_audit.log_action(db, "issue.delete", current_user.id, "issue", issue.id)
     await manager.broadcast(json.dumps({"type": "ISSUE_DELETED", "data": str(id)}))
     return issue
 

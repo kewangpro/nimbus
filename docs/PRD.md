@@ -54,6 +54,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ### 2.5 User Roles & Access
 *   **Roles:** Admin, Member, Client.
 *   **Client Portal:** Restricted view showing only relevant client issues.
+*   **Audit Logs:** Track who performs which actions across the workspace to ensure accountability. ([Learn more](AUDITS.md))
 
 ### 2.6 File Storage
 *   **Attachments:** MinIO (S3-compatible) for secure file uploads.

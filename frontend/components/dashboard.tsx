@@ -24,6 +24,7 @@ import { CalendarDays, Layout, LogOut, Plus, FolderKanban, Mail } from "lucide-r
 import { cn } from "@/lib/utils"
 import { TimezoneProvider } from "@/components/timezone-provider"
 import { UserSettingsModal } from "@/components/user-settings-modal"
+import { AuditLogsModal } from "@/components/audit-logs-modal"
 
 interface DashboardProps {
     user: User | null
@@ -153,6 +154,7 @@ export function Dashboard({ user, logout }: DashboardProps) {
                             )}
                         </div>
                         <div className="flex items-center gap-3">
+                            <AuditLogsModal />
                             <UserSettingsModal user={user} onUpdate={() => window.location.reload()} />
                             <AIPlanner onIssuesCreated={handleIssueCreated} projectId={project?.id} userId={user?.id} />
                             {viewMode === 'project' && project && (

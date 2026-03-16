@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
-from app.crud import crud_project
+from app.crud import crud_project, crud_audit
 from app.schemas.project import Project, ProjectCreate, ProjectUpdate
 from app.models.user import User
 
@@ -57,6 +57,7 @@ async def create_project(
     Create new project.
     """
     project = await crud_project.create(db=db, obj_in=project_in, owner_id=current_user.id)
+    await crud_audit.log_action(db, "project.create", current_user.id, "project", project.id)
     return project
 
 @router.get("/{id}", response_model=Project)
@@ -89,6 +90,7 @@ async def update_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     project = await crud_project.update(db=db, db_obj=project, obj_in=project_in)
+    await crud_audit.log_action(db, "project.update", current_user.id, "project", project.id)
     return project
 
 @router.delete("/{id}", response_model=Project)
@@ -105,4 +107,5 @@ async def delete_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     project = await crud_project.remove(db=db, id=id)
+    await crud_audit.log_action(db, "project.delete", current_user.id, "project", project.id)
     return project

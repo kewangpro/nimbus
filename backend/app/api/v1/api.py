@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import users, auth, issues, ai, uploads, ws, projects, email_oauth
+from app.api.v1.endpoints import users, auth, issues, ai, uploads, ws, projects, email_oauth, audit_logs
 
 
 api_router = APIRouter()
@@ -11,3 +11,4 @@ api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 api_router.include_router(ws.router, prefix="/ws", tags=["websocket"])
 api_router.include_router(email_oauth.router, prefix="/email-oauth", tags=["email-oauth"])
+api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit-logs"])
