@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.schemas.token import Token
 from app.schemas.user import User as UserSchema
 from app.schemas.project import ProjectCreate
-from app.crud import crud_user, crud_project
+from app.crud import crud_user, crud_project, crud_audit
 
 
 router = APIRouter()
@@ -151,6 +151,16 @@ async def callback_oauth(
             access_token=access_token,
             refresh_token=refresh_token,
             expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        )
+        
+        # Audit log for SSO login
+        await crud_audit.log_action(
+            db, 
+            "auth.login", 
+            user.id, 
+            "user", 
+            user.id, 
+            details={"provider": provider}
         )
 
 

@@ -1,6 +1,9 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from app.api import deps
+from app.crud import crud_audit
+from app.db.session import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.storage import client
 from app.core.config import settings
 import uuid
@@ -10,6 +13,7 @@ router = APIRouter()
 @router.post("/", response_model=dict)
 async def upload_file(
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(deps.get_db),
     current_user: Any = Depends(deps.get_current_active_user),
 ) -> Any:
     """
@@ -34,6 +38,15 @@ async def upload_file(
         )
         
         url = f"http://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}/{file_name}"
+        
+        await crud_audit.log_action(
+            db, 
+            "file.upload", 
+            current_user.id, 
+            "file", 
+            None, 
+            details={"filename": file.filename, "size": file_size}
+        )
         
         return {
             "url": url,

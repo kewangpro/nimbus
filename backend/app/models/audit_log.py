@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from app.db.base import Base
 import uuid
@@ -12,5 +12,5 @@ class AuditLog(Base):
     action = Column(String, index=True, nullable=False)
     entity_type = Column(String, index=True, nullable=True)
     entity_id = Column(UUID(as_uuid=True), index=True, nullable=True)
-    details = Column(JSON().with_variant(JSON, "sqlite"), nullable=True)
+    details = Column(JSON().with_variant(JSONB, "postgresql").with_variant(JSON, "sqlite"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

@@ -25,6 +25,31 @@ Actions related to task (issue) management within projects.
 | `issue.create` | When a user creates a new issue on the board or list. |
 | `issue.update` | When an issue is updated (e.g., status changed, assignee updated, description modified). |
 | `issue.delete` | When an issue is permanently removed from the system. |
+| `issue.backfill` | When AI embeddings are backfilled for existing issues. |
+| `ai_schedule` | When the [AI Schedule](#📅-ai-schedule) organizes your tasks for the week. |
+
+### 👤 User & Auth
+Actions related to user accounts and authentication.
+
+| Action Type | Trigger Description |
+| :--- | :--- |
+| `auth.login` | When a user logs in via SSO (Gmail/Outlook). |
+| `user.update_me` | When a user updates their own profile details. |
+
+### ✉️ Email Integrations
+Actions related to the email-to-task automation.
+
+| Action Type | Trigger Description |
+| :--- | :--- |
+| `email.task_created` | When a task is automatically created from a polled email. |
+| `email.task_created_manual` | When a user manually creates a task from their inbox. |
+
+### 📂 Files
+Actions related to file management.
+
+| Action Type | Trigger Description |
+| :--- | :--- |
+| `file.upload` | When a user uploads a file/attachment. |
 
 ## Log Data Structure
 Each audit log entry captures:
@@ -32,7 +57,12 @@ Each audit log entry captures:
 - `action`: The specific action key (e.g., `issue.update`).
 - `entity_type`: The type of resource mutated (e.g., `issue`, `project`).
 - `entity_id`: The unique identifier corresponding to that specific entity.
-- `details`: (Optional) Additional contextual metadata regarding the change.
+- `details`: Rich contextual metadata including:
+    - `title` / `name`: The human-readable identifier of the entity (persisted even if the entity is deleted).
+    - `changes`: An array of field names that were modified during an update (e.g., `["status", "priority", "due_date"]`).
+    - `via`: Identifies the system/tool that triggered the update (e.g., `ai_scheduler`).
+    - `email_subject`: For tasks created from email.
+    - `filename`: For file uploads.
 - `created_at`: The precise UTC timestamp when the action occurred.
 
 ## Extensibility 

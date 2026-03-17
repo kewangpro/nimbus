@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, date, time, timezone
 
 from app.api import deps
 from app.core import ai
-from app.crud import crud_embedding, crud_issue, crud_issue_summary, crud_project, crud_user, crud_issue_link
+from app.crud import crud_embedding, crud_audit, crud_issue, crud_issue_summary, crud_project, crud_user, crud_issue_link
 from app.schemas.issue import Issue, IssuePriority, IssueStatus
 
 router = APIRouter()
@@ -202,6 +202,14 @@ async def auto_schedule(
                 issue_obj = await crud_issue.get(db, id=issue_id)
                 if issue_obj:
                     await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
+                    await crud_audit.log_action(
+                        db,
+                        "issue.update",
+                        current_user.id,
+                        "issue",
+                        issue_obj.id,
+                        details={"title": issue_obj.title, "changes": ["due_date"], "via": "ai_scheduler"}
+                    )
                     count += 1
             except ValueError:
                 continue

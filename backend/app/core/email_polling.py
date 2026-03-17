@@ -14,6 +14,7 @@ from app.schemas.issue import IssueCreate
 from app.models.project import Project
 from app.models.user import User
 from app.crud.crud_issue import create as create_issue
+from app.crud import crud_audit
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,8 @@ async def process_email_source(db: AsyncSession, user: User):
             from email import message_from_string
             for msg_id in msg_ids:
 
-                _, data = await imap.fetch(msg_id, "RFC822")
+                # Use BODY.PEEK[] to fetch without marking as Seen
+                _, data = await imap.fetch(msg_id, "BODY.PEEK[]")
                 if not data or len(data) < 2:
                     continue
                     
@@ -150,7 +152,21 @@ async def process_email_source(db: AsyncSession, user: User):
                             assignee_id=user.id
                         )
 
-                        await create_issue(db, obj_in=issue_in, owner_id=user.id)
+                        issue = await create_issue(db, obj_in=issue_in, owner_id=user.id)
+                        
+                        # Explicitly mark as seen only after DB commit
+                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                        
+                        # Audit log for automated email task creation
+                        await crud_audit.log_action(
+                            db, 
+                            "email.task_created", 
+                            user.id, 
+                            "issue", 
+                            issue.id,
+                            details={"title": issue.title, "email_subject": subject, "source": "automation"}
+                        )
+                        
                         logger.info(f"SUCCESS: Created auto-task from email for {user.email}: {issue_in.title}")
 
         await imap.logout()

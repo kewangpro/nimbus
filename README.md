@@ -34,7 +34,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Single Sign-On:** Login seamlessly with **Google** or **Outlook**.
     *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project for you.
     *   **Email-to-Task Mastery:**
-        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses `gemma3` to extract structured tasks into your **General** project.
+        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses `gemma3` to extract structured tasks into your **General** project. The implementation uses atomic flagging (`BODY.PEEK`) to ensure emails are only marked as read after the task is successfully committed, preventing data loss during network or AI timeouts.
         *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)**. To save bandwidth and improve performance, emails are only fetched when you click the **Refresh** button. Content is **persisted in memory**, so you can switch between views (e.g., Board or Calendar) and return to your inbox without losing your retrieved emails.
 
 
@@ -50,7 +50,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Detail View:** Comprehensive modal for editing issues with quick actions ("Do Today", "Complete") for overdue tasks.
     *   **Persistent Preferences:** Remembers UI settings like the "Show Completed" and "Show Weekends" toggles across sessions.
 *   **Role-Based Access:** Distinct views for Admins, Members, and Clients.
-*   **Audit Logs:** Built-in auditing engine keeping track of workspace events and user actions securely. ([View events list](docs/AUDITS.md))
+*   **Audit Logs:** Built-in auditing engine keeping track of workspace events (Project/Task CRUD), email integrations, AI-driven scheduling, authentication, and file uploads. Captures entity titles and specific field-level changes for full accountability. ([View events list](docs/AUDITS.md))
 *   **File Storage:** Secure attachment handling with MinIO (S3 compatible).
 
 ## 🛠️ Tech Stack

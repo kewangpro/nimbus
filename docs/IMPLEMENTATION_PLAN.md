@@ -129,3 +129,13 @@
 *   [x] Python 3.9 Compatibility: Mocked `mcp` in `conftest.py` and handled type union syntax for compatibility.
 *   [x] Cleanup utility: `scripts/fix_encoded_titles.py` for retroactive title fixing.
 *   [x] **All 11 tests passing.**
+
+---
+
+## Phase 10: Reliability & Auditing ✅
+**Goal:** Harden the system for production and ensure operational visibility.
+
+*   [x] **Atomic Email Polling:** Use `BODY.PEEK` and explicit flagging to prevent email loss.
+*   [x] **Expanded Audit Logging:** Track authentication (SSO login), user profile updates, manual email-to-task creation, AI backfill jobs, and file uploads.
+*   [x] **Detailed Auditing (Titles & Changes):** Every log entry captures the entity title/name (e.g., Issue Title) and tracks specific field-level changes (e.g., `status`, `priority`) during updates.
+*   [x] **Enhanced Documentation:** Updated `AUDITS.md` and `README.md` with detailed action references and data structure info.

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
-from app.crud import crud_user
+from app.crud import crud_user, crud_audit
 from app.schemas.user import User, UserCreate, UserCreatePublic, UserSelfUpdate
 
 router = APIRouter()
@@ -43,5 +43,28 @@ async def update_user_me(
     """
     update_data = user_in.dict(exclude_unset=True)
     # Check if we need to verify email uniqueness if email is being updated (omitted for brevity unless needed)
+    # Track changes
+    old_data = {
+        "full_name": current_user.full_name,
+        "email_automation_enabled": current_user.email_automation_enabled,
+        "timezone": current_user.timezone,
+    }
+    
     user = await crud_user.update(db, db_obj=current_user, obj_in=update_data)
+    
+    changes = []
+    for field, old_val in old_data.items():
+        if field in update_data and update_data[field] != old_val:
+            changes.append(field)
+    if "password" in update_data:
+        changes.append("password")
+
+    await crud_audit.log_action(
+        db, 
+        "user.update_me", 
+        current_user.id, 
+        "user", 
+        user.id,
+        details={"changes": changes}
+    )
     return user

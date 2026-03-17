@@ -22,6 +22,7 @@ async def backfill_embeddings(
     Backfill embeddings for all issues.
     """
     job_id = await jobs.enqueue_job(jobs.JOB_BACKFILL_EMBEDDINGS, {"requested_by": str(current_user.id)})
+    await crud_audit.log_action(db, "issue.backfill", current_user.id, "issue", None, details={"job_id": job_id})
     return {"message": "Backfill job queued", "job_id": job_id}
 
 @router.get("/", response_model=List[Issue])
@@ -69,7 +70,14 @@ async def create_issue(
     Create new issue.
     """
     issue = await crud_issue.create(db=db, obj_in=issue_in, owner_id=current_user.id)
-    await crud_audit.log_action(db, "issue.create", current_user.id, "issue", issue.id)
+    await crud_audit.log_action(
+        db, 
+        "issue.create", 
+        current_user.id, 
+        "issue", 
+        issue.id,
+        details={"title": issue.title}
+    )
     await manager.broadcast(json.dumps({"type": "ISSUE_CREATED", "data": str(issue.id)}))
     return issue
 
@@ -102,8 +110,33 @@ async def update_issue(
     issue = await crud_issue.get(db=db, id=id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+    
+    # Track changes
+    old_data = {
+        "title": issue.title,
+        "status": issue.status,
+        "priority": issue.priority,
+        "assignee_id": issue.assignee_id,
+        "project_id": issue.project_id,
+        "due_date": issue.due_date,
+    }
+    
     issue = await crud_issue.update(db=db, db_obj=issue, obj_in=issue_in)
-    await crud_audit.log_action(db, "issue.update", current_user.id, "issue", issue.id)
+    
+    changes = []
+    for field, old_val in old_data.items():
+        new_val = getattr(issue, field)
+        if old_val != new_val:
+            changes.append(field)
+
+    await crud_audit.log_action(
+        db, 
+        "issue.update", 
+        current_user.id, 
+        "issue", 
+        issue.id,
+        details={"title": issue.title, "changes": changes}
+    )
     await manager.broadcast(json.dumps({"type": "ISSUE_UPDATED", "data": str(issue.id)}))
     return issue
 
@@ -120,8 +153,17 @@ async def delete_issue(
     issue = await crud_issue.get(db=db, id=id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+    
+    issue_title = issue.title
     issue = await crud_issue.remove(db=db, id=id)
-    await crud_audit.log_action(db, "issue.delete", current_user.id, "issue", issue.id)
+    await crud_audit.log_action(
+        db, 
+        "issue.delete", 
+        current_user.id, 
+        "issue", 
+        issue.id,
+        details={"title": issue_title}
+    )
     await manager.broadcast(json.dumps({"type": "ISSUE_DELETED", "data": str(id)}))
     return issue
 

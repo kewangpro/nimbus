@@ -5,6 +5,7 @@ from aioimaplib import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from app.models.user import User
+from app.crud import crud_audit
 from app.schemas.issue import IssueCreate
 from app.crud.crud_issue import create as create_issue
 from app.models.project import Project
@@ -178,4 +179,15 @@ async def create_task_from_email(
 
     
     issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id)
+    
+    # Audit log for manual email task creation
+    await crud_audit.log_action(
+        db, 
+        "email.task_created_manual", 
+        current_user.id, 
+        "issue", 
+        issue.id, 
+        details={"title": issue.title, "email_subject": subject, "source": "manual"}
+    )
+    
     return {"status": "success", "issue_id": str(issue.id)}

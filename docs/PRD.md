@@ -54,7 +54,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ### 2.5 User Roles & Access
 *   **Roles:** Admin, Member, Client.
 *   **Client Portal:** Restricted view showing only relevant client issues.
-*   **Audit Logs:** Track who performs which actions across the workspace to ensure accountability. ([Learn more](AUDITS.md))
+*   **Audit Logs:** Track mutations (create/update/delete) with user attribution. Capture entity titles and specific field-level changes for full accountability, including AI-driven scheduling events. ([Learn more](AUDITS.md))
 
 ### 2.6 File Storage
 *   **Attachments:** MinIO (S3-compatible) for secure file uploads.
@@ -74,4 +74,4 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ## 4. Non-Functional Requirements
 *   **Performance:** Dashboard load < 1.5s; real-time sync < 200ms.
 *   **Privacy:** All AI processing runs locally on the host machine via Ollama. No data leaves the user's environment.
-*   **Reliability:** OAuth tokens are automatically refreshed. Email polling recovers gracefully on transient failures.
+*   **Reliability:** OAuth tokens are automatically refreshed. Email polling is atomic; emails are only marked as "Seen" after the task is successfully created and committed to the database (using `BODY.PEEK`), preventing data loss during processing failures.
