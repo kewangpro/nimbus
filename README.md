@@ -100,8 +100,14 @@ python -m app.worker
 
 If you prefer Docker for backend + worker:
 ```bash
+# Start services
 docker compose up -d backend worker
+
+# Run database migrations
 docker compose exec backend alembic upgrade head
+
+# View logs
+docker compose logs --tail=100 -f
 ```
 
 ### 3. Frontend Setup

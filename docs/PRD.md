@@ -74,4 +74,4 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ## 4. Non-Functional Requirements
 *   **Performance:** Dashboard load < 1.5s; real-time sync < 200ms.
 *   **Privacy:** All AI processing runs locally on the host machine via Ollama. No data leaves the user's environment.
-*   **Reliability:** OAuth tokens are automatically refreshed. Email polling is atomic; emails are only marked as "Seen" after the task is successfully created and committed to the database (using `BODY.PEEK`), preventing data loss during processing failures.
+*   **Reliability:** OAuth tokens are automatically refreshed. Email polling is atomic (using `BODY.PEEK`) and idempotent; a new polling job is only enqueued if one isn't already pending in the queue. The background worker includes a built-in reconnection strategy for Redis/DB failures to ensure continuous operation.

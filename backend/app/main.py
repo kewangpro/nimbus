@@ -9,11 +9,15 @@ from app.mcp.server import mcp
 
 
 async def schedule_email_polling():
-    """Background task to enqueue email polling every minute"""
+    """Background task to enqueue email polling every minute if not already enqueued"""
+    from app.core.jobs import is_job_type_queued
     while True:
         try:
-            print("INFO: Enqueuing scheduled email polling job...")
-            await enqueue_job(JOB_POLL_EMAILS, {})
+            if not await is_job_type_queued(JOB_POLL_EMAILS):
+                print("INFO: Enqueuing scheduled email polling job...")
+                await enqueue_job(JOB_POLL_EMAILS, {})
+            else:
+                print("DEBUG: Email polling job already in queue, skipping enqueue.")
         except Exception as e:
             print(f"ERROR: Failed to enqueue email job: {e}")
         await asyncio.sleep(60) # Poll every minute

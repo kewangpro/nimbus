@@ -139,3 +139,12 @@
 *   [x] **Expanded Audit Logging:** Track authentication (SSO login), user profile updates, manual email-to-task creation, AI backfill jobs, and file uploads.
 *   [x] **Detailed Auditing (Titles & Changes):** Every log entry captures the entity title/name (e.g., Issue Title) and tracks specific field-level changes (e.g., `status`, `priority`) during updates.
 *   [x] **Enhanced Documentation:** Updated `AUDITS.md` and `README.md` with detailed action references and data structure info.
+
+---
+
+## Phase 11: System Resilience & Optimization ✅
+**Goal:** Ensure the system recovers gracefully from infrastructure failure.
+
+*   [x] **Worker Reconnection:** Implemented error handling and retry loops in the background worker for Redis/Postgres connection drops.
+*   [x] **Job Idempotency:** Added a check to prevent redundant periodic jobs (e.g., email polling) from accumulating in the queue when the worker is offline.
+*   [x] **Improved Monitoring:** Added standard logging commands and monitoring guides to `README.md` and `DEPLOYMENT.md`.

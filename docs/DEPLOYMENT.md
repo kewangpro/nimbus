@@ -133,3 +133,22 @@ alembic upgrade head
 ```
 
 The `docker compose exec backend alembic upgrade head` command can be added to CI/CD pipelines to automate this step.
+
+---
+
+## 7. Monitoring & Reliability
+
+### Logs
+To monitor services in real-time, use Docker Compose logs:
+```bash
+# View last 100 lines and follow all logs
+docker compose logs --tail=100 -f
+
+# Follow specific service logs
+docker compose logs -f backend
+docker compose logs -f worker
+```
+
+### Resilience
+- **Worker:** The background worker includes automatic reconnection logic. If Redis or the database becomes temporarily unavailable, the worker will enter a retry loop (5-10s delay) rather than exiting.
+- **Job Idempotency:** Scheduled jobs (like email polling) use a Redis-based idempotency check. New jobs are only enqueued if a job of the same type isn't already pending, preventing task accumulation during infrastructure downtime.

@@ -60,18 +60,29 @@ async def _process_job(raw: str) -> None:
 
 
 async def run_worker() -> None:
-    redis = Redis.from_url(settings.REDIS_URL, decode_responses=True)
     print("Nimbus worker started. Waiting for jobs...")
-    try:
-        while True:
-            result = await redis.blpop(QUEUE_NAME, timeout=5)
-            if not result:
-                continue
-            _, raw = result
-            await _process_job(raw)
-    finally:
-        await redis.aclose()
+    while True:
+        try:
+            redis = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            try:
+                while True:
+                    result = await redis.blpop(QUEUE_NAME, timeout=5)
+                    if not result:
+                        continue
+                    _, raw = result
+                    await _process_job(raw)
+            finally:
+                await redis.aclose()
+        except (ConnectionError, ConnectionRefusedError, OSError) as e:
+            print(f"Redis connection error: {e}. Retrying in 5 seconds...")
+            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"Unexpected worker error: {e}. Retrying in 10 seconds...")
+            await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
-    asyncio.run(run_worker())
+    try:
+        asyncio.run(run_worker())
+    except KeyboardInterrupt:
+        print("Worker stopped by user.")
