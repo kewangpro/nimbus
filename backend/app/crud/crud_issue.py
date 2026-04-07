@@ -42,7 +42,7 @@ async def get_multi(
         joinedload(Issue.project),
         joinedload(Issue.assignee),
         selectinload(Issue.labels)
-    ).offset(skip).limit(limit)
+    ).order_by(Issue.created_at.desc()).offset(skip).limit(limit)
     
     if owner_id:
         query = query.where(Issue.owner_id == owner_id)

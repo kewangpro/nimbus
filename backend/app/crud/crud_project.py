@@ -16,7 +16,7 @@ async def get_by_name(db: AsyncSession, name: str) -> Optional[Project]:
 async def get_multi(
     db: AsyncSession, *, skip: int = 0, limit: int = 100
 ) -> List[Project]:
-    query = select(Project).offset(skip).limit(limit)
+    query = select(Project).order_by(Project.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 
