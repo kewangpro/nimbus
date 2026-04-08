@@ -15,6 +15,8 @@ try:
     import mcp
 except ImportError:
     mcp_mock = MagicMock()
+    # FastMCP() should return an object where .tool() is a decorator returning the original function
+    mcp_mock.FastMCP.return_value.tool.return_value = lambda f: f
     sys.modules["mcp"] = mcp_mock
     sys.modules["mcp.server"] = mcp_mock
     sys.modules["mcp.server.fastmcp"] = mcp_mock

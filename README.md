@@ -149,7 +149,8 @@ To connect an external tool, point your MCP client to the **SSE (Server-Sent Eve
 - `list_calendar_events`: Fetches a list of all scheduled tasks within a timeframe.
 - `get_task_details`: Retrieves full metadata for a specific task ID.
 - `schedule_task`: Updates the due date of an existing task.
-- `create_calendar_task`: Adds a new task with an optional deadline to your General project.
+- `create_calendar_task`: Adds a new task with an optional deadline and project name (defaults to 'General').
+- `search_tasks`: Finds relevant tasks using natural language semantic search.
 ## 🔧 Troubleshooting & Utilities
 
 ### Python Compatibility

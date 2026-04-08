@@ -132,3 +132,25 @@ CREATE TABLE issue_links (
 *   **Fallback:** If Ollama is offline, AI endpoints return HTTP 500. No keyword fallback exists — treat AI features as optional.
 *   **Background Jobs:** Embedding backfills and email polling run via the async worker to avoid blocking the API.
 *   **Caching:** Issue summaries are content-hash cached; regenerated only when issue content changes.
+---
+136: 
+137: ## 7. External AI Integration (MCP)
+138: Nimbus implements a **Model Context Protocol (MCP)** server via the `FastMCP` framework. This allows external AI assistants (like Claude) to securely access and modify the user's project data.
+139: 
+140: ### Tools Provided:
+141: | Tool | Purpose |
+142: |:---|:---|
+143: | `list_calendar_events` | Fetch tasks within a timeframe, sorted by due date. Excludes completed items. |
+144: | `search_tasks` | Executes natural language semantic search against the vector database. |
+145: | `create_calendar_task` | Create new issues with dynamic project selection support. |
+146: | `schedule_task` | Update task deadlines. |
+147: | `get_task_details` | Retrieve full issue metadata. |
+148: 
+149: ### Transport:
+150: *   **Protocol:** SSE (Server-Sent Events).
+151: *   **Endpoint:** `/mcp/sse` (Mounted within the main FastAPI application).
+152: 
+153: ### Security:
+154: *   Currently uses environment-based user lookup (`NIMBUS_USER_EMAIL`) for MCP context.
+155: *   Strictly filters data by `owner_id` to ensure isolation.
+156: 

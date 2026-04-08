@@ -97,4 +97,5 @@
     *   `list_calendar_events`: List scheduled issues.
     *   `get_task_details`: Fetch full metadata for an issue.
     *   `schedule_task`: Update issue due dates.
-    *   `create_calendar_task`: Create a new issue with a deadline.
+    *   `create_calendar_task`: Create a new issue with a deadline and optional project name.
+    *   `search_tasks`: Semantic search for issues using natural language.

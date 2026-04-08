@@ -148,3 +148,16 @@
 *   [x] **Worker Reconnection:** Implemented error handling and retry loops in the background worker for Redis/Postgres connection drops.
 *   [x] **Job Idempotency:** Added a check to prevent redundant periodic jobs (e.g., email polling) from accumulating in the queue when the worker is offline.
 *   [x] **Improved Monitoring:** Added standard logging commands and monitoring guides to `README.md` and `DEPLOYMENT.md`.
+---
+151: 
+152: ## Phase 12: External AI Integration (MCP) ✅
+153: **Goal:** Enable external AI assistants (e.g., Claude Desktop) to directly manage Nimbus data via the Model Context Protocol.
+154: 
+155: *   [x] **FastMCP Server:** Integrated `FastMCP` into the FastAPI backend.
+156: *   [x] **SSE Transport:** Mounted MCP at `GET /mcp/sse` for standard cross-tool connectivity.
+157: *   [x] **Calendar Tools:** Implemented `list_calendar_events` (with chronological sorting and timeframe windowing) and `schedule_task`.
+158: *   [x] **Task Management Tools:** Implemented `create_calendar_task` (with dynamic project selection) and `get_task_details`.
+159: *   [x] **Semantic Search Tool:** Exposed `search_tasks` to allow external AIs to find issues using the local vector database.
+160: *   [x] **Robust Error Handling:** Comprehensive try-except blocks with actionable feedback for AI self-correction.
+161: *   [x] **Automated Testing:** Dedicated test suite (`tests/test_mcp_server.py`) with enhanced mocking for Python 3.9 compatibility.
+162: 
