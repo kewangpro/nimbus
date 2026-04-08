@@ -207,25 +207,36 @@ async def test_list_calendar_events_ordering_and_filtering(db):
         done = now + timedelta(days=2)
         # 6. Canceled task within 7 days (should BE EXCLUDED)
         canceled = now + timedelta(days=4)
+        
+        # 7. Same day as 'mid', but created later (should come BEFORE 'mid' in same-day group)
+        mid_later_due = now + timedelta(days=3)
+        
+        early_created = now - timedelta(hours=10)
+        mid_created = now - timedelta(hours=5)
+        mid_later_created = now # Most recent
 
-        db.add(Issue(title="Early Task", due_date=early, owner_id=user.id, project_id=project.id))
-        db.add(Issue(title="Mid Task", due_date=mid, owner_id=user.id, project_id=project.id))
+        db.add(Issue(title="Early Task", due_date=early, created_at=early_created, owner_id=user.id, project_id=project.id))
+        db.add(Issue(title="Mid Task", due_date=mid, created_at=mid_created, owner_id=user.id, project_id=project.id))
         db.add(Issue(title="Border Task", due_date=border, owner_id=user.id, project_id=project.id))
         db.add(Issue(title="Far Task", due_date=far, owner_id=user.id, project_id=project.id))
         db.add(Issue(title="Done Task", due_date=done, owner_id=user.id, status=IssueStatus.DONE, project_id=project.id))
         db.add(Issue(title="Canceled Task", due_date=canceled, owner_id=user.id, status=IssueStatus.CANCELED, project_id=project.id))
+        
+        db.add(Issue(title="Mid Later Task", due_date=mid_later_due, created_at=mid_later_created, owner_id=user.id, project_id=project.id))
         await db.commit()
 
         with patch("app.mcp.server.get_default_user_id", return_value=user.id):
             # Fetch with 7 days filter
             res = await list_calendar_events(days=7)
             
-            # Verify order: Early -> Mid -> Border
+            # Verify order: Early -> [Mid Later, Mid] (if same time) -> Border
+            # Secondary sort is Issue.created_at.desc(), so Mid Later (now) > Mid (now - 5h)
             lines = [l for l in res.split("\n") if l.startswith("-")]
-            assert len(lines) == 3
+            assert len(lines) == 4
             assert "Early Task" in lines[0]
-            assert "Mid Task" in lines[1]
-            assert "Border Task" in lines[2]
+            assert "Mid Later Task" in lines[1]
+            assert "Mid Task" in lines[2]
+            assert "Border Task" in lines[3]
             assert "Far Task" not in res
             assert "Done Task" not in res
             assert "Canceled Task" not in res

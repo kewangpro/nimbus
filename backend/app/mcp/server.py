@@ -54,7 +54,7 @@ async def list_calendar_events(days: int = 7) -> str:
                     Issue.status != IssueStatus.DONE,
                     Issue.status != IssueStatus.CANCELED
                 )
-            ).order_by(Issue.due_date)
+            ).order_by(Issue.due_date.asc(), Issue.created_at.desc())
             
             result = await db.execute(query)
             issues = result.scalars().all()
