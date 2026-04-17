@@ -42,8 +42,13 @@ class Settings(BaseSettings):
     # This should be the base URL of your backend (e.g. http://localhost:8000)
     BACKEND_URL: str = "http://localhost:8000"
 
+    # AI Config
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "gemma3:latest"
+
 
     class Config:
+
         case_sensitive = True
         env_file = ".env"
 

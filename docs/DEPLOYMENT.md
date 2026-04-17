@@ -99,11 +99,9 @@ cd frontend && npm install && PORT=3100 npm run dev
 - API Docs: `http://localhost:8000/docs`
 - MinIO Console: `http://localhost:9001`
 
-> **Note:** The backend connects to Ollama via `http://host.docker.internal:11434`. Ensure Ollama is running locally with:
-> ```bash
-> ollama pull gemma3
-> ollama pull nomic-embed-text
-> ```
+> **Note on Ollama Networking:**
+> - If running in Docker, use `OLLAMA_BASE_URL=http://host.docker.internal:11434`.
+> - If running a remote Ollama instance, ensure `OLLAMA_HOST=0.0.0.0` is set on that machine to allow external connections.
 
 ### Option B: Cloud PaaS (Production)
 | Component | Recommended Service |

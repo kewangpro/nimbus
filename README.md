@@ -120,8 +120,23 @@ App: `http://localhost:3100`
 If port 3100 is in use, pick another port (e.g. `PORT=3101`).
 
 ## 🧠 AI Configuration
-Ensure **Ollama** is running on your host machine at `http://localhost:11434` (default).
-The backend connects to it via `http://host.docker.internal:11434` if running in Docker, or `localhost` if running locally.
+
+### Connecting to Ollama
+The Nimbus backend needs to communicate with your Ollama instance. The URL depends on your setup:
+
+*   **Running Nimbus in Docker + Ollama on same Mac:**
+    Use `http://host.docker.internal:11434`
+*   **Running Nimbus locally (no Docker) + Ollama on same Mac:**
+    Use `http://localhost:11434`
+*   **Running Ollama on a remote machine (e.g., Mac mini):**
+    1. Use `http://<remote-ip>:11434`
+    2. **Important:** On the remote machine, ensure Ollama is listening on all interfaces by setting `OLLAMA_HOST=0.0.0.0` before starting it.
+
+Ensure you have the required models pulled:
+```bash
+ollama pull gemma3
+ollama pull nomic-embed-text
+```
 
 To test AI features:
 1.  **Planner:** Click "AI Plan" in the header and type your project thoughts.
