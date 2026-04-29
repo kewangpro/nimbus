@@ -8,7 +8,7 @@ from app.models.issue import IssuePriority
 
 class EmailProcessor:
     def __init__(self):
-        self.system_prompt = (
+        self.base_system_prompt = (
             "You are an AI assistant for Nimbus, a project management tool. "
             "Convert the following email into a structured task. "
             "Extract a clear title, a detailed description, a priority, and a suggested due date if mentioned. "
@@ -18,9 +18,15 @@ class EmailProcessor:
         )
 
     async def extract_task(self, subject: str, body: str) -> Optional[Dict[str, Any]]:
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        system_prompt = (
+            f"{self.base_system_prompt} "
+            f"The current date is {current_date}. If a date is mentioned without a year, "
+            f"infer the most logical year relative to today."
+        )
         prompt = f"Email Subject: {subject}\n\nEmail Body:\n{body}"
         
-        response_text = await ai.generate_completion(prompt, system_prompt=self.system_prompt)
+        response_text = await ai.generate_completion(prompt, system_prompt=system_prompt)
         if not response_text:
             return None
         
