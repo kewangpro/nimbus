@@ -171,9 +171,13 @@ async def auto_schedule(
         raise HTTPException(status_code=500, detail="Failed to generate schedule")
 
     import json
+    import re
     count = 0
     try:
         clean_json = response.replace("```json", "").replace("```", "").strip()
+        json_match = re.search(r"\[.*\]", clean_json, re.DOTALL)
+        if json_match:
+            clean_json = json_match.group(0)
         schedule_data = json.loads(clean_json)
 
         from uuid import UUID
