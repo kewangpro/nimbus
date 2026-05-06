@@ -9,7 +9,10 @@ Nimbus is a modern, high-performance project management tool designed to replace
 *   **Local AI Intelligence (Ollama):**
     *   **🤖 AI Project Planner:** Turn natural language "brain dumps" into structured project tasks, **automatically scheduling them** with balanced due dates across the work week.
         *   **Project Selection:** Pick an existing project or create a new one before creating issues.
-    *   **📅 AI Schedule:** Distributes open tasks that are unscheduled or past due across the work week (Monday-Friday), skipping weekends and resolving overdue backlogs.
+    *   **📅 AI Schedule:** 
+        *   **Input:** All open issues that are unscheduled, past due, or scheduled far in the future (> 7 days).
+        *   **Output:** Updated `due_date` for each affected issue.
+        *   **Logic:** Prioritizes `URGENT` items early, pulls all provided tasks into the next 5 days, skips weekends, and resolves overdue backlogs. Ensures all relevant tasks are pulled into the current sprint plan.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using `gemma3`.

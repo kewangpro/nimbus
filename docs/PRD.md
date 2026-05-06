@@ -42,7 +42,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 
 ### 2.4 AI-Native Core (Local Ollama)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
-*   **AI Scheduler:** Distributes open/overdue tasks across the next 5 business days (Mon-Fri only).
+*   **AI Scheduler:** Distributes open, overdue, or far-future tasks across the next 5 business days (Mon-Fri only).
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
 *   **Auto-Triage:** Suggests issue priority using `gemma3`.
 *   **Similar Issues:** Detects likely duplicates during issue creation.

@@ -65,9 +65,9 @@ CREATE TABLE issue_links (
 *   **Scheduling:** Distributes tasks across the next 5 business days (Mon-Fri), respecting existing load.
 
 ### 4.3 AI Scheduler
-*   **Input:** All open issues that are unscheduled or past due.
+*   **Input:** All open issues that are unscheduled, past due, or scheduled far in the future (> 7 days).
 *   **Output:** Updated `due_date` for each affected issue.
-*   **Logic:** Prioritizes `URGENT` items early, limits ~3-5 tasks/day to prevent burnout, skips weekends.
+*   **Logic:** Prioritizes `URGENT` items early, pulls all provided tasks into the next 5 days, skips weekends.
 
 ### 4.4 Semantic Search
 *   **Input:** User query string.

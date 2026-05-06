@@ -115,8 +115,14 @@ async def auto_schedule(
         skip += page_size
     open_issues = [i for i in issues if i.status != IssueStatus.DONE and i.status != IssueStatus.CANCELED]
 
-    # Only schedule issues with no due_date or past due
+    # Schedule issues that are:
+    # 1. Unscheduled (no due_date)
+    # 2. Overdue
+    # 3. Scheduled far in the future (beyond the next 5 weekdays)
     now_utc = datetime.now(timezone.utc)
+    # We look 7 days ahead to account for weekends and the 5-weekday window
+    horizon = now_utc + timedelta(days=7)
+    
     schedulable_issues: list[Issue] = []
     for issue in open_issues:
         if issue.due_date is None:
@@ -126,14 +132,23 @@ async def auto_schedule(
             due_dt = issue.due_date
             if due_dt.tzinfo is None:
                 due_dt = due_dt.replace(tzinfo=timezone.utc)
-            if due_dt < now_utc:
+            
+            # If overdue OR scheduled beyond our current planning horizon, it's schedulable
+            if due_dt < now_utc or due_dt > horizon:
                 schedulable_issues.append(issue)
         except Exception:
-            # If due_date is malformed, treat as unscheduled
             schedulable_issues.append(issue)
     
     if not schedulable_issues:
-        return {"scheduled_count": 0, "message": "No unscheduled or overdue issues to schedule."}
+        return {"scheduled_count": 0, "message": "No issues require rescheduling."}
+
+    # Sort by priority (URGENT -> LOW) and limit to avoid prompt bloat
+    # Priority order: URGENT (0?), HIGH (1?), MEDIUM (2?), LOW (3?)
+    # Let's check the enum values if possible, or just trust the LLM to handle the text.
+    schedulable_issues.sort(key=lambda x: x.priority.value if hasattr(x.priority, 'value') else str(x.priority))
+    
+    # Limit to 40 tasks to ensure LLM can process them all and stay within JSON limits
+    schedulable_issues = schedulable_issues[:40]
 
     # 2. Prepare prompt
     issues_text = "\n".join([f"- ID: {i.id}, Title: {i.title}, Priority: {i.priority}" for i in schedulable_issues])
@@ -156,7 +171,7 @@ async def auto_schedule(
     Rules:
     1. Distribute workload evenly. Do NOT put all tasks on the first day.
     2. High priority tasks should be earlier in the schedule.
-    3. Limit to approx 3-5 significant tasks per day to prevent burnout.
+    3. You MUST schedule ALL provided tasks listed below.
     4. STRICTLY use only the provided dates. NO weekends.
     
     Tasks:
