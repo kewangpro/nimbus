@@ -16,8 +16,12 @@ _executor = ThreadPoolExecutor(max_workers=1)
 def _get_chat_model():
     global _mlx_model, _mlx_tokenizer
     if _mlx_model is None:
-        from mlx_lm import load
-        _mlx_model, _mlx_tokenizer = load(CHAT_MODEL)
+        try:
+            from mlx_lm import load
+            _mlx_model, _mlx_tokenizer = load(CHAT_MODEL)
+        except (ImportError, ModuleNotFoundError) as e:
+            print(f"MLX model loading failed: {e}. Note that MLX is Apple Silicon exclusive and cannot run inside a Linux Docker container.")
+            raise
     return _mlx_model, _mlx_tokenizer
 
 

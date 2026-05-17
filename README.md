@@ -142,7 +142,7 @@ AI runs entirely on-device via **MLX** on Apple Silicon — no external server r
 
 To use a larger model, set `MLX_CHAT_MODEL=mlx-community/gemma-3-12b-it-4bit` in `backend/.env`.
 
-> **Note:** MLX only runs on macOS with Apple Silicon. The Docker backend image includes `mlx-lm` but MLX GPU acceleration is not available inside Linux containers — inference will fall back to CPU via `sentence-transformers` for embeddings. For full GPU performance, run the backend locally (not in Docker).
+> **Note:** MLX only runs natively on macOS with Apple Silicon. Inside the Linux Docker container, MLX is not available (as the C++ library is macOS exclusive). Consequently, standard MLX chat completions will fail with a descriptive ModuleNotFoundError if run inside the container. For full GPU performance and MLX chat features, you should run the backend natively on your host Apple Silicon Mac (using `make backend` or `make run`). Inference will still run locally via `sentence-transformers` on CPU inside the container for vector embeddings.
 
 To test AI features:
 1.  **Planner:** Click "AI Plan" in the header and type your project thoughts.

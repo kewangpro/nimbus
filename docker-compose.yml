@@ -16,7 +16,6 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_SECURE=False
-      - OLLAMA_HOST=http://host.docker.internal:11434
     env_file:
       - ./backend/.env
 
@@ -42,7 +41,6 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_SECURE=False
-      - OLLAMA_HOST=http://host.docker.internal:11434
     depends_on:
       - db
       - redis

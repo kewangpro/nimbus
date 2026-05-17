@@ -77,7 +77,7 @@ ports:
 	@echo "------------------------------------------------"
 	@printf "%-18s %-6s %-10s %s\n" "SERVICE" "PORT" "STATUS" "PROCESS/PID"
 	@echo "------------------------------------------------"
-	@for service in "Client Portal:3100" "FastAPI API:8100" "PostgreSQL DB:5432" "Redis Cache:6379" "MinIO S3 API:9000" "MinIO Console:9001" "Ollama AI:11434"; do \
+	@for service in "Client Portal:3100" "FastAPI API:8100" "PostgreSQL DB:5432" "Redis Cache:6379" "MinIO S3 API:9000" "MinIO Console:9001"; do \
 		name=$${service%%:*}; \
 		port=$${service##*:}; \
 		pid=$$(lsof -t -i:$$port 2>/dev/null | head -n 1); \

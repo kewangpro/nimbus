@@ -103,8 +103,8 @@ cd frontend && npm install && PORT=3100 npm run dev
 - MinIO Console: `http://localhost:9001`
 
 > **Note on MLX + Docker:**
-> - MLX GPU acceleration requires Apple Silicon macOS. Inside the Linux Docker container, `mlx-lm` is installed but MLX Metal is unavailable — the chat model will run on CPU, which is significantly slower.
-> - For full inference performance, run the backend locally (outside Docker) on an Apple Silicon Mac.
+> - MLX only runs natively on macOS with Apple Silicon. Inside the Linux Docker container, MLX is not available (as the C++ library is macOS exclusive). Consequently, standard MLX chat completions will fail with a descriptive ModuleNotFoundError inside the container.
+> - For full GPU performance and MLX chat features, you should run the backend natively on your host Apple Silicon Mac (using `make backend` or `make run`). Inference will still run locally via `sentence-transformers` on CPU inside the container for vector embeddings.
 
 ### Option B: Cloud PaaS (Production)
 | Component | Recommended Service |
