@@ -122,6 +122,14 @@ PORT=3100 npm run dev
 App: `http://localhost:3100`
 If port 3100 is in use, pick another port (e.g. `PORT=3101`).
 
+### 4. Interactive Port Diagnostics
+To quickly verify that all Nimbus services are running on their correct ports and identify any port conflicts with other processes on your machine, simply run:
+```bash
+make ports
+```
+This prints a clean, real-time diagnostic dashboard directly in your terminal, showing which ports are `ACTIVE` (with their Process IDs and process names) or `FREE` (ready to use).
+
+
 ## 🧠 AI Configuration
 
 ### Connecting to Ollama

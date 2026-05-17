@@ -147,6 +147,14 @@ docker compose logs -f backend
 docker compose logs -f worker
 ```
 
+### Auditing Active Ports
+To verify the status of all Nimbus ports, identify conflicts, and see what processes are running on them on your host machine, run:
+```bash
+make ports
+```
+This prints a clean, real-time diagnostic dashboard directly in your CLI.
+
+
 ### Resilience
 - **Worker:** The background worker includes automatic reconnection logic. If Redis or the database becomes temporarily unavailable, the worker will enter a retry loop (5-10s delay) rather than exiting.
 - **Job Idempotency:** Scheduled jobs (like email polling) use a Redis-based idempotency check. New jobs are only enqueued if a job of the same type isn't already pending, preventing task accumulation during infrastructure downtime.
