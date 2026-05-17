@@ -8,7 +8,7 @@
 *   **Backend:** FastAPI, SQLAlchemy (Async), Alembic, Redis.
 *   **Database:** PostgreSQL 16 with `pgvector`.
 *   **Infrastructure:** Docker Compose, MinIO.
-*   **AI (Local):** Ollama (`gemma3`, `nomic-embed-text`).
+*   **AI (Local):** MLX + `mlx-lm` (Gemma 3, Apple Silicon), `sentence-transformers` (nomic-embed-text-v1).
 
 ---
 
@@ -34,10 +34,10 @@
 ---
 
 ## Phase 3: Intelligence Layer (Local AI) ✅
-**Goal:** Additive AI using local Ollama — no cloud dependence.
+**Goal:** Additive AI using local MLX — no cloud dependence.
 *   [x] `pgvector` enabled in Docker.
-*   [x] Auto-embedding on issue create/update (`nomic-embed-text`).
-*   [x] **Auto-Triage:** Priority suggestions (`gemma3`).
+*   [x] Auto-embedding on issue create/update (`nomic-ai/nomic-embed-text-v1` via sentence-transformers).
+*   [x] **Auto-Triage:** Priority suggestions (Gemma 3 via mlx-lm).
 *   [x] **Semantic Search:** Vector cosine distance queries.
 *   [x] **Similar Issues:** Duplicate detection during creation.
 
@@ -116,7 +116,7 @@
 ### 9.4 Email Automation (Background Polling)
 *   [x] `email_automation_enabled` toggle in User Settings (checkbox).
 *   [x] Background worker polls every 60 seconds for UNSEEN emails from the last 3 days.
-*   [x] `email_processor.extract_task()` extracts title, description, and priority using `gemma3`.
+*   [x] `email_processor.extract_task()` extracts title, description, and priority using Gemma 3 via MLX.
 *   [x] Created tasks are assigned to the inbox owner and placed in their "Email" project.
 *   [x] Graceful fallback: if `UNSEEN SINCE <date>` fails, retries with `UNSEEN` only.
 

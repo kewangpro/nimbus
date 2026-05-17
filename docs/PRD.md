@@ -14,7 +14,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 | **Primary Focus** | Enterprise config | Developer velocity | **Local AI + Email Automation** |
 | **Data Entry** | Manual forms | Fast forms | **Natural Language + Email** |
 | **Search** | Keyword / JQL | Fast keyword | **Semantic / Vector search** |
-| **AI Integration** | Bolt-on | Minimal | **Core architecture (Local Ollama)** |
+| **AI Integration** | Bolt-on | Minimal | **Core architecture (Local MLX/Gemma 3)** |
 | **Email Integration** | None | None | **SSO-linked IMAP inbox** |
 
 ---
@@ -40,11 +40,11 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 *   **Manual Task Creation:** Convert any email to a task with one click. Task is automatically assigned to the logged-in user.
 *   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for new unseen emails every minute.
 
-### 2.4 AI-Native Core (Local Ollama)
+### 2.4 AI-Native Core (Local MLX + Gemma 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
 *   **AI Scheduler:** Distributes open, overdue, or far-future tasks across the next 5 business days (Mon-Fri only).
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
-*   **Auto-Triage:** Suggests issue priority using `gemma3`.
+*   **Auto-Triage:** Suggests issue priority using Gemma 3 via MLX.
 *   **Similar Issues:** Detects likely duplicates during issue creation.
 *   **Issue Summaries:** Generates per-issue AI summaries with next steps.
 *   **AI Filters:** Natural language to structured issue filters.
@@ -66,12 +66,12 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 *   **Backend:** FastAPI (Python), SQLAlchemy (Async), Alembic.
 *   **Database:** PostgreSQL 16 with `pgvector`.
 *   **Infrastructure:** Docker Compose, Redis, MinIO.
-*   **AI Engine:** Local Ollama (`gemma3`, `nomic-embed-text`).
+*   **AI Engine:** Local MLX (`mlx-lm` + Gemma 3 for inference, `sentence-transformers` + nomic-embed-text-v1 for embeddings).
 *   **Email:** IMAP/XOAUTH2 via `aioimaplib` using SSO tokens.
 
 ---
 
 ## 4. Non-Functional Requirements
 *   **Performance:** Dashboard load < 1.5s; real-time sync < 200ms.
-*   **Privacy:** All AI processing runs locally on the host machine via Ollama. No data leaves the user's environment.
+*   **Privacy:** All AI processing runs locally on the host machine via MLX. No data leaves the user's environment.
 *   **Reliability:** OAuth tokens are automatically refreshed. Email polling is atomic (using `BODY.PEEK`) and idempotent; a new polling job is only enqueued if one isn't already pending in the queue. The background worker includes a built-in reconnection strategy for Redis/DB failures to ensure continuous operation.

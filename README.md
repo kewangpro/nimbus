@@ -6,7 +6,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
 
 ## 🚀 Features
 
-*   **Local AI Intelligence (Ollama):**
+*   **Local AI Intelligence (MLX + Apple Silicon):**
     *   **🤖 AI Project Planner:** Turn natural language "brain dumps" into structured project tasks, **automatically scheduling them** with balanced due dates across the work week.
         *   **Project Selection:** Pick an existing project or create a new one before creating issues.
     *   **📅 AI Schedule:** 
@@ -15,13 +15,13 @@ Nimbus is a modern, high-performance project management tool designed to replace
         *   **Logic:** Prioritizes `URGENT` items early, pulls all provided tasks into the next 5 days, skips weekends, and resolves overdue backlogs. Ensures all relevant tasks are pulled into the current sprint plan.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
-    *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using `gemma3`.
+    *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using Gemma 3 via MLX.
     *   **📝 AI Summary:** Generates a concise issue summary with next steps.
     *   **🔎 AI Filters:** Convert natural language into structured filters in List view.
     *   **🧾 Client Updates:** Drafts weekly client updates per project.
     *   **🔗 Dependency Detection:** Suggests issue dependencies from project context.
     *   **Unified AI Buttons:** Consistent AI button styling across the app.
-    *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-embed-text`.
+    *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-ai/nomic-embed-text-v1` via sentence-transformers.
 *   **Interactive Views:**
     *   **Dynamic Sprint Plan (My Calendar):** A user-centric timeline showing all tasks assigned to you across **all projects**. Features horizontal scrolling, auto-adjusting range, and toggles for "Show Weekends" and "Show Completed".
         ![Calendar View](docs/screenshots/calendar.png)
@@ -37,7 +37,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Single Sign-On:** Login seamlessly with **Google** or **Outlook**.
     *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project for you.
     *   **Email-to-Task Mastery:**
-        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses `gemma3` to extract structured tasks into your **General** project. The implementation uses atomic flagging (`BODY.PEEK`) to ensure emails are only marked as read after the task is successfully committed, preventing data loss during network or AI timeouts.
+        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses Gemma 3 (via MLX) to extract structured tasks into your **General** project. The implementation uses atomic flagging (`BODY.PEEK`) to ensure emails are only marked as read after the task is successfully committed, preventing data loss during network or AI timeouts.
         *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)**. To save bandwidth and improve performance, emails are only fetched when you click the **Refresh** button. Content is **persisted in memory**, so you can switch between views (e.g., Board or Calendar) and return to your inbox without losing your retrieved emails.
 
 
@@ -62,16 +62,14 @@ Nimbus is a modern, high-performance project management tool designed to replace
 *   **Backend:** FastAPI (Python), SQLAlchemy (Async), Alembic.
 *   **Database:** PostgreSQL with `pgvector`.
 *   **Infrastructure:** Docker Compose, Redis, MinIO.
-*   **AI:** Ollama (Local LLM Inference).
+*   **AI:** MLX + `mlx-lm` (Gemma 3, Apple Silicon), `sentence-transformers` (embeddings).
 
 ## 📦 Prerequisites
 
 1.  **Docker & Docker Compose**
 2.  **Node.js 18+ & npm**
 3.  **Python 3.9+**
-4.  **Ollama** (Running locally)
-    *   `ollama pull gemma3`
-    *   `ollama pull nomic-embed-text`
+4.  **Apple Silicon Mac** (M1/M2/M3/M4) — required for MLX inference
 
 ## 🏃‍♂️ Quick Start
 
@@ -132,22 +130,19 @@ This prints a clean, real-time diagnostic dashboard directly in your terminal, s
 
 ## 🧠 AI Configuration
 
-### Connecting to Ollama
-The Nimbus backend needs to communicate with your Ollama instance. The URL depends on your setup:
+### MLX + Gemma 3 (local inference)
+AI runs entirely on-device via **MLX** on Apple Silicon — no external server required. Models are downloaded automatically from Hugging Face on first use.
 
-*   **Running Nimbus in Docker + Ollama on same Mac:**
-    Use `http://host.docker.internal:11434`
-*   **Running Nimbus locally (no Docker) + Ollama on same Mac:**
-    Use `http://localhost:11434`
-*   **Running Ollama on a remote machine (e.g., Mac mini):**
-    1. Use `http://<remote-ip>:11434`
-    2. **Important:** On the remote machine, ensure Ollama is listening on all interfaces by setting `OLLAMA_HOST=0.0.0.0` before starting it.
+**Default models** (configurable via env vars):
 
-Ensure you have the required models pulled:
-```bash
-ollama pull gemma3
-ollama pull nomic-embed-text
-```
+| Env Var | Default | Purpose |
+|:---|:---|:---|
+| `MLX_CHAT_MODEL` | `mlx-community/gemma-3-4b-it-4bit` | Planning, triage, summarization |
+| `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |
+
+To use a larger model, set `MLX_CHAT_MODEL=mlx-community/gemma-3-12b-it-4bit` in `backend/.env`.
+
+> **Note:** MLX only runs on macOS with Apple Silicon. The Docker backend image includes `mlx-lm` but MLX GPU acceleration is not available inside Linux containers — inference will fall back to CPU via `sentence-transformers` for embeddings. For full GPU performance, run the backend locally (not in Docker).
 
 To test AI features:
 1.  **Planner:** Click "AI Plan" in the header and type your project thoughts.

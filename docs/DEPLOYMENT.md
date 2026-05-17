@@ -22,7 +22,10 @@ The **frontend** (Next.js) runs separately (locally via `npm run dev`, or deploy
 DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/nimbus
 REDIS_URL=redis://host:6379/0
 SECRET_KEY=<generate with: openssl rand -hex 32>
-OLLAMA_HOST=http://localhost:11434
+
+# AI models (downloaded from Hugging Face on first use)
+MLX_CHAT_MODEL=mlx-community/gemma-3-4b-it-4bit
+EMBEDDING_MODEL=nomic-ai/nomic-embed-text-v1
 
 # MinIO / S3
 MINIO_ENDPOINT=localhost:9000
@@ -99,9 +102,9 @@ cd frontend && npm install && PORT=3100 npm run dev
 - API Docs: `http://localhost:8100/docs`
 - MinIO Console: `http://localhost:9001`
 
-> **Note on Ollama Networking:**
-> - If running in Docker, use `OLLAMA_BASE_URL=http://host.docker.internal:11434`.
-> - If running a remote Ollama instance, ensure `OLLAMA_HOST=0.0.0.0` is set on that machine to allow external connections.
+> **Note on MLX + Docker:**
+> - MLX GPU acceleration requires Apple Silicon macOS. Inside the Linux Docker container, `mlx-lm` is installed but MLX Metal is unavailable — the chat model will run on CPU, which is significantly slower.
+> - For full inference performance, run the backend locally (outside Docker) on an Apple Silicon Mac.
 
 ### Option B: Cloud PaaS (Production)
 | Component | Recommended Service |
@@ -111,7 +114,7 @@ cd frontend && npm install && PORT=3100 npm run dev
 | **Database** | Supabase or Neon (both support `pgvector`) |
 | **Redis** | Upstash |
 | **Storage** | AWS S3 or Cloudflare R2 |
-| **AI** | Private GPU node running Ollama |
+| **AI** | Apple Silicon Mac running the backend locally for MLX GPU inference |
 
 ---
 

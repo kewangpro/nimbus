@@ -1,20 +1,20 @@
 # AI Architecture: Nimbus (Local AI + Email Intelligence)
 
 ## 1. Overview
-The AI layer is **additive** — the core project management system works without it. Intelligence is applied asynchronously using **local LLMs via Ollama**, ensuring complete privacy and zero inference cost. Long-running AI tasks are processed by a Redis-backed background worker.
+The AI layer is **additive** — the core project management system works without it. Intelligence is applied asynchronously using **local LLMs via MLX on Apple Silicon**, ensuring complete privacy and zero inference cost. Long-running AI tasks are processed by a Redis-backed background worker.
 
-Email intelligence is powered by the same AI pipeline: incoming emails are parsed and structured by `gemma3` into tasks, using the user's IMAP inbox via XOAUTH2.
+Email intelligence is powered by the same AI pipeline: incoming emails are parsed and structured by Gemma 3 into tasks, using the user's IMAP inbox via XOAUTH2.
 
 ---
 
 ## 2. Models & Providers
 
-| Model | Purpose | Provider |
+| Model | Purpose | Library |
 |:---|:---|:---|
-| `nomic-embed-text` | Issue embeddings for semantic search | Ollama (local) |
-| `gemma3` | Planning, triage, summarization, email extraction | Ollama (local) |
+| `mlx-community/gemma-3-4b-it-4bit` | Planning, triage, summarization, email extraction | `mlx-lm` (Apple Silicon GPU) |
+| `nomic-ai/nomic-embed-text-v1` | Issue embeddings for semantic search | `sentence-transformers` |
 
-**Ollama API:** `http://localhost:11434` (or `http://host.docker.internal:11434` inside Docker)
+Models are downloaded from Hugging Face on first use and cached locally. The chat model is configurable via the `MLX_CHAT_MODEL` env var; the embedding model via `EMBEDDING_MODEL`.
 
 ---
 
@@ -127,9 +127,10 @@ CREATE TABLE issue_links (
 ---
 
 ## 6. Controls & Performance
-*   **Async:** All AI calls use `ollama.AsyncClient` — non-blocking.
+*   **Async:** All AI calls run in a single-worker `ThreadPoolExecutor` wrapped with `asyncio.run_in_executor` — non-blocking to the FastAPI event loop. MLX requires sequential GPU access, hence `max_workers=1`.
+*   **Lazy loading:** Models are loaded on first inference call and kept in memory for the process lifetime.
 *   **Debounce:** UI updates are immediate (optimistic); vector updates happen on save.
-*   **Fallback:** If Ollama is offline, AI endpoints return HTTP 500. No keyword fallback exists — treat AI features as optional.
+*   **Fallback:** If inference fails (e.g. model not yet downloaded), AI endpoints return HTTP 500. No keyword fallback — treat AI features as optional.
 *   **Background Jobs:** Embedding backfills and email polling run via the async worker to avoid blocking the API.
 *   **Caching:** Issue summaries are content-hash cached; regenerated only when issue content changes.
 ---

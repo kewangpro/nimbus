@@ -73,12 +73,21 @@ async def test_ai_schedule_endpoint(
     )
 
     # 2. Mock AI Completion
-    # We want to see that A, B, and C are rescheduled. D is not.
-    # May 6, 7, 8, 2026 are Wed, Thu, Fri (confirmed weekdays)
+    # Compute the next 3 weekdays dynamically so the dates stay within allowed_dates.
+    def _next_weekdays(n: int) -> list:
+        days = []
+        d = datetime.now(timezone.utc).date() + timedelta(days=1)
+        while len(days) < n:
+            if d.weekday() < 5:
+                days.append(d.strftime("%Y-%m-%d"))
+            d += timedelta(days=1)
+        return days
+
+    wd1, wd2, wd3 = _next_weekdays(3)
     mock_response = json.dumps([
-        {"id": str(issue_overdue.id), "date": "2026-05-06"},
-        {"id": str(issue_future.id), "date": "2026-05-07"},
-        {"id": str(issue_unscheduled.id), "date": "2026-05-08"}
+        {"id": str(issue_overdue.id), "date": wd1},
+        {"id": str(issue_future.id), "date": wd2},
+        {"id": str(issue_unscheduled.id), "date": wd3}
     ])
     
     with patch("app.core.ai.generate_completion", return_value=mock_response):
@@ -101,9 +110,10 @@ async def test_ai_schedule_endpoint(
         
         # Overdue should now have a future date
         assert issue_overdue.due_date is not None
-        # Future task (240 days) should now be in the next few days
-        assert issue_future.due_date.year == 2026
-        assert issue_future.due_date.month == 5
+        # Future task (240 days) should now be rescheduled into the next few days
+        assert issue_future.due_date is not None
+        future_due = issue_future.due_date.replace(tzinfo=None) if issue_future.due_date.tzinfo else issue_future.due_date
+        assert future_due < (now + timedelta(days=10)).replace(tzinfo=None)
         # Unscheduled task should now have a date
         assert issue_unscheduled.due_date is not None
         # In-window task should be UNCHANGED (approx check due to timezone handling)
