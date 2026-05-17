@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     MICROSOFT_CLIENT_ID: Optional[str] = None
     MICROSOFT_CLIENT_SECRET: Optional[str] = None
     
-    # This should be the base URL of your backend (e.g. http://localhost:8000)
-    BACKEND_URL: str = "http://localhost:8000"
+    # This should be the base URL of your backend (e.g. http://localhost:8100)
+    BACKEND_URL: str = "http://localhost:8100"
 
     # AI Config
     OLLAMA_BASE_URL: str = "http://localhost:11434"

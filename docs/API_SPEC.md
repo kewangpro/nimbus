@@ -2,7 +2,7 @@
 
 ## Overview
 *   **Base URL:** `/api/v1`
-*   **Swagger UI:** Available at `http://localhost:8000/docs` when running locally.
+*   **Swagger UI:** Available at `http://localhost:8100/docs` when running locally.
 *   **Auth:** SSO (Google / Outlook OAuth2). All endpoints require a valid Bearer token (`Authorization: Bearer <token>`).
 
 ## 1. Authentication
@@ -90,7 +90,7 @@
         *   `{"type": "ISSUE_CREATED", "data": "uuid"}`
         *   `{"type": "ISSUE_UPDATED", "data": "uuid"}`
 ## 8. MCP Server (Model Context Protocol)
-*   **SSE URL:** `GET /mcp/sse` (Full URL: `http://localhost:8000/mcp/sse`)
+*   **SSE URL:** `GET /mcp/sse` (Full URL: `http://localhost:8100/mcp/sse`)
 *   **Description:** Implements the MCP SSE transport for external AI assistant integration.
 *   **Protocol:** [Model Context Protocol](https://modelcontextprotocol.io/)
 *   **Tools Provided:**

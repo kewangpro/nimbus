@@ -30,7 +30,7 @@ MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 
 # URLs
-BACKEND_URL=http://localhost:8000
+BACKEND_URL=http://localhost:8100
 FRONTEND_URL=http://localhost:3100
 
 # Google OAuth (for Gmail SSO + Email)
@@ -44,8 +44,8 @@ MICROSOFT_CLIENT_SECRET=your_microsoft_client_secret
 
 ### Frontend (`frontend/.env.local`)
 ```ini
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-NEXT_PUBLIC_WS_URL=ws://localhost:8000/api/v1/ws
+NEXT_PUBLIC_API_URL=http://localhost:8100/api/v1
+NEXT_PUBLIC_WS_URL=ws://localhost:8100/api/v1/ws
 ```
 
 > For production, replace `localhost` URLs with your deployed domain.
@@ -64,7 +64,7 @@ Nimbus uses **SSO as the primary authentication method**. Both Google and Outloo
 5. **Type:** Web application.
 6. **Authorized redirect URI:**
    ```
-   http://localhost:8000/api/v1/auth/callback/gmail
+   http://localhost:8100/api/v1/auth/callback/gmail
    ```
 7. Copy **Client ID** → `GOOGLE_CLIENT_ID`, **Client Secret** → `GOOGLE_CLIENT_SECRET`.
 
@@ -74,7 +74,7 @@ Nimbus uses **SSO as the primary authentication method**. Both Google and Outloo
 3. **Account types:** Multitenant + personal Microsoft accounts.
 4. **Redirect URI (Web):**
    ```
-   http://localhost:8000/api/v1/auth/callback/outlook
+   http://localhost:8100/api/v1/auth/callback/outlook
    ```
 5. **API Permissions:** Add `openid`, `offline_access`, `https://outlook.office.com/IMAP.AccessAsUser.All`.
 6. Copy **Application (client) ID** → `MICROSOFT_CLIENT_ID`.
@@ -96,7 +96,7 @@ docker compose exec backend alembic upgrade head
 cd frontend && npm install && PORT=3100 npm run dev
 ```
 - App: `http://localhost:3100`
-- API Docs: `http://localhost:8000/docs`
+- API Docs: `http://localhost:8100/docs`
 - MinIO Console: `http://localhost:9001`
 
 > **Note on Ollama Networking:**

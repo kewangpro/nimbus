@@ -46,7 +46,7 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 gap-4">
-            <Button variant="outline" size="lg" onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/auth/login/gmail`} className="w-full py-6 text-lg">
+            <Button variant="outline" size="lg" onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8100/api/v1'}/auth/login/gmail`} className="w-full py-6 text-lg">
               <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -55,7 +55,7 @@ export default function RegisterPage() {
               </svg>
               Sign up with Google
             </Button>
-            <Button variant="outline" size="lg" onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/auth/login/outlook`} className="w-full py-6 text-lg">
+            <Button variant="outline" size="lg" onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8100/api/v1'}/auth/login/outlook`} className="w-full py-6 text-lg">
               <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24">
                 <path d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zm12.6 0H12.6V0H24v11.4z" fill="#f25022" />
               </svg>

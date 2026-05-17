@@ -94,7 +94,7 @@ alembic upgrade head
 # Start API Server
 uvicorn app.main:app --reload
 ```
-API Documentation: `http://localhost:8000/docs`
+API Documentation: `http://localhost:8100/docs`
 
 Start the async worker for AI jobs (embeddings backfill, etc.):
 ```bash
@@ -161,7 +161,7 @@ Nimbus features a built-in **Model Context Protocol (MCP)** server, enabling ext
 
 ### Connection Info
 To connect an external tool, point your MCP client to the **SSE (Server-Sent Events)** endpoint:
-`http://localhost:8000/mcp/sse`
+`http://localhost:8100/mcp/sse`
 
 ### Available Tools
 - `list_calendar_events`: Fetches a list of all scheduled tasks within a timeframe.

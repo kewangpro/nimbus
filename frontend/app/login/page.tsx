@@ -26,7 +26,7 @@ function LoginContent() {
 
   const handleSocialLogin = (provider: string) => {
     setError(null)
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/auth/login/${provider}`
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8100/api/v1'}/auth/login/${provider}`
   }
 
   return (

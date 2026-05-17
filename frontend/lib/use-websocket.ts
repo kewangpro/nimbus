@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/api/v1/ws';
+const SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8100/api/v1/ws';
 
 export const useWebSocket = (onMessage: (data: unknown) => void) => {
   const ws = useRef<WebSocket | null>(null);
