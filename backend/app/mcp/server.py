@@ -4,7 +4,24 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from uuid import UUID
 
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.fastmcp import FastMCP
+    mcp = FastMCP("Nimbus Calendar")
+except (ImportError, ModuleNotFoundError):
+    class MockFastMCP:
+        def __init__(self, name: str):
+            self.name = name
+        def tool(self):
+            return lambda f: f
+        def sse_app(self):
+            from fastapi import FastAPI
+            app = FastAPI(title=f"Mock MCP: {self.name}")
+            @app.get("/")
+            async def index():
+                return {"message": "MCP Server disabled due to Python 3.9 compatibility limitations"}
+            return app
+    mcp = MockFastMCP("Nimbus Calendar")
+
 from sqlalchemy import select, and_
 
 from app.db.session import AsyncSessionLocal
@@ -15,8 +32,7 @@ from app.crud import crud_issue, crud_project, crud_embedding
 from app.schemas.issue import IssueCreate, IssueUpdate
 from app.core import ai
 
-# Initialize FastMCP server
-mcp = FastMCP("Nimbus Calendar")
+
 
 async def get_default_user_id() -> UUID:
     """Gets the ID of the primary user."""

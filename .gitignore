@@ -1,7 +1,9 @@
 # Python
 backend/venv/
-backend/__pycache__/
-backend/*.pyc
+__pycache__/
+*.pyc
+**/__pycache__/
+**/*.pyc
 backend/.env
 backend/.pytest_cache/
 backend/alembic/versions/__pycache__/

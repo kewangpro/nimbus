@@ -68,7 +68,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
 
 1.  **Docker & Docker Compose**
 2.  **Node.js 18+ & npm**
-3.  **Python 3.9+**
+3.  **Python 3.10+** (Required for MLX & Gemma 3 support)
 4.  **Apple Silicon Mac** (M1/M2/M3/M4) — required for MLX inference
 
 ## 🏃‍♂️ Quick Start
@@ -90,7 +90,7 @@ pip install -r requirements.txt
 alembic upgrade head
 
 # Start API Server
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8100
 ```
 API Documentation: `http://localhost:8100/docs`
 
@@ -99,17 +99,9 @@ Start the async worker for AI jobs (embeddings backfill, etc.):
 python -m app.worker
 ```
 
-If you prefer Docker for backend + worker:
-```bash
-# Start services
-docker compose up -d backend worker
+> [!IMPORTANT]
+> **Native macOS Requirement:** Because MLX is Apple Silicon exclusive (requiring direct Apple GPU access), the `backend` and `worker` **must** run natively on your macOS host. Running them inside a Linux Docker container will cause MLX imports to fail. Accordingly, the Docker configuration is reserved strictly for database, Redis, and MinIO storage infrastructure.
 
-# Run database migrations
-docker compose exec backend alembic upgrade head
-
-# View logs
-docker compose logs --tail=100 -f
-```
 
 ### 3. Frontend Setup
 ```bash
@@ -140,7 +132,7 @@ AI runs entirely on-device via **MLX** on Apple Silicon — no external server r
 | `MLX_CHAT_MODEL` | `mlx-community/gemma-3-4b-it-4bit` | Planning, triage, summarization |
 | `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |
 
-To use a larger model, set `MLX_CHAT_MODEL=mlx-community/gemma-3-12b-it-4bit` in `backend/.env`.
+To use a different model, set `MLX_CHAT_MODEL=mlx-community/gemma-3-4b-it-4bit` in `backend/.env`.
 
 > **Note:** MLX only runs natively on macOS with Apple Silicon. Inside the Linux Docker container, MLX is not available (as the C++ library is macOS exclusive). Consequently, standard MLX chat completions will fail with a descriptive ModuleNotFoundError if run inside the container. For full GPU performance and MLX chat features, you should run the backend natively on your host Apple Silicon Mac (using `make backend` or `make run`). Inference will still run locally via `sentence-transformers` on CPU inside the container for vector embeddings.
 

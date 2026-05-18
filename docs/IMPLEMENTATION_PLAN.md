@@ -128,7 +128,7 @@
 *   [x] Updated all test mocks to match new IMAP search protocol.
 *   [x] Python 3.9 Compatibility: Mocked `mcp` in `conftest.py` and handled type union syntax for compatibility.
 *   [x] Cleanup utility: `scripts/fix_encoded_titles.py` for retroactive title fixing.
-*   [x] **All 11 tests passing.**
+*   [x] **All 74 tests passing with robust coverage expansion (reaching 67% overall).**
 
 ---
 

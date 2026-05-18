@@ -80,7 +80,7 @@ ports:
 	@for service in "Client Portal:3100" "FastAPI API:8100" "PostgreSQL DB:5432" "Redis Cache:6379" "MinIO S3 API:9000" "MinIO Console:9001"; do \
 		name=$${service%%:*}; \
 		port=$${service##*:}; \
-		pid=$$(lsof -t -i:$$port 2>/dev/null | head -n 1); \
+		pid=$$(lsof -t -sTCP:LISTEN -i:$$port 2>/dev/null | head -n 1); \
 		if [ -n "$$pid" ]; then \
 			proc_path=$$(ps -p $$pid -o comm= 2>/dev/null || echo "Unknown"); \
 			proc=$$(basename "$$proc_path" 2>/dev/null || echo "Unknown"); \
@@ -89,4 +89,13 @@ ports:
 			printf "\033[31m%-18s %-6s %-10s\033[0m -\n" "$$name" "$$port" "FREE"; \
 		fi \
 	done
+	@# Check background worker separately since it does not listen on a port
+	@worker_pid=$$(pgrep -f "app.worker" | head -n 1); \
+	if [ -n "$$worker_pid" ]; then \
+		proc_path=$$(ps -p $$worker_pid -o comm= 2>/dev/null || echo "Unknown"); \
+		proc=$$(basename "$$proc_path" 2>/dev/null || echo "Unknown"); \
+		printf "\033[32m%-18s %-6s %-10s\033[0m %s (PID: %s)\n" "Async Worker" "N/A" "ACTIVE" "$$proc" "$$worker_pid"; \
+	else \
+		printf "\033[31m%-18s %-6s %-10s\033[0m -\n" "Async Worker" "N/A" "OFFLINE"; \
+	fi
 	@echo "------------------------------------------------"
