@@ -18,6 +18,12 @@ class EmailProcessor:
         )
 
     async def extract_task(self, subject: str, body: str) -> Optional[Dict[str, Any]]:
+        # Truncate extremely long email bodies to prevent stalling or crashing the local LLM
+        max_body_len = 10000
+        if len(body) > max_body_len:
+            print(f"WARNING: Email body length ({len(body)}) exceeds limit. Truncating to {max_body_len} characters to protect local LLM.")
+            body = body[:max_body_len] + "\n\n... [Email body truncated by Nimbus for length] ..."
+
         current_date = datetime.now().strftime("%Y-%m-%d")
         system_prompt = (
             f"{self.base_system_prompt} "
