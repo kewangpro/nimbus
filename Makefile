@@ -1,4 +1,4 @@
-.PHONY: help infra infra-down docker-up docker-down docker-logs migrate backend worker frontend run ports
+.PHONY: help infra infra-down docker-up docker-down docker-logs migrate backend worker frontend run stop ports
 
 # Default target when just running 'make'
 .DEFAULT_GOAL := help
@@ -18,6 +18,7 @@ help:
 	@echo "  make worker         - Launch the local background worker process"
 	@echo "  make frontend       - Launch the Next.js frontend locally"
 	@echo "  make run            - Run API + Worker + Frontend locally in parallel"
+	@echo "  make stop           - Stop all local services and backend containers"
 	@echo "=========================================================="
 
 infra:
@@ -71,6 +72,26 @@ frontend:
 run:
 	@echo "🔥 Starting complete Nimbus app locally..."
 	@make -j 3 backend worker frontend
+
+stop:
+	@echo "🛑 Stopping all running Nimbus services..."
+	@make infra-down
+	@port_8100_pid=$$(lsof -t -i:8100 2>/dev/null); \
+	if [ -n "$$port_8100_pid" ]; then \
+		echo "Killing FastAPI Backend (PID: $$port_8100_pid)..."; \
+		kill -9 $$port_8100_pid 2>/dev/null || true; \
+	fi
+	@port_3100_pid=$$(lsof -t -i:3100 2>/dev/null); \
+	if [ -n "$$port_3100_pid" ]; then \
+		echo "Killing Next.js Frontend (PID: $$port_3100_pid)..."; \
+		kill -9 $$port_3100_pid 2>/dev/null || true; \
+	fi
+	@worker_pids=$$(pgrep -f "app.worker" 2>/dev/null); \
+	if [ -n "$$worker_pids" ]; then \
+		echo "Killing Background Worker process(es)..."; \
+		kill -9 $$worker_pids 2>/dev/null || true; \
+	fi
+	@echo "✅ All Nimbus services stopped."
 
 ports:
 	@echo "🔍 Nimbus Port Status:"
