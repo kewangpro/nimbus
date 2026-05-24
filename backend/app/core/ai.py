@@ -49,7 +49,13 @@ def _sync_generate(prompt: str, system_prompt: str) -> str:
     else:
         formatted = f"{system_prompt}\n{prompt}" if system_prompt else prompt
 
-    return generate(model, tokenizer, prompt=formatted, verbose=False, max_tokens=2048)
+    res = generate(model, tokenizer, prompt=formatted, verbose=False, max_tokens=2048)
+    try:
+        import mlx.core as mx
+        mx.metal.clear_cache()
+    except Exception:
+        pass
+    return res
 
 
 def _sync_embed(text: str) -> List[float]:

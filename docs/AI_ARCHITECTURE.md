@@ -133,6 +133,7 @@ CREATE TABLE issue_links (
 *   **Fallback:** If inference fails (e.g. model not yet downloaded), AI endpoints return HTTP 500. No keyword fallback — treat AI features as optional.
 *   **Background Jobs:** Embedding backfills and email polling run via the async worker to avoid blocking the API.
 *   **Caching:** Issue summaries are content-hash cached; regenerated only when issue content changes.
+*   **Memory Management:** The system releases unused Metal GPU memory after each generation by calling `mlx.core.metal.clear_cache()`. This minimizes unified memory fragmentation and prevents OutOfMemory errors in the persistent backend and background worker processes.
 ---
 136: 
 137: ## 7. External AI Integration (MCP)

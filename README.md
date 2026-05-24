@@ -169,6 +169,11 @@ To connect an external tool, point your MCP client to the **SSE (Server-Sent Eve
 ### Python Compatibility
 The backend is compatible with **Python 3.9+**. If you are running tests on Python 3.9, the `mcp` library (which requires 3.10) is automatically mocked to allow the core test suite to pass.
 
+### GPU Out Of Memory (OOM) on macOS
+Local AI completion uses the Apple Silicon GPU via MLX. If you hit a `std::runtime_error: [METAL] Command buffer execution failed: Insufficient Memory` error:
+- **Cache Clearing:** The AI generation pipeline automatically clears the Metal memory cache (`mlx.core.metal.clear_cache()`) after each completion.
+- **Worker Resilience:** The background worker is run inside an auto-restart loop in the `Makefile`. If it exits or crashes, it automatically restarts after 5 seconds to clear stale memory allocations and resume work.
+
 
 
 ## 📚 Documentation

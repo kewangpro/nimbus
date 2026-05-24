@@ -55,9 +55,9 @@ backend:
 worker:
 	@echo "⚙️ Starting Background Worker locally..."
 	@if [ -d "backend/venv" ]; then \
-		cd backend && ./venv/bin/python -m app.worker; \
+		cd backend && while true; do ./venv/bin/python -m app.worker; echo "Worker exited. Restarting in 5 seconds..."; sleep 5; done; \
 	else \
-		cd backend && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt && ./venv/bin/python -m app.worker; \
+		cd backend && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt && while true; do ./venv/bin/python -m app.worker; echo "Worker exited. Restarting in 5 seconds..."; sleep 5; done; \
 	fi
 
 frontend:
