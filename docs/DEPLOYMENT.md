@@ -157,6 +157,12 @@ make ports
 ```
 This prints a clean, real-time diagnostic dashboard directly in your CLI.
 
+### Stopping Services
+To stop all application servers (Next.js Client, FastAPI Backend, background Async Worker) and core Docker infrastructure containers in one command, run:
+```bash
+make stop
+```
+
 
 ### Resilience
 - **Worker Reconnection:** The background worker includes automatic reconnection logic. If Redis or the database becomes temporarily unavailable, the worker will enter a retry loop (5-10s delay) rather than exiting.

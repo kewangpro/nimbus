@@ -119,6 +119,12 @@ make ports
 ```
 This prints a clean, real-time diagnostic dashboard directly in your terminal, showing which ports are `ACTIVE` (with their Process IDs and process names) or `FREE` (ready to use).
 
+### 5. Stopping the Application
+To stop all running frontend, backend, background worker services, and Docker infrastructure containers (db, redis, minio) in one command, run:
+```bash
+make stop
+```
+
 
 ## 🧠 AI Configuration
 
