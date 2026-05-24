@@ -188,12 +188,29 @@ async def auto_schedule(
     import json
     import re
     count = 0
+
     try:
-        clean_json = response.replace("```json", "").replace("```", "").strip()
-        json_match = re.search(r"\[.*\]", clean_json, re.DOTALL)
-        if json_match:
-            clean_json = json_match.group(0)
-        schedule_data = json.loads(clean_json)
+        # Robust parsing: Extract individual JSON objects {...} from the response.
+        # This ensures that even if the JSON response is truncated or contains trailing text,
+        # we can still successfully parse and schedule all fully generated tasks.
+        schedule_data = []
+        matches = re.findall(r'\{[^{}]*\}', response)
+        for m in matches:
+            try:
+                item = json.loads(m)
+                if "id" in item and "date" in item:
+                    schedule_data.append(item)
+            except Exception:
+                continue
+
+        if not schedule_data:
+            clean_json = response.replace("```json", "").replace("```", "").strip()
+            json_match = re.search(r"\[.*\]", clean_json, re.DOTALL)
+            if json_match:
+                clean_json = json_match.group(0)
+            schedule_data = json.loads(clean_json)
+            if isinstance(schedule_data, dict):
+                schedule_data = [schedule_data]
 
         from uuid import UUID
         from app.schemas.issue import IssueUpdate
@@ -285,12 +302,38 @@ async def plan_tasks(
         raise HTTPException(status_code=500, detail="Failed to generate plan")
     
     import json
+    import re
     
+    # Robust parsing: Extract individual JSON objects {...} from the response.
+    data = []
+    matches = re.findall(r'\{[^{}]*\}', response)
+    for m in matches:
+        try:
+            item = json.loads(m)
+            if "title" in item:
+                data.append(item)
+        except Exception:
+            continue
+
+    if not data:
+        try:
+            # cleanup markdown
+            clean_json = response.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_json)
+            if isinstance(data, dict):
+                data = [data]
+        except Exception as e:
+            print(f"Plan parse error: {e}")
+            # Fallback: Treat the whole text as one task if parsing fails
+            return [PlannedIssue(
+                title="Task from plan", 
+                description=request.text, 
+                priority=IssuePriority.MEDIUM, 
+                status=IssueStatus.TODO,
+                due_date=today.strftime("%Y-%m-%d")
+            )]
+
     try:
-        # cleanup markdown
-        clean_json = response.replace("```json", "").replace("```", "").strip()
-        data = json.loads(clean_json)
-        
         results = []
         for item in data:
             # Normalize enum values
