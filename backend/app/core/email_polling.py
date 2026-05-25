@@ -54,6 +54,7 @@ async def process_email_source(db: AsyncSession, user: User):
     """
     email_address = user.email
     provider = user.oauth_provider
+    user_id = user.id
     
     try:
         # Refresh token if needed
@@ -107,72 +108,134 @@ async def process_email_source(db: AsyncSession, user: User):
         if msg_ids:
             from email import message_from_string
             for msg_id in msg_ids:
+                try:
+                    # Use BODY.PEEK[] to fetch without marking as Seen
+                    _, data = await imap.fetch(msg_id, "BODY.PEEK[]")
+                    if not data or len(data) < 2:
+                        continue
+                        
+                    raw_email = data[1].decode() if isinstance(data[1], (bytes, bytearray)) else data[1]
+                    msg = message_from_string(raw_email)
 
-                # Use BODY.PEEK[] to fetch without marking as Seen
-                _, data = await imap.fetch(msg_id, "BODY.PEEK[]")
-                if not data or len(data) < 2:
-                    continue
-                    
-                raw_email = data[1].decode() if isinstance(data[1], (bytes, bytearray)) else data[1]
-                msg = message_from_string(raw_email)
+                    subject = decode_mime_header(msg["Subject"] or "(No Subject)")
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                payload = part.get_payload(decode=True)
+                                if payload:
+                                    body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
+                                break
+                    else:
+                        payload = msg.get_payload(decode=True)
+                        if payload:
+                            body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
 
-                
-                
-                subject = decode_mime_header(msg["Subject"] or "(No Subject)")
-                body = ""
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        if part.get_content_type() == "text/plain":
-                            payload = part.get_payload(decode=True)
-                            if payload:
-                                body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-                            break
+                    # Process with AI
+                    task_data = await email_processor.extract_task(subject, body)
+                    if not task_data:
+                        raise ValueError("AI extraction failed or returned invalid data")
 
-                else:
-                    payload = msg.get_payload(decode=True)
-                    if payload:
-                        body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
+                    # Sanitize task_data
+                    title_val = task_data.get("title", subject)
+                    if isinstance(title_val, list):
+                        title_val = " ".join(str(item) for item in title_val)
+                    elif title_val is not None:
+                        title_val = str(title_val)
+                    if not title_val or not title_val.strip():
+                        title_val = subject
 
+                    desc_val = task_data.get("description", body)
+                    if isinstance(desc_val, list):
+                        desc_val = "\n".join(str(item) for item in desc_val)
+                    elif desc_val is not None:
+                        desc_val = str(desc_val)
+                    if not desc_val:
+                        desc_val = body
 
-                # Process with AI
-                task_data = await email_processor.extract_task(subject, body)
-                if task_data:
+                    priority_val = task_data.get("priority", "medium")
+                    if isinstance(priority_val, str):
+                        priority_val = priority_val.strip().lower()
+                    else:
+                        priority_val = "medium"
+                    if priority_val not in ["low", "medium", "high", "urgent"]:
+                        priority_val = "medium"
+
+                    due_date_val = task_data.get("due_date")
+                    parsed_due_date = None
+                    if due_date_val:
+                        if isinstance(due_date_val, list):
+                            due_date_val = str(due_date_val[0]) if due_date_val else None
+                        if isinstance(due_date_val, str):
+                            due_date_val = due_date_val.strip()
+                            for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+                                try:
+                                    parsed_due_date = datetime.strptime(due_date_val, fmt)
+                                    parsed_due_date = parsed_due_date.replace(tzinfo=timezone.utc)
+                                    break
+                                except ValueError:
+                                    continue
+
                     # Find user's "General" project
-                    res = await db.execute(select(Project).where(and_(Project.owner_id == user.id, Project.name == "General")))
+                    res = await db.execute(select(Project).where(and_(Project.owner_id == user_id, Project.name == "General")))
                     proj = res.scalars().first()
 
-                    
-                    if proj:
-                        issue_in = IssueCreate(
-                            title=task_data.get("title", subject),
-                            description=task_data.get("description", body),
-                            priority=task_data.get("priority", "medium"),
-                            due_date=task_data.get("due_date"),
-                            project_id=proj.id,
-                            assignee_id=user.id
-                        )
+                    if not proj:
+                        raise ValueError(f"Default 'General' project not found for user {email_address}")
 
-                        issue = await create_issue(db, obj_in=issue_in, owner_id=user.id)
-                        
-                        # Explicitly mark as seen only after DB commit
-                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
-                        
-                        # Audit log for automated email task creation
+                    issue_in = IssueCreate(
+                        title=title_val,
+                        description=desc_val,
+                        priority=priority_val,
+                        due_date=parsed_due_date,
+                        project_id=proj.id,
+                        assignee_id=user_id
+                    )
+
+                    issue = await create_issue(db, obj_in=issue_in, owner_id=user_id)
+                    
+                    # Explicitly mark as seen only after DB commit
+                    await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                    
+                    # Audit log for automated email task creation
+                    await crud_audit.log_action(
+                        db, 
+                        "email.task_created", 
+                        user_id, 
+                        "issue", 
+                        issue.id,
+                        details={"title": issue.title, "email_subject": subject, "source": "automation"}
+                    )
+                    
+                    logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue_in.title}")
+
+                except Exception as email_err:
+                    logger.error(f"Failed to process email msg_id {msg_id} for user {email_address}: {email_err}", exc_info=True)
+                    # Rollback db session to clean up any failed transaction
+                    await db.rollback()
+                    try:
+                        # Log audit event for failure in a clean transaction
                         await crud_audit.log_action(
-                            db, 
-                            "email.task_created", 
-                            user.id, 
-                            "issue", 
-                            issue.id,
-                            details={"title": issue.title, "email_subject": subject, "source": "automation"}
+                            db,
+                            "email.task_creation_failed",
+                            user_id=user_id,
+                            details={"msg_id": msg_id, "error": str(email_err)}
                         )
-                        
-                        logger.info(f"SUCCESS: Created auto-task from email for {user.email}: {issue_in.title}")
+                    except Exception as audit_err:
+                        logger.error(f"Failed to write failure audit log for {email_address}: {audit_err}")
+                        await db.rollback()
+                    
+                    try:
+                        # Ensure we mark the email as Seen to prevent it from blocking the queue
+                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                        logger.info(f"Marked email msg_id {msg_id} as seen to prevent queue lockup.")
+                    except Exception as imap_err:
+                        logger.error(f"Failed to mark email msg_id {msg_id} as seen: {imap_err}")
 
         await imap.logout()
 
     except Exception as e:
-        logger.exception(f"Error processing emails for {user.email}")
+        logger.exception(f"Error processing emails for {email_address}")
 
 async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
     """
