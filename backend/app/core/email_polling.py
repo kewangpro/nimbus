@@ -132,82 +132,92 @@ async def process_email_source(db: AsyncSession, user: User):
                             body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
 
                     # Process with AI
-                    task_data = await email_processor.extract_task(subject, body)
-                    if not task_data:
+                    extracted_tasks = await email_processor.extract_task(subject, body)
+                    if not extracted_tasks:
                         raise ValueError("AI extraction failed or returned invalid data")
 
-                    # Sanitize task_data
-                    title_val = task_data.get("title", subject)
-                    if isinstance(title_val, list):
-                        title_val = " ".join(str(item) for item in title_val)
-                    elif title_val is not None:
-                        title_val = str(title_val)
-                    if not title_val or not title_val.strip():
-                        title_val = subject
-
-                    desc_val = task_data.get("description", body)
-                    if isinstance(desc_val, list):
-                        desc_val = "\n".join(str(item) for item in desc_val)
-                    elif desc_val is not None:
-                        desc_val = str(desc_val)
-                    if not desc_val:
-                        desc_val = body
-
-                    priority_val = task_data.get("priority", "medium")
-                    if isinstance(priority_val, str):
-                        priority_val = priority_val.strip().lower()
+                    if isinstance(extracted_tasks, dict):
+                        tasks = [extracted_tasks]
+                    elif isinstance(extracted_tasks, list):
+                        tasks = extracted_tasks
                     else:
-                        priority_val = "medium"
-                    if priority_val not in ["low", "medium", "high", "urgent"]:
-                        priority_val = "medium"
+                        raise ValueError("Invalid format returned by AI extraction")
 
-                    due_date_val = task_data.get("due_date")
-                    parsed_due_date = None
-                    if due_date_val:
-                        if isinstance(due_date_val, list):
-                            due_date_val = str(due_date_val[0]) if due_date_val else None
-                        if isinstance(due_date_val, str):
-                            due_date_val = due_date_val.strip()
-                            for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
-                                try:
-                                    parsed_due_date = datetime.strptime(due_date_val, fmt)
-                                    parsed_due_date = parsed_due_date.replace(tzinfo=timezone.utc)
-                                    break
-                                except ValueError:
-                                    continue
+                    created_issues = []
+                    for task_data in tasks:
+                        # Sanitize task_data
+                        title_val = task_data.get("title", subject)
+                        if isinstance(title_val, list):
+                            title_val = " ".join(str(item) for item in title_val)
+                        elif title_val is not None:
+                            title_val = str(title_val)
+                        if not title_val or not title_val.strip():
+                            title_val = subject
 
-                    # Find user's "General" project
-                    res = await db.execute(select(Project).where(and_(Project.owner_id == user_id, Project.name == "General")))
-                    proj = res.scalars().first()
+                        desc_val = task_data.get("description", body)
+                        if isinstance(desc_val, list):
+                            desc_val = "\n".join(str(item) for item in desc_val)
+                        elif desc_val is not None:
+                            desc_val = str(desc_val)
+                        if not desc_val:
+                            desc_val = body
 
-                    if not proj:
-                        raise ValueError(f"Default 'General' project not found for user {email_address}")
+                        priority_val = task_data.get("priority", "medium")
+                        if isinstance(priority_val, str):
+                            priority_val = priority_val.strip().lower()
+                        else:
+                            priority_val = "medium"
+                        if priority_val not in ["low", "medium", "high", "urgent"]:
+                            priority_val = "medium"
 
-                    issue_in = IssueCreate(
-                        title=title_val,
-                        description=desc_val,
-                        priority=priority_val,
-                        due_date=parsed_due_date,
-                        project_id=proj.id,
-                        assignee_id=user_id
-                    )
+                        due_date_val = task_data.get("due_date")
+                        parsed_due_date = None
+                        if due_date_val:
+                            if isinstance(due_date_val, list):
+                                due_date_val = str(due_date_val[0]) if due_date_val else None
+                            if isinstance(due_date_val, str):
+                                due_date_val = due_date_val.strip()
+                                for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+                                    try:
+                                        parsed_due_date = datetime.strptime(due_date_val, fmt)
+                                        parsed_due_date = parsed_due_date.replace(tzinfo=timezone.utc)
+                                        break
+                                    except ValueError:
+                                        continue
 
-                    issue = await create_issue(db, obj_in=issue_in, owner_id=user_id)
+                        # Find user's "General" project
+                        res = await db.execute(select(Project).where(and_(Project.owner_id == user_id, Project.name == "General")))
+                        proj = res.scalars().first()
+
+                        if not proj:
+                            raise ValueError(f"Default 'General' project not found for user {email_address}")
+
+                        issue_in = IssueCreate(
+                            title=title_val,
+                            description=desc_val,
+                            priority=priority_val,
+                            due_date=parsed_due_date,
+                            project_id=proj.id,
+                            assignee_id=user_id
+                        )
+
+                        issue = await create_issue(db, obj_in=issue_in, owner_id=user_id)
+                        created_issues.append(issue)
                     
-                    # Explicitly mark as seen only after DB commit
+                    # Explicitly mark as seen only after DB commit of all issues
                     await imap.store(msg_id, "+FLAGS", "(\\Seen)")
                     
-                    # Audit log for automated email task creation
-                    await crud_audit.log_action(
-                        db, 
-                        "email.task_created", 
-                        user_id, 
-                        "issue", 
-                        issue.id,
-                        details={"title": issue.title, "email_subject": subject, "source": "automation"}
-                    )
-                    
-                    logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue_in.title}")
+                    # Audit log for each automated email task creation
+                    for issue in created_issues:
+                        await crud_audit.log_action(
+                            db, 
+                            "email.task_created", 
+                            user_id, 
+                            "issue", 
+                            issue.id,
+                            details={"title": issue.title, "email_subject": subject, "source": "automation"}
+                        )
+                        logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue.title}")
 
                 except Exception as email_err:
                     logger.error(f"Failed to process email msg_id {msg_id} for user {email_address}: {email_err}", exc_info=True)
