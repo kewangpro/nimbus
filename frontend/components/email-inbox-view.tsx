@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { useTimezone } from "@/components/timezone-provider"
 import { Button } from "@/components/ui/button"
-import { Loader2, Plus, CheckCircle2, RefreshCw, Mail } from "lucide-react"
+import { Loader2, Plus, CheckCircle2, RefreshCw, Mail, Check } from "lucide-react"
 import { toast } from "sonner"
 import { Email } from "@/types"
 
@@ -22,7 +22,8 @@ export function EmailInboxView({
     setHasFetched 
 }: EmailInboxViewProps) {
     const [loading, setLoading] = useState(false)
-    const [processingId, setProcessingId] = useState<string | null>(null)
+    const [isProcessingBulk, setIsProcessingBulk] = useState(false)
+    const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set())
     const { formatInTimezone } = useTimezone()
 
     const formatEmailDate = (dateStr: string) => {
@@ -41,6 +42,7 @@ export function EmailInboxView({
             const response = await api.get("/email-oauth/inbox")
             setPersistentEmails(response.data)
             setHasFetched(true)
+            setSelectedEmailIds(new Set())
         } catch (error) {
             console.error(error)
             toast.error("Failed to fetch inbox. Make sure SSO is connected.")
@@ -53,19 +55,39 @@ export function EmailInboxView({
         // fetchInbox() // Removed auto-fetch as per user request
     }, [])
 
-    const handleCreateTask = async (email: Email) => {
-        setProcessingId(email.id)
+    const toggleSelection = (id: string) => {
+        const newSelection = new Set(selectedEmailIds)
+        if (newSelection.has(id)) {
+            newSelection.delete(id)
+        } else {
+            newSelection.add(id)
+        }
+        setSelectedEmailIds(newSelection)
+    }
+
+    const toggleSelectAll = () => {
+        if (selectedEmailIds.size === persistentEmails.length) {
+            setSelectedEmailIds(new Set())
+        } else {
+            setSelectedEmailIds(new Set(persistentEmails.map(e => e.id)))
+        }
+    }
+
+    const handleBulkCreateTask = async () => {
+        if (selectedEmailIds.size === 0) return
+        
+        setIsProcessingBulk(true)
+        const emailsToProcess = persistentEmails.filter(e => selectedEmailIds.has(e.id))
+        
         try {
-            await api.post("/email-oauth/create-task-from-email", {
-                subject: email.subject,
-                snippet: email.snippet
-            })
-            toast.success("Task created from email!")
+            await api.post("/email-oauth/create-tasks-bulk", emailsToProcess)
+            toast.success(`Successfully created tasks from ${selectedEmailIds.size} emails!`)
+            setSelectedEmailIds(new Set())
         } catch (error) {
             console.error(error)
-            toast.error("Failed to create task")
+            toast.error("Failed to create tasks")
         } finally {
-            setProcessingId(null)
+            setIsProcessingBulk(false)
         }
     }
 
@@ -75,13 +97,29 @@ export function EmailInboxView({
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">My Inbox</h2>
                     <p className="text-muted-foreground">
-
-                        Select an email to manually convert it into a task in the General project.
+                        Select one or more emails to convert them into tasks in the General project.
                     </p>
                 </div>
-                <Button variant="outline" size="icon" onClick={fetchInbox} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                </Button>
+                <div className="flex items-center gap-2">
+                    {selectedEmailIds.size > 0 && (
+                        <Button 
+                            variant="default" 
+                            className="gap-2" 
+                            onClick={handleBulkCreateTask}
+                            disabled={isProcessingBulk}
+                        >
+                            {isProcessingBulk ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Plus className="h-4 w-4" />
+                            )}
+                            +Task ({selectedEmailIds.size})
+                        </Button>
+                    )}
+                    <Button variant="outline" size="icon" onClick={fetchInbox} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    </Button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-hidden">
@@ -105,31 +143,45 @@ export function EmailInboxView({
                         </Button>
                     </div>
                 ) : persistentEmails.length > 0 ? (
-                    <div className="h-full pr-4 overflow-y-auto custom-scrollbar">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="h-full pr-4 overflow-y-auto custom-scrollbar flex flex-col space-y-4">
+                        <div className="flex items-center gap-2 px-1">
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-xs h-7"
+                                onClick={toggleSelectAll}
+                            >
+                                {selectedEmailIds.size === persistentEmails.length ? "Deselect All" : "Select All"}
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                                {selectedEmailIds.size} selected
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
                             {persistentEmails.map((email) => (
-                                <div key={email.id} className="p-4 border rounded-lg hover:border-primary/50 transition-colors bg-card flex flex-col justify-between h-full">
+                                <div 
+                                    key={email.id} 
+                                    className={`p-4 border rounded-lg transition-all cursor-pointer flex flex-col justify-between h-full relative group ${
+                                        selectedEmailIds.has(email.id) 
+                                        ? 'border-primary bg-primary/5 ring-1 ring-primary/20' 
+                                        : 'hover:border-primary/40 bg-card hover:bg-accent/5'
+                                    }`}
+                                    onClick={() => toggleSelection(email.id)}
+                                >
                                     <div className="space-y-4 flex-1">
                                         <div className="flex justify-between items-start gap-4">
                                             <div className="space-y-1 min-w-0">
-                                                <h4 className="font-semibold text-sm truncate">{email.subject}</h4>
+                                                <h4 className="font-semibold text-sm truncate pr-6">{email.subject}</h4>
                                                 <p className="text-xs text-muted-foreground truncate">{email.from}</p>
                                                 <p className="text-[10px] text-muted-foreground/60">{formatEmailDate(email.date)}</p>
                                             </div>
-                                            <Button
-                                                size="sm"
-                                                variant="secondary"
-                                                className="shrink-0 h-8 gap-1"
-                                                onClick={() => handleCreateTask(email)}
-                                                disabled={processingId === email.id}
-                                            >
-                                                {processingId === email.id ? (
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                                ) : (
-                                                    <Plus className="h-3 w-3" />
-                                                )}
-                                                Task
-                                            </Button>
+                                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                                selectedEmailIds.has(email.id) 
+                                                ? 'bg-primary border-primary text-primary-foreground' 
+                                                : 'border-muted-foreground/30 group-hover:border-primary/50'
+                                            }`}>
+                                                {selectedEmailIds.has(email.id) && <Check className="h-3 w-3" />}
+                                            </div>
                                         </div>
                                         <div className="p-2 bg-muted/30 rounded text-xs text-muted-foreground italic line-clamp-3">
                                             "{email.snippet}..."

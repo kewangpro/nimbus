@@ -1,4 +1,4 @@
-.PHONY: help infra infra-down docker-up docker-down docker-logs migrate backend worker frontend run stop ports
+.PHONY: help infra infra-down docker-up docker-down docker-logs migrate backend worker frontend run stop ports clean-logs
 
 # Default target when just running 'make'
 .DEFAULT_GOAL := help
@@ -17,8 +17,9 @@ help:
 	@echo "  make backend        - Launch the FastAPI API server locally"
 	@echo "  make worker         - Launch the local background worker process"
 	@echo "  make frontend       - Launch the Next.js frontend locally"
-	@echo "  make run            - Run API + Worker + Frontend locally in parallel"
+	@echo "  make run            - Run API + Worker + Frontend locally in parallel with logging"
 	@echo "  make stop           - Stop all local services and backend containers"
+	@echo "  make clean-logs     - Remove all local log files"
 	@echo "=========================================================="
 
 infra:
@@ -71,7 +72,23 @@ frontend:
 
 run:
 	@echo "🔥 Starting complete Nimbus app locally..."
-	@make -j 3 backend worker frontend
+	@mkdir -p logs
+	@echo "📋 Logs are being written to the 'logs/' directory."
+	@make -j 3 backend-live worker-live frontend-live
+
+backend-live:
+	@make backend 2>&1 | tee logs/backend.log
+
+worker-live:
+	@make worker 2>&1 | tee logs/worker.log
+
+frontend-live:
+	@make frontend 2>&1 | tee logs/frontend.log
+
+clean-logs:
+	@echo "🧹 Cleaning up log files..."
+	rm -rf logs/
+	@echo "✅ Logs cleared."
 
 stop:
 	@echo "🛑 Stopping all running Nimbus services..."

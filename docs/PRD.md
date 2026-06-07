@@ -37,7 +37,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ### 2.3 SSO & Email Integration
 *   **Single Sign-On:** Login via Google or Outlook (OAuth2 PKCE).
 *   **Email Inbox:** View the last 3 days of inbox emails from within Nimbus ("View Inbox" in the Email project).
-*   **Manual Task Creation:** Convert any email to a task with one click. Task is automatically assigned to the logged-in user.
+*   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project.
 *   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for new unseen emails every minute.
 
 ### 2.4 AI-Native Core (Local MLX + Gemma 3)

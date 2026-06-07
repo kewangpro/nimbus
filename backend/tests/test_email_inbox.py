@@ -56,6 +56,47 @@ async def test_get_inbox_success(client: AsyncClient, db: AsyncSession, normal_u
 
 
 @pytest.mark.asyncio
+async def test_get_inbox_standard_imap_response(client: AsyncClient, db: AsyncSession, normal_user_token_headers: dict):
+    # 1. Update Test User with OAuth Token
+    res = await db.execute(select(User).where(User.email == "user@example.com"))
+    user = res.scalars().first()
+    user.oauth_provider = "gmail"
+    user.oauth_access_token = "valid-token"
+    user.oauth_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    db.add(user)
+    await db.commit()
+
+    # 2. Mock IMAP with standard "* SEARCH 1 2 3" response
+    mock_imap = MagicMock()
+    mock_imap.wait_hello_from_server = AsyncMock()
+    mock_imap.protocol = MagicMock()
+    mock_imap.protocol.new_tag = MagicMock(return_value="A1")
+    
+    mock_search_resp = MagicMock()
+    mock_search_resp.result = "OK"
+    mock_search_resp.lines = [b"* SEARCH 101 102", b"A1 OK SEARCH completed."]
+    
+    mock_imap.protocol.execute = AsyncMock(side_effect=[
+        MagicMock(result="OK"),       # AUTHENTICATE
+        mock_search_resp,             # SEARCH SINCE ...
+    ])
+    mock_imap.select = AsyncMock()
+
+    mock_email_content = b"Subject: Task 101\r\nFrom: sender@example.com\r\nDate: Mon, 8 Mar 2026 12:00:00 +0000\r\n\r\nContent"
+    mock_imap.fetch = AsyncMock(return_value=("OK", [None, mock_email_content]))
+    mock_imap.logout = AsyncMock()
+
+    with patch("aioimaplib.IMAP4_SSL", return_value=mock_imap):
+        response = await client.get("/api/v1/email-oauth/inbox", headers=normal_user_token_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    # Should have parsed 102 and 101 (reversed)
+    assert len(data) == 2
+    assert data[0]["subject"] == "Task 101"
+
+
+@pytest.mark.asyncio
 async def test_create_task_from_email(client: AsyncClient, db: AsyncSession, normal_user_token_headers: dict):
     # 1. Setup "Email" Project for the user created by normal_user_token_headers
     res = await db.execute(select(User).where(User.email == "user@example.com"))

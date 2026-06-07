@@ -39,6 +39,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Email-to-Task Mastery:**
         *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses Gemma 3 (via MLX) to extract structured tasks into your **General** project. The implementation uses atomic flagging (`BODY.PEEK`) to ensure emails are only marked as read after the task is successfully committed, preventing data loss during network or AI timeouts.
         *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)**. To save bandwidth and improve performance, emails are only fetched when you click the **Refresh** button. Content is **persisted in memory**, so you can switch between views (e.g., Board or Calendar) and return to your inbox without losing your retrieved emails.
+        *   **Bulk Task Creation:** Select one or multiple emails from your inbox using the visual checkboxes. Click the **+Task** button in the header to instantly convert all selected emails into structured tasks. This uses the same AI extraction engine as the automated poller but gives you full control over which items enter your workspace.
 
 
         *   **Smart Display:** Email subjects and sender names are automatically decoded from **RFC 2047 (MIME encoded-word)** format. This ensures that emojis and special characters (like smart quotes) in subject lines appear correctly as human-readable text.

@@ -106,3 +106,51 @@ async def test_create_task_from_email(
     resp_data = r.json()
     assert resp_data["status"] == "success"
     assert "issue_id" in resp_data
+
+
+@pytest.mark.asyncio
+@patch("app.core.email_processor.email_processor.extract_task", new_callable=AsyncMock)
+async def test_create_tasks_bulk(
+    mock_extract_task,
+    client: AsyncClient, normal_user_token_headers: dict, db: AsyncSession
+) -> None:
+    from app.crud.crud_user import get_by_email
+    user = await get_by_email(db, email="user@example.com")
+    
+    # Ensure "General" project exists
+    res = await db.execute(select(Project).where(
+        and_(Project.owner_id == user.id, Project.name == "General")
+    ))
+    proj = res.scalars().first()
+    if not proj:
+        p_in = ProjectCreate(name="General")
+        await crud_project.create(db, obj_in=p_in, owner_id=user.id)
+        
+    mock_extract_task.side_effect = [
+        {
+            "title": "Task 1",
+            "description": "Desc 1",
+            "priority": "low"
+        },
+        {
+            "title": "Task 2",
+            "description": "Desc 2",
+            "priority": "high"
+        }
+    ]
+    
+    bulk_data = [
+        {"subject": "Email 1", "snippet": "Snippet 1"},
+        {"subject": "Email 2", "snippet": "Snippet 2"}
+    ]
+    
+    r = await client.post(
+        "/api/v1/email-oauth/create-tasks-bulk", 
+        headers=normal_user_token_headers, 
+        json=bulk_data
+    )
+    
+    assert r.status_code == 200
+    resp_data = r.json()
+    assert resp_data["status"] == "success"
+    assert len(resp_data["issue_ids"]) == 2

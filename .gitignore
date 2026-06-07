@@ -33,3 +33,6 @@ backend/.idea/
 frontend/.vscode/
 frontend/.idea/
 
+# Local Logs
+logs/
+

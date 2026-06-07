@@ -126,18 +126,21 @@ async def callback_oauth(
             # We use the id_token from Microsoft (OIDC) which is safer and avoids Graph API scope conflicts
             id_token = tokens.get("id_token")
             if id_token:
-                from jose import jwt
-                # We don't verify the signature here for simplicity, as we just got it over HTTPS from MS
-                payload = jwt.get_unverified_claims(id_token)
-                email = payload.get("email") or payload.get("preferred_username")
-                full_name = payload.get("name")
-                oauth_id = payload.get("sub")
+                try:
+                    from jose import jwt
+                    # We don't verify the signature here for simplicity, as we just got it over HTTPS from MS
+                    payload = jwt.get_unverified_claims(id_token)
+                    email = payload.get("email") or payload.get("preferred_username") or payload.get("upn")
+                    full_name = payload.get("name")
+                    oauth_id = payload.get("sub")
+                except Exception as e:
+                    print(f"ERROR: Failed to parse id_token: {str(e)}")
             else:
                 print("ERROR: No id_token returned from Microsoft")
 
 
         if not email:
-            print(f"ERROR: No email found for provider {provider.value}. Check if scopes are sufficient.")
+            print(f"ERROR: No email found for provider {provider}. Check if scopes are sufficient.")
             raise HTTPException(status_code=400, detail="Failed to retrieve user email")
 
 

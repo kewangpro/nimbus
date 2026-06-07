@@ -98,15 +98,19 @@ async def process_email_source(db: AsyncSession, user: User):
             # Fallback: try just UNSEEN
             search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), "UNSEEN"))
         
-        # Parse message IDs from response lines (decode bytes -> str for fetch())
+        # Parse message IDs from response lines (e.g. b'* SEARCH 101 102 103')
         msg_ids = []
         for line in search_resp.lines:
-            if isinstance(line, bytes) and line.strip() and not line.strip().startswith(b'SEARCH'):
-                msg_ids.extend(mid.decode() for mid in line.split())
+            if isinstance(line, bytes) and line.strip():
+                parts = line.split()
+                for part in parts:
+                    val = part.decode(errors='ignore')
+                    if val.isdigit():
+                        msg_ids.append(val)
 
         
         if msg_ids:
-            from email import message_from_string
+            from email import message_from_bytes
             for msg_id in msg_ids:
                 try:
                     # Use BODY.PEEK[] to fetch without marking as Seen
@@ -114,8 +118,8 @@ async def process_email_source(db: AsyncSession, user: User):
                     if not data or len(data) < 2:
                         continue
                         
-                    raw_email = data[1].decode() if isinstance(data[1], (bytes, bytearray)) else data[1]
-                    msg = message_from_string(raw_email)
+                    raw_email_bytes = data[1] if isinstance(data[1], (bytes, bytearray)) else data[1].encode(errors='replace')
+                    msg = message_from_bytes(raw_email_bytes)
 
                     subject = decode_mime_header(msg["Subject"] or "(No Subject)")
                     body = ""

@@ -49,7 +49,7 @@ async def get_inbox(
     host = "imap.gmail.com" if provider == "gmail" else "outlook.office365.com"
     
     import aioimaplib
-    from email import message_from_string
+    from email import message_from_bytes
     
     try:
         imap = aioimaplib.IMAP4_SSL(host=host)
@@ -76,11 +76,15 @@ async def get_inbox(
             await imap.logout()
             return []
         
-        # Parse IDs from the response lines (e.g. b'101 102 103')
+        # Parse IDs from the response lines (e.g. b'* SEARCH 101 102 103')
         found_ids = []
         for line in search_resp.lines:
-            if isinstance(line, bytes) and line.strip() and not line.strip().startswith(b'SEARCH'):
-                found_ids.extend(mid.decode() for mid in line.split())
+            if isinstance(line, bytes) and line.strip():
+                parts = line.split()
+                for part in parts:
+                    val = part.decode(errors='ignore')
+                    if val.isdigit():
+                        found_ids.append(val)
 
         
         if not found_ids:
@@ -99,8 +103,8 @@ async def get_inbox(
             if not data or len(data) < 2:
                 continue
                 
-            raw_email = data[1].decode() if isinstance(data[1], (bytes, bytearray)) else data[1]
-            msg = message_from_string(raw_email)
+            raw_email_bytes = data[1] if isinstance(data[1], (bytes, bytearray)) else data[1].encode(errors='replace')
+            msg = message_from_bytes(raw_email_bytes)
 
 
             
@@ -125,7 +129,7 @@ async def get_inbox(
                     body = raw_body if msg.get_content_type() == "text/plain" else _strip_html(raw_body)
 
             results.append({
-                "id": msg_id if isinstance(msg_id, str) else msg_id.decode(),
+                "id": msg_id,
                 "subject": _decode_header(msg["Subject"]) or "(No Subject)",
                 "from": _decode_header(msg["From"]),
                 "date": msg["Date"],
@@ -191,3 +195,68 @@ async def create_task_from_email(
     )
     
     return {"status": "success", "issue_id": str(issue.id)}
+
+
+@router.post("/create-tasks-bulk")
+async def create_tasks_bulk(
+    emails_data: List[dict],
+    current_user: User = Depends(deps.get_current_active_user),
+    db: AsyncSession = Depends(deps.get_db)
+) -> Any:
+    """On-demand task creation from multiple selected emails"""
+    from app.core.email_processor import email_processor
+    
+    # Find user's "General" project
+    res = await db.execute(select(Project).where(and_(Project.owner_id == current_user.id, Project.name == "General")))
+    proj = res.scalars().first()
+    
+    if not proj:
+        # Fallback to any project owned by user
+        res = await db.execute(select(Project).where(Project.owner_id == current_user.id))
+        proj = res.scalars().first()
+        
+    if not proj:
+        raise HTTPException(status_code=404, detail="No suitable project found to create tasks")
+
+    created_issues = []
+    for email_data in emails_data:
+        subject = email_data.get("subject", "")
+        snippet = email_data.get("snippet", "")
+        
+        # Process with AI
+        task_data_raw = await email_processor.extract_task(subject, snippet)
+        
+        # Ensure we have a list of task data even if AI returned a single object
+        tasks_to_create = []
+        if isinstance(task_data_raw, list):
+            tasks_to_create = task_data_raw
+        elif isinstance(task_data_raw, dict):
+            tasks_to_create = [task_data_raw]
+        else:
+            # Fallback if AI fails
+            tasks_to_create = [{"title": subject, "description": snippet}]
+
+        for task_data in tasks_to_create:
+            issue_in = IssueCreate(
+                title=task_data.get("title", subject),
+                description=task_data.get("description", snippet),
+                priority=task_data.get("priority", "medium"),
+                due_date=task_data.get("due_date"),
+                project_id=proj.id,
+                assignee_id=current_user.id
+            )
+
+            issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id)
+            created_issues.append(str(issue.id))
+            
+            # Audit log for manual email task creation
+            await crud_audit.log_action(
+                db, 
+                "email.task_created_manual", 
+                current_user.id, 
+                "issue", 
+                issue.id, 
+                details={"title": issue.title, "email_subject": subject, "source": "bulk"}
+            )
+    
+    return {"status": "success", "issue_ids": created_issues}

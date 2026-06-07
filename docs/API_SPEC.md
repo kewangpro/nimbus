@@ -22,6 +22,10 @@
     *   **Description:** AI-powered task creation from an email. Creates the issue in the user's **"General"** project, **auto-assigned to the current user**.
 
     *   **Response:** `{ "status": "success", "issue_id": "uuid" }`
+*   `POST /email-oauth/create-tasks-bulk`
+    *   **Body:** `List[{ "subject": "...", "snippet": "..." }]`
+    *   **Description:** Bulk AI-powered task creation from multiple emails.
+    *   **Response:** `{ "status": "success", "issue_ids": ["uuid", "uuid", ...] }`
 
 ## 3. Issues (Core)
 
