@@ -78,7 +78,7 @@
     *   **Body:** `{ "text": "Raw natural language plan..." }`
     *   **Response:** `List[PlannedIssue]` (suggested tasks).
 *   `POST /ai/schedule`
-    *   **Description:** Auto-assigns due dates for open tasks that are unscheduled, past due, or scheduled far in the future (> 7 days), distributing them across the next 5 weekdays to optimize productivity and resolve scheduling backlogs.
+    *   **Description:** Auto-assigns due dates for up to **100 open tasks** that are unscheduled, past due, or scheduled far in the future (> 7 days). Distributes them across the next 5 weekdays for maximum productivity.
     *   **Response:** `{ "scheduled_count": int, "message": "..." }`
 
 ## 6. File Storage

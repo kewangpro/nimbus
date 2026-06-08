@@ -5,12 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from datetime import datetime, timedelta, date, time, timezone
 
+import logging
+import json
+import re
+from uuid import UUID
+
 from app.api import deps
 from app.core import ai
 from app.crud import crud_embedding, crud_audit, crud_issue, crud_issue_summary, crud_project, crud_user, crud_issue_link
-from app.schemas.issue import Issue, IssuePriority, IssueStatus
+from app.schemas.issue import Issue, IssuePriority, IssueStatus, IssueUpdate
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 class SearchRequest(BaseModel):
     query: str
@@ -88,6 +94,7 @@ async def auto_schedule(
     """
     Auto-schedule open issues using AI.
     """
+    logger.info(f"User {current_user.id} requested auto-scheduling")
     # 1. Fetch open issues (scoped by role)
     owner_id = None
     assignee_id = None
@@ -113,7 +120,9 @@ async def auto_schedule(
         if len(batch) < page_size:
             break
         skip += page_size
+    
     open_issues = [i for i in issues if i.status != IssueStatus.DONE and i.status != IssueStatus.CANCELED]
+    logger.info(f"Found {len(open_issues)} open issues total")
 
     # Schedule issues that are:
     # 1. Unscheduled (no due_date)
@@ -140,15 +149,21 @@ async def auto_schedule(
             schedulable_issues.append(issue)
     
     if not schedulable_issues:
+        logger.info("No issues require rescheduling.")
         return {"scheduled_count": 0, "message": "No issues require rescheduling."}
 
+    logger.info(f"Processing {len(schedulable_issues)} schedulable issues")
+
     # Sort by priority (URGENT -> LOW) and limit to avoid prompt bloat
-    # Priority order: URGENT (0?), HIGH (1?), MEDIUM (2?), LOW (3?)
-    # Let's check the enum values if possible, or just trust the LLM to handle the text.
     schedulable_issues.sort(key=lambda x: x.priority.value if hasattr(x.priority, 'value') else str(x.priority))
     
-    # Limit to 40 tasks to ensure LLM can process them all and stay within JSON limits
-    schedulable_issues = schedulable_issues[:40]
+    # Increase limit to 100 tasks to handle larger backlogs
+    total_schedulable = len(schedulable_issues)
+    if total_schedulable > 100:
+        logger.info(f"Limiting to top 100 schedulable issues (out of {total_schedulable}) for AI processing")
+        schedulable_issues = schedulable_issues[:100]
+    else:
+        logger.info(f"Sending all {total_schedulable} schedulable issues to AI")
 
     # 2. Prepare prompt
     issues_text = "\n".join([f"- ID: {i.id}, Title: {i.title}, Priority: {i.priority}" for i in schedulable_issues])
@@ -166,13 +181,13 @@ async def auto_schedule(
     
     prompt = f"""
     You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
-    Your goal is to schedule these open tasks over the next 5 WEEKDAYS ({days_str}) for MAXIMUM productivity.
+    Your goal is to schedule EVERY SINGLE task listed below over the next 5 WEEKDAYS ({days_str}).
     
     Rules:
-    1. Distribute workload evenly. Do NOT put all tasks on the first day.
-    2. High priority tasks should be earlier in the schedule.
-    3. You MUST schedule ALL provided tasks listed below.
-    4. STRICTLY use only the provided dates. NO weekends.
+    1. You MUST return a schedule for ALL {len(schedulable_issues)} tasks. Do not skip any.
+    2. Distribute workload evenly across the 5 days.
+    3. High priority tasks should generally be earlier.
+    4. STRICTLY use only the provided dates: {days_str}.
     
     Tasks:
     {issues_text}
@@ -180,19 +195,17 @@ async def auto_schedule(
     Output strictly a JSON array of objects: {{ "id": "uuid", "date": "YYYY-MM-DD" }}
     """
     
+    logger.info("Sending prompt to AI for scheduling...")
     response = await ai.generate_completion(prompt, system_prompt="You are a JSON scheduler.")
     
     if not response:
+        logger.error("AI failed to generate a schedule response")
         raise HTTPException(status_code=500, detail="Failed to generate schedule")
 
-    import json
-    import re
     count = 0
 
     try:
         # Robust parsing: Extract individual JSON objects {...} from the response.
-        # This ensures that even if the JSON response is truncated or contains trailing text,
-        # we can still successfully parse and schedule all fully generated tasks.
         schedule_data = []
         matches = re.findall(r'\{[^{}]*\}', response)
         for m in matches:
@@ -204,6 +217,7 @@ async def auto_schedule(
                 continue
 
         if not schedule_data:
+            logger.info("Failed to find JSON objects via regex, attempting fallback JSON parsing")
             clean_json = response.replace("```json", "").replace("```", "").strip()
             json_match = re.search(r"\[.*\]", clean_json, re.DOTALL)
             if json_match:
@@ -212,8 +226,7 @@ async def auto_schedule(
             if isinstance(schedule_data, dict):
                 schedule_data = [schedule_data]
 
-        from uuid import UUID
-        from app.schemas.issue import IssueUpdate
+        logger.info(f"AI returned {len(schedule_data)} potential schedule items")
 
         allowed_ids = {str(i.id) for i in schedulable_issues}
         allowed_dates = set(next_5_weekdays)
@@ -225,8 +238,10 @@ async def auto_schedule(
             if not issue_id_str or not date_str:
                 continue
             if issue_id_str not in allowed_ids:
+                logger.warning(f"AI suggested ID {issue_id_str} which was not in our schedulable list")
                 continue
             if date_str not in allowed_dates:
+                logger.warning(f"AI suggested date {date_str} which is not in the allowed next 5 weekdays")
                 continue
 
             try:
@@ -250,10 +265,11 @@ async def auto_schedule(
             except ValueError:
                 continue
 
+        logger.info(f"Successfully applied updates to {count} issues")
         return {"scheduled_count": count, "message": f"Successfully scheduled {count} tasks."}
         
     except Exception as e:
-        print(f"Schedule parse error: {e}")
+        logger.exception(f"Schedule parse error: {e}")
         raise HTTPException(status_code=500, detail="Failed to parse schedule")
 
 @router.post("/plan", response_model=List[PlannedIssue])

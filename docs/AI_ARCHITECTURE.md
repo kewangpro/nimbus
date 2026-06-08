@@ -67,7 +67,12 @@ CREATE TABLE issue_links (
 ### 4.3 AI Scheduler
 *   **Input:** All open issues that are unscheduled, past due, or scheduled far in the future (> 7 days).
 *   **Output:** Updated `due_date` for each affected issue.
-*   **Logic:** Prioritizes `URGENT` items early, pulls all provided tasks into the next 5 days, skips weekends.
+*   **Logic:**
+    *   **Capacity:** Processes up to **100 tasks** per request (increased from 40 to handle larger backlogs).
+    *   **Priority:** Prioritizes `URGENT` items early in the schedule.
+    *   **Window:** Pulls all provided tasks into the next 5 business days (Mon-Fri).
+    *   **JSON Resilience:** Uses robust regex-based JSON extraction to handle truncated or malformed LLM responses.
+    *   **Logging:** Detailed instrumentation of the scheduling lifecycle, from issue fetching to AI interaction and database updates.
 
 ### 4.4 Semantic Search
 *   **Input:** User query string.
@@ -130,6 +135,7 @@ CREATE TABLE issue_links (
 *   **Async:** All AI calls run in a single-worker `ThreadPoolExecutor` wrapped with `asyncio.run_in_executor` — non-blocking to the FastAPI event loop. MLX requires sequential GPU access, hence `max_workers=1`.
 *   **Lazy loading:** Models are loaded on first inference call and kept in memory for the process lifetime.
 *   **Debounce:** UI updates are immediate (optimistic); vector updates happen on save.
+*   **Context Window:** Completion calls use a `max_tokens` limit of **4096** (increased from 2048) to support large structured outputs (e.g., 100+ task schedules).
 *   **Fallback:** If inference fails (e.g. model not yet downloaded), AI endpoints return HTTP 500. No keyword fallback — treat AI features as optional.
 *   **Background Jobs:** Embedding backfills and email polling run via the async worker to avoid blocking the API.
 *   **Caching:** Issue summaries are content-hash cached; regenerated only when issue content changes.
