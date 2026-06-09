@@ -167,9 +167,17 @@ async def auto_schedule(
 
     # 2. Prepare prompt
     issues_text = "\n".join([f"- ID: {i.id}, Title: {i.title}, Priority: {i.priority}" for i in schedulable_issues])
-    today = datetime.now(timezone.utc).date()
+    user_tz = getattr(current_user, "timezone", "UTC")
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(user_tz)
+    except Exception:
+        tz = timezone.utc
+
+    now_in_tz = datetime.now(tz)
+    today = now_in_tz.date()
     
-    # Generate next 5 weekdays
+    # Generate next 5 weekdays in user's timezone
     next_5_weekdays = []
     current_date = today
     while len(next_5_weekdays) < 5:
@@ -178,6 +186,7 @@ async def auto_schedule(
         current_date += timedelta(days=1)
         
     days_str = ", ".join(next_5_weekdays)
+    tasks_per_day = max(1, len(schedulable_issues) // 5)
     
     prompt = f"""
     You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
@@ -185,7 +194,7 @@ async def auto_schedule(
     
     Rules:
     1. You MUST return a schedule for ALL {len(schedulable_issues)} tasks. Do not skip any.
-    2. Distribute workload evenly across the 5 days.
+    2. Distribute workload evenly across the 5 days. Aim for about {tasks_per_day} tasks per day.
     3. High priority tasks should generally be earlier.
     4. STRICTLY use only the provided dates: {days_str}.
     
@@ -247,7 +256,8 @@ async def auto_schedule(
             try:
                 issue_id = UUID(issue_id_str)
                 due_day = datetime.strptime(date_str, "%Y-%m-%d").date()
-                due_date = datetime.combine(due_day, time.min, tzinfo=timezone.utc)
+                # Use user's timezone for the due date to ensure it lands on the correct day in the UI
+                due_date = datetime.combine(due_day, time.min, tzinfo=tz)
 
                 # Update issue
                 issue_obj = await crud_issue.get(db, id=issue_id)
@@ -281,7 +291,15 @@ async def plan_tasks(
     """
     Break down a natural language plan into structured issues.
     """
-    today = datetime.now()
+    user_tz = getattr(current_user, "timezone", "UTC")
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(user_tz)
+    except Exception:
+        tz = timezone.utc
+
+    now_in_tz = datetime.now(tz)
+    today = now_in_tz.date()
     
     # Generate next 5 weekdays for context
     next_5_weekdays = []

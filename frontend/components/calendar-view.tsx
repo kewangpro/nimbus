@@ -29,6 +29,12 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
     const [showWeekends, setShowWeekends] = useState(true)
     const { timezone, toZoned } = useTimezone()
 
+    // Stable "today" in user's timezone
+    const todayInTz = useMemo(() => startOfDay(toZoned(new Date())), [timezone, refreshTrigger])
+
+    const isTodayInTz = (date: Date) => isSameDay(date, todayInTz)
+    const isBeforeTodayInTz = (date: Date) => isBefore(date, todayInTz)
+
     // Load preferences from local storage on mount
     useEffect(() => {
         if (typeof window === "undefined" || typeof window.localStorage?.getItem !== "function") {
@@ -114,15 +120,15 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
 
     // Calculate dynamic date range
     const days = useMemo(() => {
-        const today = startOfDay(toZoned(new Date()))
-        let minDate = today
-        let maxDate = addDays(today, 4) // Minimum 5 days
+        let minDate = todayInTz
+        let maxDate = addDays(todayInTz, 4) // Minimum 5 days
 
         issues.forEach(issue => {
             if (!issue.due_date) return
             if (!showCompleted && (issue.status === IssueStatus.DONE || issue.status === IssueStatus.CANCELED)) return
 
-            const date = startOfDay(parseISO(issue.due_date))
+            // Ensure we use the user's timezone when determining which "day" an issue belongs to
+            const date = startOfDay(toZoned(issue.due_date))
 
             if (isBefore(date, minDate)) minDate = date
             if (isAfter(date, maxDate)) maxDate = date
@@ -140,7 +146,7 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
             current = addDays(current, 1)
         }
         return dayList
-    }, [issues, showCompleted, showWeekends])
+    }, [issues, showCompleted, showWeekends, todayInTz, toZoned])
 
     // Helper to split issues into days for render
     const getIssuesForDay = (date: Date) => {
@@ -216,13 +222,13 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
                             return (
                                 <div
                                     key={dateKey}
-                                    className={`flex flex-col w-[calc((100%-3rem)/4)] shrink-0 rounded-lg border bg-muted/30 h-full overflow-hidden ${isToday(day) ? 'ring-2 ring-primary/20 bg-primary/5' : ''
+                                    className={`flex flex-col w-[calc((100%-3rem)/4)] shrink-0 rounded-lg border bg-muted/30 h-full overflow-hidden ${isTodayInTz(day) ? 'ring-2 ring-primary/20 bg-primary/5' : ''
                                         }`}
                                 >
-                                    <div className={`p-3 text-center border-b bg-background ${isToday(day) ? 'text-primary' : ''}`}>
+                                    <div className={`p-3 text-center border-b bg-background ${isTodayInTz(day) ? 'text-primary' : ''}`}>
                                         <div className="font-bold flex items-center justify-center gap-2">
                                             {format(day, 'EEEE')}
-                                            {isBefore(day, startOfDay(toZoned(new Date()))) && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Overdue</span>}
+                                            {isBeforeTodayInTz(day) && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Overdue</span>}
                                         </div>
                                         <div className="text-sm opacity-80">{format(day, 'MMM d')}</div>
                                     </div>
