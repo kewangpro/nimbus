@@ -138,14 +138,27 @@ async def process_email_source(db: AsyncSession, user: User):
                     # Process with AI
                     extracted_tasks = await email_processor.extract_task(subject, body)
                     if not extracted_tasks:
-                        raise ValueError("AI extraction failed or returned invalid data")
-
-                    if isinstance(extracted_tasks, dict):
-                        tasks = [extracted_tasks]
-                    elif isinstance(extracted_tasks, list):
-                        tasks = extracted_tasks
+                        logger.warning(f"AI extraction failed for email '{subject}' (msg_id {msg_id}). Falling back to manual task extraction.")
+                        # Fallback: create a single task from the email subject/body
+                        tasks = [{
+                            "title": f"Auto-Task: {subject}",
+                            "description": body,
+                            "priority": "medium",
+                            "due_date": None
+                        }]
                     else:
-                        raise ValueError("Invalid format returned by AI extraction")
+                        if isinstance(extracted_tasks, dict):
+                            tasks = [extracted_tasks]
+                        elif isinstance(extracted_tasks, list):
+                            tasks = extracted_tasks
+                        else:
+                            logger.warning(f"Invalid format returned by AI extraction for msg_id {msg_id}. Falling back.")
+                            tasks = [{
+                                "title": f"Auto-Task: {subject}",
+                                "description": body,
+                                "priority": "medium",
+                                "due_date": None
+                            }]
 
                     created_issues = []
                     for task_data in tasks:

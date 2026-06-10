@@ -102,7 +102,13 @@ CREATE TABLE issue_links (
 
 ### 4.10 Email Task Extraction
 *   **Input:** Email `subject` + `body` snippet.
-*   **Output:** Structured task with `title`, `description`, `priority`, and optional `due_date`.
+*   **Output:** One or more structured tasks with `title`, `description`, `priority`, and optional `due_date`.
+*   **Prompting Strategy:** Uses a few-shot "example response format" to guide the 1B model. Examples are generic (e.g., "Task title") to prevent the model from leaking example content into real tasks.
+*   **Parsing Resilience:**
+    *   **Level 1:** Standard JSON parse.
+    *   **Level 2:** Regex-based block extraction (handles conversational filler before/after JSON).
+    *   **Level 3:** Manual brace-matching parser for partial or multiple JSON objects.
+*   **Fallback Mechanism:** If all AI parsing levels fail, the system falls back to creating a single task with the title `Auto-Task: <Subject>` and the full email body as the description. This ensures zero data loss.
 *   **Used by:** Both manual inbox task creation and automatic background email polling.
 
 ---
