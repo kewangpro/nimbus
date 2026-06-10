@@ -24,7 +24,7 @@ REDIS_URL=redis://host:6379/0
 SECRET_KEY=<generate with: openssl rand -hex 32>
 
 # AI models (downloaded from Hugging Face on first use)
-MLX_CHAT_MODEL=mlx-community/gemma-3-4b-it-4bit
+MLX_CHAT_MODEL=mlx-community/Llama-3.2-1B-Instruct-4bit
 EMBEDDING_MODEL=nomic-ai/nomic-embed-text-v1
 
 # MinIO / S3

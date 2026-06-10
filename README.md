@@ -91,18 +91,13 @@ pip install -r requirements.txt
 # Run Migrations
 alembic upgrade head
 
-# Start API Server
+# Start API Server (includes integrated Background Worker)
 uvicorn app.main:app --reload --port 8100
 ```
 API Documentation: `http://localhost:8100/docs`
 
-Start the async worker for AI jobs (embeddings backfill, etc.):
-```bash
-python -m app.worker
-```
-
 > [!IMPORTANT]
-> **Native macOS Requirement:** Because MLX is Apple Silicon exclusive (requiring direct Apple GPU access), the `backend` and `worker` **must** run natively on your macOS host. Running them inside a Linux Docker container will cause MLX imports to fail. Accordingly, the Docker configuration is reserved strictly for database, Redis, and MinIO storage infrastructure.
+> **Native macOS Requirement:** Because MLX is Apple Silicon exclusive (requiring direct Apple GPU access), the `backend` **must** run natively on your macOS host. Running it inside a Linux Docker container will cause MLX imports to fail. Accordingly, the Docker configuration is reserved strictly for database, Redis, and MinIO storage infrastructure.
 
 
 ### 3. Frontend Setup
@@ -122,7 +117,7 @@ make ports
 This prints a clean, real-time diagnostic dashboard directly in your terminal, showing which ports are `ACTIVE` (with their Process IDs and process names) or `FREE` (ready to use).
 
 ### 5. Stopping the Application
-To stop all running frontend, backend, background worker services, and Docker infrastructure containers (db, redis, minio) in one command, run:
+To stop all running frontend, backend services, and Docker infrastructure containers (db, redis, minio) in one command, run:
 ```bash
 make stop
 ```
@@ -130,17 +125,17 @@ make stop
 
 ## 🧠 AI Configuration
 
-### MLX + Gemma 3 (local inference)
+### MLX + Local Inference
 AI runs entirely on-device via **MLX** on Apple Silicon — no external server required. Models are downloaded automatically from Hugging Face on first use.
 
 **Default models** (configurable via env vars):
 
 | Env Var | Default | Purpose |
 |:---|:---|:---|
-| `MLX_CHAT_MODEL` | `mlx-community/gemma-3-4b-it-4bit` | Planning, triage, summarization |
+| `MLX_CHAT_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Planning, triage, summarization |
 | `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |
 
-To use a different model, set `MLX_CHAT_MODEL=mlx-community/gemma-3-4b-it-4bit` in `backend/.env`.
+To use a different model (e.g. a larger 4B or 8B model), set `MLX_CHAT_MODEL` in `backend/.env`.
 
 > **Note:** MLX only runs natively on macOS with Apple Silicon. Inside the Linux Docker container, MLX is not available (as the C++ library is macOS exclusive). Consequently, standard MLX chat completions will fail with a descriptive ModuleNotFoundError if run inside the container. For full GPU performance and MLX chat features, you should run the backend natively on your host Apple Silicon Mac (using `make backend` or `make run`). Inference will still run locally via `sentence-transformers` on CPU inside the container for vector embeddings.
 

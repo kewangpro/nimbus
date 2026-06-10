@@ -6,7 +6,10 @@ from app.api.v1.api import api_router
 from app.core.storage import init_storage
 from app.core.jobs import enqueue_job, JOB_POLL_EMAILS
 from app.mcp.server import mcp
+from app.core.worker_task import run_worker
 
+
+from contextlib import asynccontextmanager
 
 async def schedule_email_polling():
     """Background task to enqueue email polling every minute if not already enqueued"""
@@ -18,21 +21,37 @@ async def schedule_email_polling():
                 await enqueue_job(JOB_POLL_EMAILS, {})
             else:
                 print("DEBUG: Email polling job already in queue, skipping enqueue.")
+        except asyncio.CancelledError:
+            break
         except Exception as e:
             print(f"ERROR: Failed to enqueue email job: {e}")
         await asyncio.sleep(60) # Poll every minute
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    init_storage()
+    # Start the scheduler and worker in the background
+    polling_task = asyncio.create_task(schedule_email_polling())
+    worker_task = asyncio.create_task(run_worker())
+    
+    yield
+    
+    # Shutdown logic
+    print("INFO: Shutting down background tasks...")
+    polling_task.cancel()
+    worker_task.cancel()
+    try:
+        await asyncio.gather(polling_task, worker_task, return_exceptions=True)
+    except Exception as e:
+        print(f"DEBUG: Error during task cleanup: {e}")
+    print("INFO: Background tasks stopped.")
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
-
-@app.on_event("startup")
-async def startup_event():
-    init_storage()
-    # Start the scheduler in the background
-    asyncio.create_task(schedule_email_polling())
-
 
 # Set all CORS enabled origins
 app.add_middleware(

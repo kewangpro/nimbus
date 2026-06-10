@@ -1,16 +1,16 @@
 import asyncio
 import json
-
+import logging
 from redis.asyncio import Redis
 
 from app.core.config import settings
 from app.core.jobs import QUEUE_NAME, JOB_BACKFILL_EMBEDDINGS, JOB_POLL_EMAILS
 from app.core import ai
 from app.core.email_polling import poll_emails
-
 from app.crud import crud_embedding, crud_issue
 from app.db.session import AsyncSessionLocal
 
+logger = logging.getLogger(__name__)
 
 async def _backfill_embeddings() -> int:
     count = 0
@@ -40,27 +40,26 @@ async def _process_job(raw: str) -> None:
     try:
         job = json.loads(raw)
     except Exception:
-        print("Invalid job payload")
+        logger.error("Invalid job payload")
         return
 
     job_type = job.get("type")
     if job_type == JOB_BACKFILL_EMBEDDINGS:
         total = await _backfill_embeddings()
-        print(f"Backfill completed. Updated {total} issues.")
+        logger.info(f"Backfill completed. Updated {total} issues.")
         return
 
     if job_type == JOB_POLL_EMAILS:
         async with AsyncSessionLocal() as db:
             await poll_emails(db)
-        print("Email polling completed.")
+        logger.info("Email polling completed.")
         return
 
-
-    print(f"Unknown job type: {job_type}")
+    logger.warning(f"Unknown job type: {job_type}")
 
 
 async def run_worker() -> None:
-    print("Nimbus worker started. Waiting for jobs...")
+    logger.info("Nimbus background worker task started.")
     while True:
         try:
             redis = Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -74,15 +73,11 @@ async def run_worker() -> None:
             finally:
                 await redis.aclose()
         except (ConnectionError, ConnectionRefusedError, OSError) as e:
-            print(f"Redis connection error: {e}. Retrying in 5 seconds...")
+            logger.error(f"Redis connection error: {e}. Retrying in 5 seconds...")
             await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            logger.info("Worker task cancelled.")
+            break
         except Exception as e:
-            print(f"Unexpected worker error: {e}. Retrying in 10 seconds...")
+            logger.error(f"Unexpected worker error: {e}. Retrying in 10 seconds...")
             await asyncio.sleep(10)
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(run_worker())
-    except KeyboardInterrupt:
-        print("Worker stopped by user.")

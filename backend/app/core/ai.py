@@ -4,7 +4,7 @@ from typing import List, Optional
 import os
 import logging
 
-CHAT_MODEL = os.getenv("MLX_CHAT_MODEL", "mlx-community/gemma-3-4b-it-4bit")
+CHAT_MODEL = os.getenv("MLX_CHAT_MODEL", "mlx-community/Llama-3.2-1B-Instruct-4bit")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-ai/nomic-embed-text-v1")
 
 logger = logging.getLogger(__name__)

@@ -1,4 +1,4 @@
-.PHONY: help infra infra-down docker-up docker-down docker-logs migrate backend worker frontend run stop ports clean-logs
+.PHONY: help infra infra-down docker-up docker-down docker-logs migrate backend frontend run stop ports clean-logs
 
 # Default target when just running 'make'
 .DEFAULT_GOAL := help
@@ -15,9 +15,8 @@ help:
 	@echo "  make docker-logs    - Stream logs from all running Docker containers"
 	@echo "  make migrate        - Run database migrations inside backend container"
 	@echo "  make backend        - Launch the FastAPI API server locally"
-	@echo "  make worker         - Launch the local background worker process"
 	@echo "  make frontend       - Launch the Next.js frontend locally"
-	@echo "  make run            - Run API + Worker + Frontend locally in parallel with logging"
+	@echo "  make run            - Run API + Frontend locally in parallel with logging"
 	@echo "  make stop           - Stop all local services and backend containers"
 	@echo "  make clean-logs     - Remove all local log files"
 	@echo "=========================================================="
@@ -47,19 +46,11 @@ migrate:
 	docker compose exec backend alembic upgrade head
 
 backend:
-	@echo "🐍 Starting FastAPI Backend locally on port 8100..."
+	@echo "🐍 Starting FastAPI Backend (with integrated Worker) locally on port 8100..."
 	@if [ -d "backend/venv" ]; then \
 		cd backend && ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload; \
 	else \
 		cd backend && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt && ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload; \
-	fi
-
-worker:
-	@echo "⚙️ Starting Background Worker locally..."
-	@if [ -d "backend/venv" ]; then \
-		cd backend && while true; do ./venv/bin/python -m app.worker; echo "Worker exited. Restarting in 5 seconds..."; sleep 5; done; \
-	else \
-		cd backend && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt && while true; do ./venv/bin/python -m app.worker; echo "Worker exited. Restarting in 5 seconds..."; sleep 5; done; \
 	fi
 
 frontend:
@@ -74,13 +65,10 @@ run:
 	@echo "🔥 Starting complete Nimbus app locally..."
 	@mkdir -p logs
 	@echo "📋 Logs are being written to the 'logs/' directory."
-	@make -j 3 backend-live worker-live frontend-live
+	@make -j 2 backend-live frontend-live
 
 backend-live:
 	@make backend 2>&1 | tee logs/backend.log
-
-worker-live:
-	@make worker 2>&1 | tee logs/worker.log
 
 frontend-live:
 	@make frontend 2>&1 | tee logs/frontend.log
@@ -103,11 +91,6 @@ stop:
 		echo "Killing Next.js Frontend (PID: $$port_3100_pid)..."; \
 		kill -9 $$port_3100_pid 2>/dev/null || true; \
 	fi
-	@worker_pids=$$(pgrep -f "app.worker" 2>/dev/null); \
-	if [ -n "$$worker_pids" ]; then \
-		echo "Killing Background Worker process(es)..."; \
-		kill -9 $$worker_pids 2>/dev/null || true; \
-	fi
 	@echo "✅ All Nimbus services stopped."
 
 ports:
@@ -127,13 +110,4 @@ ports:
 			printf "\033[31m%-18s %-6s %-10s\033[0m -\n" "$$name" "$$port" "FREE"; \
 		fi \
 	done
-	@# Check background worker separately since it does not listen on a port
-	@worker_pid=$$(pgrep -f "app.worker" | head -n 1); \
-	if [ -n "$$worker_pid" ]; then \
-		proc_path=$$(ps -p $$worker_pid -o comm= 2>/dev/null || echo "Unknown"); \
-		proc=$$(basename "$$proc_path" 2>/dev/null || echo "Unknown"); \
-		printf "\033[32m%-18s %-6s %-10s\033[0m %s (PID: %s)\n" "Async Worker" "N/A" "ACTIVE" "$$proc" "$$worker_pid"; \
-	else \
-		printf "\033[31m%-18s %-6s %-10s\033[0m -\n" "Async Worker" "N/A" "OFFLINE"; \
-	fi
 	@echo "------------------------------------------------"
