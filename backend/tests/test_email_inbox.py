@@ -128,3 +128,34 @@ async def test_create_task_from_email(client: AsyncClient, db: AsyncSession, nor
 
     assert response.status_code == 200
     assert response.json()["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_create_tasks_bulk(client: AsyncClient, db: AsyncSession, normal_user_token_headers: dict):
+    # 1. Setup user and project
+    res = await db.execute(select(User).where(User.email == "user@example.com"))
+    user = res.scalars().first()
+    project = Project(name="General", owner_id=user.id)
+    db.add(project)
+    await db.commit()
+
+    # 2. Mock AI with mixed valid and "null" string responses
+    mock_extract = AsyncMock(side_effect=[
+        {"title": "Task 1", "due_date": "2026-06-15"},
+        {"title": "Task 2", "due_date": "null"}  # Test "null" string resilience
+    ])
+
+    payload = [
+        {"subject": "S1", "snippet": "B1"},
+        {"subject": "S2", "snippet": "B2"}
+    ]
+
+    with patch("app.core.email_processor.email_processor.extract_task", mock_extract):
+        response = await client.post(
+            "/api/v1/email-oauth/create-tasks-bulk",
+            json=payload,
+            headers=normal_user_token_headers
+        )
+
+    assert response.status_code == 200
+    assert len(response.json()) >= 2

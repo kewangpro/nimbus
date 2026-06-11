@@ -126,11 +126,19 @@ async def auto_schedule(
 
     # Schedule issues that are:
     # 1. Unscheduled (no due_date)
-    # 2. Overdue
+    # 2. Overdue (due before today)
     # 3. Scheduled far in the future (beyond the next 5 weekdays)
-    now_utc = datetime.now(timezone.utc)
+    user_tz = getattr(current_user, "timezone", "UTC")
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(user_tz)
+    except Exception:
+        tz = timezone.utc
+
+    now_in_tz = datetime.now(tz)
+    today = now_in_tz.date()
     # We look 7 days ahead to account for weekends and the 5-weekday window
-    horizon = now_utc + timedelta(days=7)
+    horizon = now_in_tz + timedelta(days=7)
     
     schedulable_issues: list[Issue] = []
     for issue in open_issues:
@@ -142,8 +150,11 @@ async def auto_schedule(
             if due_dt.tzinfo is None:
                 due_dt = due_dt.replace(tzinfo=timezone.utc)
             
-            # If overdue OR scheduled beyond our current planning horizon, it's schedulable
-            if due_dt < now_utc or due_dt > horizon:
+            # Convert to user's timezone for comparison
+            due_in_tz = due_dt.astimezone(tz)
+            
+            # If overdue (before today) OR scheduled beyond our current planning horizon, it's schedulable
+            if due_in_tz.date() < today or due_in_tz > horizon:
                 schedulable_issues.append(issue)
         except Exception:
             schedulable_issues.append(issue)
@@ -154,28 +165,35 @@ async def auto_schedule(
 
     logger.info(f"Processing {len(schedulable_issues)} schedulable issues")
 
-    # Sort by priority (URGENT -> LOW) and limit to avoid prompt bloat
-    schedulable_issues.sort(key=lambda x: x.priority.value if hasattr(x.priority, 'value') else str(x.priority))
+    # Priority mapping for numerical sorting
+    priority_map = {
+        "urgent": 0,
+        "high": 1,
+        "medium": 2,
+        "low": 3
+    }
+
+    # Sort criteria:
+    # 1. Unscheduled first (due_date is None)
+    # 2. Priority (URGENT -> LOW)
+    # 3. Created date (Older first)
+    schedulable_issues.sort(key=lambda x: (
+        0 if x.due_date is None else 1,
+        priority_map.get(str(x.priority).lower(), 9),
+        x.created_at or datetime.min.replace(tzinfo=timezone.utc)
+    ))
     
-    # Increase limit to 100 tasks to handle larger backlogs
+    # Reduced limit to 40 tasks to improve 1B model accuracy and prevent date hallucination
     total_schedulable = len(schedulable_issues)
-    if total_schedulable > 100:
-        logger.info(f"Limiting to top 100 schedulable issues (out of {total_schedulable}) for AI processing")
-        schedulable_issues = schedulable_issues[:100]
+    if total_schedulable > 40:
+        logger.info(f"Limiting to top 40 schedulable issues (out of {total_schedulable}) for AI processing")
+        schedulable_issues = schedulable_issues[:40]
     else:
         logger.info(f"Sending all {total_schedulable} schedulable issues to AI")
 
-    # 2. Prepare prompt
-    issues_text = "\n".join([f"- ID: {i.id}, Title: {i.title}, Priority: {i.priority}" for i in schedulable_issues])
-    user_tz = getattr(current_user, "timezone", "UTC")
-    try:
-        from zoneinfo import ZoneInfo
-        tz = ZoneInfo(user_tz)
-    except Exception:
-        tz = timezone.utc
-
-    now_in_tz = datetime.now(tz)
-    today = now_in_tz.date()
+    # 2. Prepare prompt using Day Numbers to prevent date hallucination
+    id_map = {str(idx): str(i.id) for idx, i in enumerate(schedulable_issues)}
+    issues_text = "\n".join([f"- Index: {idx}, Title: {i.title}, Priority: {i.priority}" for idx, i in enumerate(schedulable_issues)])
     
     # Generate next 5 weekdays in user's timezone
     next_5_weekdays = []
@@ -184,28 +202,42 @@ async def auto_schedule(
         if current_date.weekday() < 5: # 0-4 are Mon-Fri
             next_5_weekdays.append(current_date.strftime("%Y-%m-%d"))
         current_date += timedelta(days=1)
-        
-    days_str = ", ".join(next_5_weekdays)
+    
+    # Map Day 1-5 to dates
+    day_map = {str(i+1): d for i, d in enumerate(next_5_weekdays)}
     tasks_per_day = max(1, len(schedulable_issues) // 5)
     
     prompt = f"""
     You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
-    Your goal is to schedule EVERY SINGLE task listed below over the next 5 WEEKDAYS ({days_str}).
+    Your goal is to assign each of the {len(schedulable_issues)} tasks below to one of the NEXT 5 DAYS.
     
-    Rules:
-    1. You MUST return a schedule for ALL {len(schedulable_issues)} tasks. Do not skip any.
-    2. Distribute workload evenly across the 5 days. Aim for about {tasks_per_day} tasks per day.
-    3. High priority tasks should generally be earlier.
-    4. STRICTLY use only the provided dates: {days_str}.
+    ### THE ONLY ALLOWED DAY NUMBERS ###
+    1 (Earliest)
+    2
+    3
+    4
+    5 (Latest)
     
-    Tasks:
+    ### RULES ###
+    1. ASSIGN ALL: You MUST assign ALL {len(schedulable_issues)} tasks.
+    2. USE DAY NUMBERS: Respond only with the "day_number" (1, 2, 3, 4, or 5).
+    3. BATCHING: Put about {tasks_per_day} tasks on each day.
+    4. PRIORITY: 'URGENT' tasks MUST go on Day 1.
+    
+    ### TASK LIST ###
     {issues_text}
     
-    Output strictly a JSON array of objects: {{ "id": "uuid", "date": "YYYY-MM-DD" }}
+    ### OUTPUT FORMAT ###
+    Respond ONLY with a valid JSON array of objects.
+    Format: [{{"index": 0, "day_number": 1}}, {{"index": 1, "day_number": 1}}, ...]
     """
     
     logger.info("Sending prompt to AI for scheduling...")
-    response = await ai.generate_completion(prompt, system_prompt="You are a JSON scheduler.")
+    system_message = (
+        "You are a task scheduler. Output strictly valid JSON arrays. "
+        "Only use day_number 1 through 5. Do not use actual dates."
+    )
+    response = await ai.generate_completion(prompt, system_prompt=system_message)
     
     if not response:
         logger.error("AI failed to generate a schedule response")
@@ -220,7 +252,7 @@ async def auto_schedule(
         for m in matches:
             try:
                 item = json.loads(m)
-                if "id" in item and "date" in item:
+                if ("index" in item or "day_number" in item):
                     schedule_data.append(item)
             except Exception:
                 continue
@@ -237,20 +269,22 @@ async def auto_schedule(
 
         logger.info(f"AI returned {len(schedule_data)} potential schedule items")
 
+        allowed_indices = set(id_map.keys())
         allowed_ids = {str(i.id) for i in schedulable_issues}
-        allowed_dates = set(next_5_weekdays)
+        allowed_day_numbers = set(day_map.keys())
 
         for item in schedule_data:
-            issue_id_str = item.get("id")
-            date_str = item.get("date")
+            idx_val = str(item.get("index"))
+            day_num = str(item.get("day_number"))
+            
+            issue_id_str = id_map.get(idx_val)
+            date_str = day_map.get(day_num)
 
             if not issue_id_str or not date_str:
-                continue
-            if issue_id_str not in allowed_ids:
-                logger.warning(f"AI suggested ID {issue_id_str} which was not in our schedulable list")
-                continue
-            if date_str not in allowed_dates:
-                logger.warning(f"AI suggested date {date_str} which is not in the allowed next 5 weekdays")
+                if not issue_id_str:
+                    logger.warning(f"AI suggested Index {idx_val} which was not in our list")
+                if not date_str:
+                    logger.warning(f"AI suggested Day Number {day_num} which is not 1-5")
                 continue
 
             try:
@@ -272,7 +306,8 @@ async def auto_schedule(
                         details={"title": issue_obj.title, "changes": ["due_date"], "via": "ai_scheduler"}
                     )
                     count += 1
-            except ValueError:
+            except Exception as e:
+                logger.error(f"Error updating issue {issue_id_str}: {e}")
                 continue
 
         logger.info(f"Successfully applied updates to {count} issues")

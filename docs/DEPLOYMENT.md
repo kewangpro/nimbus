@@ -26,6 +26,7 @@ SECRET_KEY=<generate with: openssl rand -hex 32>
 # AI models (downloaded from Hugging Face on first use)
 MLX_CHAT_MODEL=mlx-community/Llama-3.2-1B-Instruct-4bit
 EMBEDDING_MODEL=nomic-ai/nomic-embed-text-v1
+HF_TOKEN=your_hugging_face_token  # Optional, but recommended
 
 # MinIO / S3
 MINIO_ENDPOINT=localhost:9000

@@ -98,8 +98,8 @@
 *   [x] Social login buttons on the frontend.
 
 ### 9.2 Auto-Project Setup
-*   [x] On first login, automatically create **"General"** and **"Email"** projects.
-*   [x] "Email" project is the designated target for all email-generated tasks.
+*   [x] On first login, automatically create a **"General"** project.
+*   [x] "General" project is the designated target for all tasks, including those generated from email.
 
 ### 9.3 Email Inbox (Manual)
 *   [x] `GET /email-oauth/inbox` — Fetches the last 3 days of emails via IMAP/XOAUTH2.
@@ -111,13 +111,13 @@
 *   [x] HTML snippet stripping: regex strips HTML tags from marketing emails; prefers `text/plain` part.
 *   [x] Timezone-aware email dates: displayed in the user's configured timezone via `formatInTimezone()`.
 
-*   [x] "View Inbox" button in the Email project header opens an inbox modal.
+*   [x] "View Inbox" button in the header opens an inbox modal.
 
 ### 9.4 Email Automation (Background Polling)
 *   [x] `email_automation_enabled` toggle in User Settings (checkbox).
 *   [x] Background worker polls every 60 seconds for UNSEEN emails from the last 3 days.
 *   [x] `email_processor.extract_task()` extracts title, description, and priority using Gemma 3 via MLX.
-*   [x] Created tasks are assigned to the inbox owner and placed in their "Email" project.
+*   [x] Created tasks are assigned to the inbox owner and placed in their "General" project.
 *   [x] Graceful fallback: if `UNSEEN SINCE <date>` fails, retries with `UNSEEN` only.
 
 ### 9.5 Cleanup & Quality
@@ -128,7 +128,7 @@
 *   [x] Updated all test mocks to match new IMAP search protocol.
 *   [x] Python 3.9 Compatibility: Mocked `mcp` in `conftest.py` and handled type union syntax for compatibility.
 *   [x] Cleanup utility: `scripts/fix_encoded_titles.py` for retroactive title fixing.
-*   [x] **All 74 tests passing with robust coverage expansion (reaching 67% overall).**
+*   [x] **All 87 tests passing with robust coverage expansion (reaching 70% overall).**
 
 ---
 
@@ -150,14 +150,37 @@
 *   [x] **Improved Monitoring:** Added standard logging commands and monitoring guides to `README.md` and `DEPLOYMENT.md`.
 ---
 151: 
-152: ## Phase 12: External AI Integration (MCP) ✅
-153: **Goal:** Enable external AI assistants (e.g., Claude Desktop) to directly manage Nimbus data via the Model Context Protocol.
-154: 
-155: *   [x] **FastMCP Server:** Integrated `FastMCP` into the FastAPI backend.
-156: *   [x] **SSE Transport:** Mounted MCP at `GET /mcp/sse` for standard cross-tool connectivity.
-157: *   [x] **Calendar Tools:** Implemented `list_calendar_events` (with chronological sorting and timeframe windowing) and `schedule_task`.
-158: *   [x] **Task Management Tools:** Implemented `create_calendar_task` (with dynamic project selection) and `get_task_details`.
-159: *   [x] **Semantic Search Tool:** Exposed `search_tasks` to allow external AIs to find issues using the local vector database.
-160: *   [x] **Robust Error Handling:** Comprehensive try-except blocks with actionable feedback for AI self-correction.
-161: *   [x] **Automated Testing:** Dedicated test suite (`tests/test_mcp_server.py`) with enhanced mocking for Python 3.9 compatibility.
+## Phase 12: External AI Integration (MCP) ✅
+**Goal:** Enable external AI assistants (e.g., Claude Desktop) to directly manage Nimbus data via the Model Context Protocol.
+
+*   [x] **FastMCP Server:** Integrated `FastMCP` into the FastAPI backend.
+*   [x] **SSE Transport:** Mounted MCP at `GET /mcp/sse` for standard cross-tool connectivity.
+*   [x] **Calendar Tools:** Implemented `list_calendar_events` (with chronological sorting and timeframe windowing) and `schedule_task`.
+*   [x] **Task Management Tools:** Implemented `create_calendar_task` (with dynamic project selection) and `get_task_details`.
+*   [x] **Semantic Search Tool:** Exposed `search_tasks` to allow external AIs to find issues using the local vector database.
+*   [x] **Robust Error Handling:** Comprehensive try-except blocks with actionable feedback for AI self-correction.
+*   [x] **Automated Testing:** Dedicated test suite (`tests/test_mcp_server.py`) with enhanced mocking for Python 3.9 compatibility.
+
+---
+
+## Phase 13: Email Processor Refinement & JSON Robustness ✅
+**Goal:** Reduce noise from automated email tasks and ensure valid JSON extraction even with smaller local models.
+
+*   [x] **Negative Prompting:** Updated system prompt to explicitly ignore boilerplate links (Unsubscribe, More Info, Help Center).
+*   [x] **Few-Shot Advertising Filtering:** Added examples of marketing emails returning an empty list `[]` to guide the AI.
+*   [x] **JSON Pre-cleaning:** Automated stripping of markdown blocks and trailing comments (e.g., `#` or `//`) from AI responses.
+*   [x] **Single-Quote Fallback:** Implemented `ast.literal_eval` to handle AI-generated single-quoted dictionaries.
+*   [x] **Strict Validation:** Only processes items that include a valid `title` key, filtering out conversational noise.
+*   [x] **Bulk Creation Stability:** Fixed Pydantic validation error by sanitizing `"null"` strings in the `due_date` field.
+
+---
+
+## Phase 14: Scheduler Intelligence Optimization ✅
+**Goal:** Maximize scheduling accuracy for local 1B models when handling large backlogs.
+
+*   [x] **Index Mapping:** Replaced 36-character UUIDs with short integers (`0, 1, 2...`) in prompts to save tokens and eliminate model confusion.
+*   [x] **Day Number Strategy:** Directed AI to output `day_number` (1-5) instead of date strings, preventing hallucinated future months.
+*   [x] **Priority Mapping:** Implemented numerical prioritization (`URGENT=0`, `HIGH=1`) to ensure correct sorting in batch processing.
+*   [x] **Unscheduled First:** Updated logic to prioritize tasks with no dates over overdue tasks, ensuring full backlog visibility.
+
 162: 

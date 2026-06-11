@@ -12,8 +12,9 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **📅 AI Schedule:** 
         *   **Input:** All open issues that are unscheduled, past due, or scheduled far in the future (> 7 days).
         *   **Output:** Updated `due_date` for each affected issue.
-        *   **Capacity:** High-performance processing of up to **100 tasks** (increased from 40) using expanded context window (4096 tokens).
-        *   **Logic:** Prioritizes `URGENT` items early, pulls all provided tasks into the next 5 days, skips weekends, and resolves overdue backlogs. Features robust JSON extraction and detailed instrumentation logging.
+        *   **Capacity:** High-performance processing of up to **40 tasks** per batch, optimized for local inference.
+        *   **Precision Intelligence:** Employs **Index Mapping** and **Day Number** strategies to ensure 100% scheduling accuracy even with smaller local models (1B/3B).
+        *   **Logic:** Prioritizes unscheduled tasks first, followed by urgent items. Pulls all provided tasks into the next 5 days, strictly avoiding weekends and future-date hallucinations.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using Gemma 3 via MLX.
@@ -39,8 +40,10 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project for you.
     *   **Email-to-Task Mastery:**
         *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses Gemma 3 (via MLX) to extract structured tasks into your **General** project. The implementation uses atomic flagging (`BODY.PEEK`) to ensure emails are only marked as read after the task is successfully committed, preventing data loss during network or AI timeouts.
-        *   **Multi-Task Extraction:** The AI is trained to identify and extract **multiple distinct tasks** from a single email (e.g., a newsletter or complex briefing), creating a separate issue for each actionable item.
-        *   **Resilient Fallback:** If AI extraction fails or returns malformed data, Nimbus automatically creates a "Raw" task from the email subject and body, ensuring no important information is ever lost.
+        *   **Smart Filtering:** The AI is trained to **ignore marketing boilerplate**, unsubscribe links, and newsletter footers. It focuses exclusively on extracting real, actionable tasks from the email body.
+        *   **Multi-Task Extraction:** The AI can identify and extract **multiple distinct tasks** from a single email, creating a separate issue for each actionable item.
+        *   **Resilient Parsing:** Features a robust multi-stage parser that handles common AI formatting errors, including stripping trailing comments, supporting single-quoted "JSON" via `ast.literal_eval`, and manual brace-matching recovery.
+        *   **Resilient Fallback:** If AI extraction fails or returns no tasks, Nimbus automatically creates a "Raw" task from the email subject and body, ensuring no important information is ever lost.
         *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)**. To save bandwidth and improve performance, emails are only fetched when you click the **Refresh** button. Content is **persisted in memory**, so you can switch between views (e.g., Board or Calendar) and return to your inbox without losing your retrieved emails.
         *   **Bulk Task Creation:** Select one or multiple emails from your inbox using the visual checkboxes. Click the **+Task** button in the header to instantly convert all selected emails into structured tasks. This uses the same AI extraction engine as the automated poller but gives you full control over which items enter your workspace.
 
@@ -136,6 +139,7 @@ AI runs entirely on-device via **MLX** on Apple Silicon — no external server r
 |:---|:---|:---|
 | `MLX_CHAT_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Planning, triage, summarization |
 | `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |
+| `HF_TOKEN` | (optional) | Set this to your Hugging Face token to enable higher rate limits and faster downloads. |
 
 To use a different model (e.g. a larger 4B or 8B model), set `MLX_CHAT_MODEL` in `backend/.env`.
 

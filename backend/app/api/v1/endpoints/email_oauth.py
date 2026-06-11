@@ -172,11 +172,16 @@ async def create_task_from_email(
         raise HTTPException(status_code=404, detail="No suitable project found to create task")
 
 
+    # AI sometimes returns "null" as a string, which breaks Pydantic validation
+    due_date_val = task_data.get("due_date")
+    if due_date_val == "null":
+        due_date_val = None
+
     issue_in = IssueCreate(
         title=task_data.get("title", subject),
         description=task_data.get("description", snippet),
         priority=task_data.get("priority", "medium"),
-        due_date=task_data.get("due_date"),
+        due_date=due_date_val,
         project_id=proj.id,
         assignee_id=current_user.id
     )
@@ -237,11 +242,16 @@ async def create_tasks_bulk(
             tasks_to_create = [{"title": subject, "description": snippet}]
 
         for task_data in tasks_to_create:
+            # AI sometimes returns "null" as a string, which breaks Pydantic validation
+            due_date_val = task_data.get("due_date")
+            if due_date_val == "null":
+                due_date_val = None
+
             issue_in = IssueCreate(
                 title=task_data.get("title", subject),
                 description=task_data.get("description", snippet),
                 priority=task_data.get("priority", "medium"),
-                due_date=task_data.get("due_date"),
+                due_date=due_date_val,
                 project_id=proj.id,
                 assignee_id=current_user.id
             )

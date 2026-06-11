@@ -23,9 +23,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 
 ### 2.1 Project Management
 *   **Projects:** Container for issues. Every issue belongs to exactly one project.
-*   **Auto-Created Projects:** On first login, Nimbus automatically creates two projects:
-    *   **General** — Default workspace for all issues.
-    *   **Email** — Connected to the user's SSO inbox for email-to-task automation.
+*   **Auto-Created Project:** On first login, Nimbus automatically creates a **"General"** project for you. This serves as your default workspace for all issues, including those generated from email.
 *   **Context Switching:** Users switch between projects to filter Board/List views.
 
 ### 2.2 Issue Tracking
@@ -36,7 +34,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 
 ### 2.3 SSO & Email Integration
 *   **Single Sign-On:** Login via Google or Outlook (OAuth2 PKCE).
-*   **Email Inbox:** View the last 3 days of inbox emails from within Nimbus ("View Inbox" in the Email project).
+*   **Email Inbox:** View the last 3 days of inbox emails from within Nimbus ("View Inbox" button in the header).
 *   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project.
 *   **Intelligent Extraction:** AI identifies and extracts **multiple distinct tasks** from a single email (e.g., newsletters), creating separate issues for each.
 *   **Resilient Fallback:** If AI extraction fails or returns malformed data, Nimbus automatically creates a "Raw" task from the email subject and body to ensure zero data loss.
@@ -44,7 +42,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 
 ### 2.4 AI-Native Core (Local MLX + Gemma 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
-*   **AI Scheduler:** Distributes open, overdue, or far-future tasks across the next 5 business days (Mon-Fri only).
+*   **AI Scheduler:** Distributes open, overdue, or far-future tasks across the next 5 business days (Mon-Fri only). Processes tasks in optimized batches of **40 items** to ensure high accuracy with local LLMs.
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
 *   **Auto-Triage:** Suggests issue priority using Gemma 3 via MLX.
 *   **Similar Issues:** Detects likely duplicates during issue creation.

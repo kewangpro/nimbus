@@ -14,7 +14,7 @@ Email intelligence is powered by the same AI pipeline: incoming emails are parse
 | `mlx-community/gemma-3-4b-it-4bit` | Planning, triage, summarization, email extraction | `mlx-lm` (Apple Silicon GPU) |
 | `nomic-ai/nomic-embed-text-v1` | Issue embeddings for semantic search | `sentence-transformers` |
 
-Models are downloaded from Hugging Face on first use and cached locally. The chat model is configurable via the `MLX_CHAT_MODEL` env var; the embedding model via `EMBEDDING_MODEL`.
+Models are downloaded from Hugging Face on first use and cached locally. Use `HF_TOKEN` in your environment to enable higher rate limits. The chat model is configurable via the `MLX_CHAT_MODEL` env var; the embedding model via `EMBEDDING_MODEL`.
 
 ---
 
@@ -68,11 +68,13 @@ CREATE TABLE issue_links (
 *   **Input:** All open issues that are unscheduled, past due, or scheduled far in the future (> 7 days).
 *   **Output:** Updated `due_date` for each affected issue.
 *   **Logic:**
-    *   **Capacity:** Processes up to **100 tasks** per request (increased from 40 to handle larger backlogs).
-    *   **Priority:** Prioritizes `URGENT` items early in the schedule.
-    *   **Window:** Pulls all provided tasks into the next 5 business days (Mon-Fri).
-    *   **JSON Resilience:** Uses robust regex-based JSON extraction to handle truncated or malformed LLM responses.
-    *   **Logging:** Detailed instrumentation of the scheduling lifecycle, from issue fetching to AI interaction and database updates.
+    *   **Capacity:** Processes up to **40 tasks** per request (optimized for local 1B model accuracy).
+    *   **Prioritization:** Sorts issues using a numerical map (`URGENT=0`, `HIGH=1`, etc.), prioritizing **unscheduled tasks** (no date) first to ensure backlog coverage.
+    *   **Index Mapping:** Instead of long UUIDs, the prompt uses short integers (`Index: 0, 1, 2...`) to identify tasks. This drastically reduces token usage and prevents ID hallucinations.
+    *   **Day Number Strategy:** The AI assigns tasks to a `day_number` (1-5) instead of specific dates. The backend then maps these numbers back to the current work week (Mon-Fri). This prevents the AI from picking dates outside the allowed window.
+    *   **Window:** Pulls all provided tasks into the next 5 business days.
+    *   **JSON Resilience:** Uses robust regex-based JSON extraction and fallback to standard parsing.
+    *   **Logging:** Detailed instrumentation of the scheduling lifecycle.
 
 ### 4.4 Semantic Search
 *   **Input:** User query string.
@@ -103,13 +105,16 @@ CREATE TABLE issue_links (
 ### 4.10 Email Task Extraction
 *   **Input:** Email `subject` + `body` snippet.
 *   **Output:** One or more structured tasks with `title`, `description`, `priority`, and optional `due_date`.
-*   **Prompting Strategy:** Uses a few-shot "example response format" to guide the 1B model. Examples are generic (e.g., "Task title") to prevent the model from leaking example content into real tasks.
+*   **Prompting Strategy:** Uses an advanced system prompt with explicit **negative constraints** (ignore boilerplate, marketing footers, "Unsubscribe" links) and **few-shot examples** of both actionable tasks and non-actionable advertisements (which should return `[]`).
 *   **Parsing Resilience:**
-    *   **Level 1:** Standard JSON parse.
-    *   **Level 2:** Regex-based block extraction (handles conversational filler before/after JSON).
-    *   **Level 3:** Manual brace-matching parser for partial or multiple JSON objects.
-*   **Fallback Mechanism:** If all AI parsing levels fail, the system falls back to creating a single task with the title `Auto-Task: <Subject>` and the full email body as the description. This ensures zero data loss.
+    *   **Level 1:** Standard JSON parse after pre-cleaning (removing markdown code blocks and trailing comments).
+    *   **Level 2:** Fallback to `ast.literal_eval` to handle AI-generated "JSON" that uses single quotes.
+    *   **Level 3:** Regex-based block extraction (handles conversational filler before/after JSON).
+    *   **Level 4:** Manual brace-matching parser for partial or multiple JSON objects.
+*   **Validation:** Every extracted task is validated for required fields (`title`) and sanitized before database insertion.
+*   **Fallback Mechanism:** If all AI parsing levels fail or return zero tasks for an email that was expected to be actionable, the system falls back to creating a single task with the title `Auto-Task: <Subject>` and the full email body as the description. This ensures zero data loss.
 *   **Used by:** Both manual inbox task creation and automatic background email polling.
+
 
 ---
 
