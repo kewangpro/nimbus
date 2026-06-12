@@ -37,6 +37,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 *   **Email Inbox:** View the last 3 days of inbox emails from within Nimbus ("View Inbox" button in the header).
 *   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project.
 *   **Intelligent Extraction:** AI identifies and extracts **multiple distinct tasks** from a single email (e.g., newsletters), creating separate issues for each.
+*   **De-duplication Safety:** Prevents creating identical tasks from the same email or across different polling cycles by verifying task titles against the database.
 *   **Resilient Fallback:** If AI extraction fails or returns malformed data, Nimbus automatically creates a "Raw" task from the email subject and body to ensure zero data loss.
 *   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for new unseen emails every minute.
 

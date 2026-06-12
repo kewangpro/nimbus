@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.email_processor import email_processor
 from app.schemas.issue import IssueCreate
+from app.models.issue import Issue
 from app.models.project import Project
 from app.models.user import User
 from app.crud.crud_issue import create as create_issue
@@ -161,6 +162,7 @@ async def process_email_source(db: AsyncSession, user: User):
                             }]
 
                     created_issues = []
+                    seen_titles = set()
                     for task_data in tasks:
                         # Sanitize task_data
                         title_val = task_data.get("title", subject)
@@ -170,6 +172,26 @@ async def process_email_source(db: AsyncSession, user: User):
                             title_val = str(title_val)
                         if not title_val or not title_val.strip():
                             title_val = subject
+                        
+                        title_val = title_val.strip()
+
+                        # 1. Local de-duplication (within the same email)
+                        if title_val.lower() in seen_titles:
+                            logger.info(f"Skipping duplicate task title in same email: {title_val}")
+                            continue
+                        seen_titles.add(title_val.lower())
+
+                        # 2. Database de-duplication (check if title already exists for this user)
+                        existing_query = select(Issue).where(
+                            and_(
+                                Issue.owner_id == user_id,
+                                Issue.title == title_val
+                            )
+                        )
+                        existing_res = await db.execute(existing_query)
+                        if existing_res.scalars().first():
+                            logger.info(f"Skipping task creation, title already exists in DB: {title_val}")
+                            continue
 
                         desc_val = task_data.get("description", body)
                         if isinstance(desc_val, list):

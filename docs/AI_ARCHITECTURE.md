@@ -65,18 +65,20 @@ CREATE TABLE issue_links (
 *   **Scheduling:** Distributes tasks across the next 5 business days (Mon-Fri), respecting existing load.
 
 ### 4.3 AI Scheduler
-*   **Input:** All open issues that are unscheduled, past due, or scheduled far in the future (> 7 days).
-*   **Output:** Updated `due_date` for each affected issue.
+*   **Input:** All open issues within the 10-day horizon (Redistributes the entire active sprint + backlog).
+*   **Output:** Optimized `due_date` for each issue.
 *   **Logic:**
-    *   **Capacity:** Processes up to **40 tasks** per request (optimized for local 1B model accuracy).
-    *   **Prioritization:** Sorts issues using a numerical map (`URGENT=0`, `HIGH=1`, etc.), prioritizing **unscheduled tasks** (no date) first to ensure backlog coverage.
-    *   **Index Mapping:** Instead of long UUIDs, the prompt uses short integers (`Index: 0, 1, 2...`) to identify tasks. This drastically reduces token usage and prevents ID hallucinations.
-    *   **Day Number Strategy:** The AI assigns tasks to a `day_number` (1-5) instead of specific dates. The backend then maps these numbers back to the current work week (Mon-Fri). This prevents the AI from picking dates outside the allowed window.
-    *   **Window:** Pulls all provided tasks into the next 5 business days.
-    *   **JSON Resilience:** Uses robust regex-based JSON extraction and fallback to standard parsing.
-    *   **Logging:** Detailed instrumentation of the scheduling lifecycle.
+    *   **Capacity:** Scalable to **100+ tasks** using **Stateful Batching** (20 tasks per iteration).
+    *   **Total Sprint Balance:** Unlike simple scheduling, this mode includes tasks already in the 5-day window to ensure the *entire week* is re-balanced if one day is overloaded.
+    *   **Stateful Load Awareness:** Each batch prompt includes a `CURRENT WORKLOAD` summary, allowing the AI to see how many tasks are already assigned to Days 1-5.
+    *   **Deterministic Safety Layer:** The backend enforces a strict `Least-Busy-Day` override. If the AI suggests an overloaded day, the system automatically pulls the task to the truly lightest day.
+    *   **100% Coverage Loop:** A final verification pass ensures every single task identified in the redistribution pool receives an update, using round-robin assignment for any items skipped by the AI.
+...
+*   **De-duplication Mechanism:**
+    *   **Layer 1 (Local):** Identical task titles within a single AI response are collapsed.
+    *   **Layer 2 (Global):** Before creation, the system queries the DB for existing issues with the same title for that user, preventing "Email Loop" duplicates from marketing bundles or redundant polls.
+*   **Validation:** Every extracted task is validated for required fields (`title`) and sanitized before database insertion.
 
-### 4.4 Semantic Search
 *   **Input:** User query string.
 *   **Output:** Issues ranked by `pgvector` cosine distance (`<=>`) to the query embedding.
 

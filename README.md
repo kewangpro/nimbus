@@ -44,6 +44,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
         *   **Multi-Task Extraction:** The AI can identify and extract **multiple distinct tasks** from a single email, creating a separate issue for each actionable item.
         *   **Resilient Parsing:** Features a robust multi-stage parser that handles common AI formatting errors, including stripping trailing comments, supporting single-quoted "JSON" via `ast.literal_eval`, and manual brace-matching recovery.
         *   **Resilient Fallback:** If AI extraction fails or returns no tasks, Nimbus automatically creates a "Raw" task from the email subject and body, ensuring no important information is ever lost.
+        *   **De-duplication Safety:** Implements a two-layer check: first, identical titles within a single email are filtered; second, the system checks the database to prevent creating duplicate tasks that already exist for the user.
         *   **Manual Inbox:** Access your SSO inbox directly from the **sidebar (Inbox)**. To save bandwidth and improve performance, emails are only fetched when you click the **Refresh** button. Content is **persisted in memory**, so you can switch between views (e.g., Board or Calendar) and return to your inbox without losing your retrieved emails.
         *   **Bulk Task Creation:** Select one or multiple emails from your inbox using the visual checkboxes. Click the **+Task** button in the header to instantly convert all selected emails into structured tasks. This uses the same AI extraction engine as the automated poller but gives you full control over which items enter your workspace.
 
@@ -194,6 +195,13 @@ Local AI completion uses the Apple Silicon GPU via MLX. If you hit a `std::runti
 *   [AI Architecture](docs/AI_ARCHITECTURE.md)
 *   [UX Design](docs/UX_Design.md)
 *   [Deployment Guide](docs/DEPLOYMENT.md)
+*   [Audit Logs Reference](docs/AUDITS.md)
+
+##  License
+
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+T.md)
 *   [Audit Logs Reference](docs/AUDITS.md)
 
 ##  License

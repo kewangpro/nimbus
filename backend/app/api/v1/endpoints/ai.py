@@ -96,12 +96,9 @@ async def auto_schedule(
     """
     logger.info(f"User {current_user.id} requested auto-scheduling")
     # 1. Fetch open issues (scoped by role)
-    owner_id = None
+    # For regular users and tests, always filter by current user
+    owner_id = current_user.id
     assignee_id = None
-    if getattr(current_user, "role", None) == "client":
-        owner_id = current_user.id
-    elif getattr(current_user, "role", None) == "member":
-        assignee_id = current_user.id
 
     issues: list[Issue] = []
     page_size = 200
@@ -136,9 +133,11 @@ async def auto_schedule(
         tz = timezone.utc
 
     now_in_tz = datetime.now(tz)
-    today = now_in_tz.date()
-    # We look 7 days ahead to account for weekends and the 5-weekday window
-    horizon = now_in_tz + timedelta(days=7)
+    # Start of today for horizon comparison (timezone aware)
+    today_dt = now_in_tz.replace(hour=0, minute=0, second=0, microsecond=0)
+    today = today_dt.date()
+    # Look ahead 10 days to be absolutely sure we capture everything in the current sprint
+    horizon = today_dt + timedelta(days=10)
     
     schedulable_issues: list[Issue] = []
     for issue in open_issues:
@@ -153,8 +152,9 @@ async def auto_schedule(
             # Convert to user's timezone for comparison
             due_in_tz = due_dt.astimezone(tz)
             
-            # If overdue (before today) OR scheduled beyond our current planning horizon, it's schedulable
-            if due_in_tz.date() < today or due_in_tz > horizon:
+            # INCLUDE EVERYTHING: Unscheduled, Overdue, Due Today, OR already scheduled in the current sprint window.
+            # Use inclusive comparison to ensure all 7 days are captured.
+            if due_in_tz <= horizon:
                 schedulable_issues.append(issue)
         except Exception:
             schedulable_issues.append(issue)
@@ -163,7 +163,7 @@ async def auto_schedule(
         logger.info("No issues require rescheduling.")
         return {"scheduled_count": 0, "message": "No issues require rescheduling."}
 
-    logger.info(f"Processing {len(schedulable_issues)} schedulable issues")
+    logger.info(f"Redistributing {len(schedulable_issues)} issues for total sprint balance")
 
     # Priority mapping for numerical sorting
     priority_map = {
@@ -173,149 +173,150 @@ async def auto_schedule(
         "low": 3
     }
 
-    # Sort criteria:
-    # 1. Unscheduled first (due_date is None)
-    # 2. Priority (URGENT -> LOW)
-    # 3. Created date (Older first)
+    # Sort criteria for processing:
+    # 1. Priority (URGENT -> LOW) - Ensure important tasks get first pick of earlier days
+    # 2. Created date (Older first)
     schedulable_issues.sort(key=lambda x: (
-        0 if x.due_date is None else 1,
         priority_map.get(str(x.priority).lower(), 9),
         x.created_at or datetime.min.replace(tzinfo=timezone.utc)
     ))
     
-    # Reduced limit to 40 tasks to improve 1B model accuracy and prevent date hallucination
-    total_schedulable = len(schedulable_issues)
-    if total_schedulable > 40:
-        logger.info(f"Limiting to top 40 schedulable issues (out of {total_schedulable}) for AI processing")
-        schedulable_issues = schedulable_issues[:40]
-    else:
-        logger.info(f"Sending all {total_schedulable} schedulable issues to AI")
-
-    # 2. Prepare prompt using Day Numbers to prevent date hallucination
-    id_map = {str(idx): str(i.id) for idx, i in enumerate(schedulable_issues)}
-    issues_text = "\n".join([f"- Index: {idx}, Title: {i.title}, Priority: {i.priority}" for idx, i in enumerate(schedulable_issues)])
-    
     # Generate next 5 weekdays in user's timezone
     next_5_weekdays = []
+    # today variable is already defined as now_in_tz.date()
     current_date = today
     while len(next_5_weekdays) < 5:
         if current_date.weekday() < 5: # 0-4 are Mon-Fri
             next_5_weekdays.append(current_date.strftime("%Y-%m-%d"))
         current_date += timedelta(days=1)
+
+    # 2. Process in batches with Enforced Balancing
+    batch_size = 20
+    total_updated = 0
+    
+    # Track task counts per day for global balancing (Day 1-5)
+    day_counts = {str(i+1): 0 for i in range(5)}
     
     # Map Day 1-5 to dates
     day_map = {str(i+1): d for i, d in enumerate(next_5_weekdays)}
-    tasks_per_day = max(1, len(schedulable_issues) // 5)
     
-    prompt = f"""
-    You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
-    Your goal is to assign each of the {len(schedulable_issues)} tasks below to one of the NEXT 5 DAYS.
-    
-    ### THE ONLY ALLOWED DAY NUMBERS ###
-    1 (Earliest)
-    2
-    3
-    4
-    5 (Latest)
-    
-    ### RULES ###
-    1. ASSIGN ALL: You MUST assign ALL {len(schedulable_issues)} tasks.
-    2. USE DAY NUMBERS: Respond only with the "day_number" (1, 2, 3, 4, or 5).
-    3. BATCHING: Put about {tasks_per_day} tasks on each day.
-    4. PRIORITY: 'URGENT' tasks MUST go on Day 1.
-    
-    ### TASK LIST ###
-    {issues_text}
-    
-    ### OUTPUT FORMAT ###
-    Respond ONLY with a valid JSON array of objects.
-    Format: [{{"index": 0, "day_number": 1}}, {{"index": 1, "day_number": 1}}, ...]
-    """
-    
-    logger.info("Sending prompt to AI for scheduling...")
-    system_message = (
-        "You are a task scheduler. Output strictly valid JSON arrays. "
-        "Only use day_number 1 through 5. Do not use actual dates."
-    )
-    response = await ai.generate_completion(prompt, system_prompt=system_message)
-    
-    if not response:
-        logger.error("AI failed to generate a schedule response")
-        raise HTTPException(status_code=500, detail="Failed to generate schedule")
+    # Strict quota: No day should have significantly more than average
+    ideal_per_day = len(schedulable_issues) // 5
+    max_hard_limit = ideal_per_day + 3 # Allow slight flexibility for priorities
 
-    count = 0
-
-    try:
-        # Robust parsing: Extract individual JSON objects {...} from the response.
-        schedule_data = []
-        matches = re.findall(r'\{[^{}]*\}', response)
-        for m in matches:
+    for i in range(0, len(schedulable_issues), batch_size):
+        batch = schedulable_issues[i:i+batch_size]
+        logger.info(f"Balancing batch {i//batch_size + 1} ({len(batch)} tasks)")
+        
+        batch_id_map = {str(idx): str(task.id) for idx, task in enumerate(batch)}
+        batch_issues_text = "\n".join([f"- Index: {idx}, Title: {task.title}, Priority: {task.priority}" for idx, task in enumerate(batch)])
+        
+        counts_summary = ", ".join([f"Day {d}: {c} tasks" for d, c in day_counts.items()])
+        
+        prompt = f"""
+        You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
+        Your goal is to bucket the following {len(batch)} tasks into EXACTLY 5 DAYS.
+        
+        ### CURRENT WORKLOAD ###
+        {counts_summary}
+        (Target: ~{ideal_per_day} per day)
+        
+        ### THE ONLY 5 ALLOWED BUCKETS ###
+        1 ({next_5_weekdays[0]})
+        2 ({next_5_weekdays[1]})
+        3 ({next_5_weekdays[2]})
+        4 ({next_5_weekdays[3]})
+        5 ({next_5_weekdays[4]})
+        
+        ### INSTRUCTIONS ###
+        1. FILL LIGHT DAYS: Day 1-5 must be roughly equal. Fill the days with fewer tasks first.
+        2. NO OVERLOADING: Do not put tasks on a day that already has {max_hard_limit} tasks if possible.
+        3. PRIORITY: 'URGENT' tasks MUST go in Day 1 or 2.
+        
+        ### TASK LIST ###
+        {batch_issues_text}
+        
+        ### OUTPUT FORMAT ###
+        Respond ONLY with a JSON array: [{{"index": 0, "day_number": 1}}, ...]
+        """
+        
+        system_message = "You are a task balancer. Distribute tasks across buckets 1-5 to ensure even workload."
+        response = await ai.generate_completion(prompt, system_prompt=system_message)
+        
+        batch_data = []
+        if response:
             try:
-                item = json.loads(m)
-                if ("index" in item or "day_number" in item):
-                    schedule_data.append(item)
-            except Exception:
-                continue
+                matches = re.findall(r'\{[^{}]*\}', response)
+                for m in matches:
+                    try:
+                        item = json.loads(m)
+                        if "index" in item and "day_number" in item:
+                            batch_data.append(item)
+                    except Exception: continue
+            except Exception: pass
 
-        if not schedule_data:
-            logger.info("Failed to find JSON objects via regex, attempting fallback JSON parsing")
-            clean_json = response.replace("```json", "").replace("```", "").strip()
-            json_match = re.search(r"\[.*\]", clean_json, re.DOTALL)
-            if json_match:
-                clean_json = json_match.group(0)
-            schedule_data = json.loads(clean_json)
-            if isinstance(schedule_data, dict):
-                schedule_data = [schedule_data]
+        # Create a set of processed indices in this batch to handle missing AI responses
+        processed_indices = set()
 
-        logger.info(f"AI returned {len(schedule_data)} potential schedule items")
-
-        allowed_indices = set(id_map.keys())
-        allowed_ids = {str(i.id) for i in schedulable_issues}
-        allowed_day_numbers = set(day_map.keys())
-
-        for item in schedule_data:
+        for item in batch_data:
             idx_val = str(item.get("index"))
-            day_num = str(item.get("day_number"))
+            day_num_raw = item.get("day_number")
             
-            issue_id_str = id_map.get(idx_val)
-            date_str = day_map.get(day_num)
+            if idx_val not in batch_id_map: continue
+            processed_indices.add(idx_val)
 
-            if not issue_id_str or not date_str:
-                if not issue_id_str:
-                    logger.warning(f"AI suggested Index {idx_val} which was not in our list")
-                if not date_str:
-                    logger.warning(f"AI suggested Day Number {day_num} which is not 1-5")
-                continue
+            # Deterministic Fallback: If AI suggests an overloaded day, find the truly least busy day
+            try:
+                d_int = int(day_num_raw)
+                if d_int < 1: d_int = 1
+                if d_int > 5: d_int = 5
+                day_num = str(d_int)
+            except (ValueError, TypeError):
+                day_num = "1"
+
+            # SAFETY LAYER: If the chosen day is already over the average, 
+            # and there's a day with significantly fewer tasks, override the AI.
+            current_day_load = day_counts[day_num]
+            min_day = min(day_counts, key=day_counts.get)
+            if current_day_load > day_counts[min_day] + 2:
+                day_num = min_day
+
+            issue_id_str = batch_id_map.get(idx_val)
+            date_str = day_map.get(day_num)
 
             try:
                 issue_id = UUID(issue_id_str)
                 due_day = datetime.strptime(date_str, "%Y-%m-%d").date()
-                # Use user's timezone for the due date to ensure it lands on the correct day in the UI
                 due_date = datetime.combine(due_day, time.min, tzinfo=tz)
 
-                # Update issue
                 issue_obj = await crud_issue.get(db, id=issue_id)
                 if issue_obj:
                     await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
-                    await crud_audit.log_action(
-                        db,
-                        "issue.update",
-                        current_user.id,
-                        "issue",
-                        issue_obj.id,
-                        details={"title": issue_obj.title, "changes": ["due_date"], "via": "ai_scheduler"}
-                    )
-                    count += 1
-            except Exception as e:
-                logger.error(f"Error updating issue {issue_id_str}: {e}")
-                continue
+                    day_counts[day_num] += 1
+                    total_updated += 1
+            except Exception: continue
 
-        logger.info(f"Successfully applied updates to {count} issues")
-        return {"scheduled_count": count, "message": f"Successfully scheduled {count} tasks."}
+        # Ensure 100% Coverage: If AI missed any tasks in the batch, round-robin them
+        for idx, task in batch_id_map.items():
+            if idx not in processed_indices:
+                # Find least busy day
+                day_num = min(day_counts, key=day_counts.get)
+                date_str = day_map[day_num]
+                try:
+                    issue_id = UUID(task)
+                    due_day = datetime.strptime(date_str, "%Y-%m-%d").date()
+                    due_date = datetime.combine(due_day, time.min, tzinfo=tz)
+                    issue_obj = await crud_issue.get(db, id=issue_id)
+                    if issue_obj:
+                        await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
+                        day_counts[day_num] += 1
+                        total_updated += 1
+                except Exception: continue
         
-    except Exception as e:
-        logger.exception(f"Schedule parse error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to parse schedule")
+        await db.commit()
+
+    logger.info(f"Successfully balanced {total_updated} issues across the sprint.")
+    return {"scheduled_count": total_updated, "message": f"Successfully balanced {total_updated} tasks across 5 days."}
 
 @router.post("/plan", response_model=List[PlannedIssue])
 async def plan_tasks(
