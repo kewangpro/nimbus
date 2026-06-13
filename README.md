@@ -10,7 +10,8 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **🤖 AI Project Planner:** Turn natural language "brain dumps" into structured project tasks, **automatically scheduling them** with balanced due dates across the work week.
         *   **Project Selection:** Pick an existing project or create a new one before creating issues.
     *   **📅 AI Schedule:** 
-        *   **Input:** All open (non-done, non-canceled) issues — unscheduled, overdue, within the current sprint window, or mis-scheduled far in the future.
+        *   **Input:** Open (non-done, non-canceled) issues that are **unscheduled** (no due date), **scheduled for today/future**, or **mis-scheduled far in the future**.
+        *   **Constraint:** Overdue tasks (due before today) are **skipped** to prevent moving them automatically.
         *   **Output:** Updated `due_date` for every affected issue.
         *   **Capacity:** Processes **20 tasks per batch** with stateful load-awareness across batches, scalable to 100+ tasks.
         *   **Live Calendar Updates:** The calendar polls every 4 seconds during scheduling, so you see tasks populate in real time as each batch commits — no waiting for the full run to finish.

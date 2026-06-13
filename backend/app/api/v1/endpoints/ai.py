@@ -123,8 +123,8 @@ async def auto_schedule(
 
     # Schedule issues that are:
     # 1. Unscheduled (no due_date)
-    # 2. Overdue (due before today)
-    # 3. Scheduled far in the future (beyond the next 5 weekdays)
+    # 2. Scheduled for today or in the future
+    # We explicitly EXCLUDE overdue tasks (due before today) to avoid moving them automatically.
     user_tz = getattr(current_user, "timezone", "UTC")
     try:
         from zoneinfo import ZoneInfo
@@ -150,7 +150,11 @@ async def auto_schedule(
             # Convert to user's timezone for comparison
             due_in_tz = due_dt.astimezone(tz)
             
-            # Include all tasks — overdue, within the sprint window, or far future (mis-scheduled).
+            # Skip overdue tasks (due before today)
+            if due_in_tz.date() < today:
+                logger.info(f"Skipping overdue task: {issue.title} (due {due_in_tz.date()})")
+                continue
+
             schedulable_issues.append(issue)
         except Exception:
             schedulable_issues.append(issue)

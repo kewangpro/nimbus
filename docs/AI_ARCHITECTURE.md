@@ -65,7 +65,8 @@ CREATE TABLE issue_links (
 *   **Scheduling:** Distributes tasks across the next 5 business days (Mon-Fri), respecting existing load.
 
 ### 4.3 AI Scheduler
-*   **Input:** All open (non-done, non-canceled) issues — regardless of their current due date. This includes unscheduled, overdue, in-sprint, and far-future mis-scheduled tasks.
+*   **Input:** Open (non-done, non-canceled) issues that are unscheduled, scheduled for today/future, or mis-scheduled far in the future.
+*   **Constraint:** Overdue tasks (due before today) are **excluded** from the rescheduling pool.
 *   **Output:** Optimized `due_date` for every issue in the pool.
 *   **Logic:**
     *   **Capacity:** Scalable to **100+ tasks** using **Stateful Batching** (20 tasks per batch).

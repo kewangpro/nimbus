@@ -78,7 +78,7 @@
     *   **Body:** `{ "text": "Raw natural language plan..." }`
     *   **Response:** `List[PlannedIssue]` (suggested tasks).
 *   `POST /ai/schedule`
-    *   **Description:** Auto-assigns due dates for **all open (non-done, non-canceled) tasks** — unscheduled, overdue, in-sprint, or mis-scheduled far in the future. Redistributes them evenly across the next 5 weekdays in stateful batches of 20. The frontend polls for changes every 4 seconds during the run to render live calendar updates.
+    *   **Description:** Auto-assigns due dates for open (non-done, non-canceled) tasks that are unscheduled, scheduled for today/future, or mis-scheduled far in the future. **Overdue tasks (due before today) are skipped.** Redistributes tasks evenly across the next 5 weekdays in stateful batches of 20. The frontend polls for changes every 4 seconds during the run to render live calendar updates.
     *   **Response:** `{ "scheduled_count": int, "message": "..." }`
 
 ## 6. File Storage

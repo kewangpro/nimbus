@@ -67,7 +67,7 @@
 
 #### 📅 AI Schedule
 *   **Location:** Calendar view "AI Schedule" button.
-*   **Interaction:** One click to redistribute all open/overdue tasks across the next 5 business days.
+*   **Interaction:** One click to redistribute open/unscheduled tasks across the next 5 business days. **Overdue tasks are skipped** to respect their original deadlines.
 
 #### 🔎 Smart Search
 *   **Location:** Global header "Smart Search..." input.

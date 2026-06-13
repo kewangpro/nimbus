@@ -51,7 +51,7 @@
 
 ## Phase 5: Advanced AI & Planning ✅
 *   [x] **AI Project Planner:** Break down natural language into structured issues.
-*   [x] **AI Scheduler:** Redistribute all open tasks (unscheduled, overdue, in-sprint, or mis-scheduled far future) across next 5 business days in stateful batches of 20. Calendar updates live every 4s during the run.
+*   [x] **AI Scheduler:** Redistribute open tasks (unscheduled, scheduled for today/future, or mis-scheduled far future) across next 5 business days in stateful batches of 20. Calendar updates live every 4s during the run. **Overdue tasks are skipped to prevent automatic rescheduling.**
 *   [x] **5-Day Sprint Calendar:** Visual per-user timeline with drag-and-drop rescheduling.
 *   [x] **AI Summary:** Per-issue summary with next steps (cached by content hash).
 *   [x] **AI Filters:** Natural language to structured issue filters (List View).
@@ -181,6 +181,6 @@
 *   [x] **Index Mapping:** Replaced 36-character UUIDs with short integers (`0, 1, 2...`) in prompts to save tokens and eliminate model confusion.
 *   [x] **Day Number Strategy:** Directed AI to output `day_number` (1-5) instead of date strings, preventing hallucinated future months.
 *   [x] **Priority Mapping:** Implemented numerical prioritization (`URGENT=0`, `HIGH=1`) to ensure correct sorting in batch processing.
-*   [x] **Unscheduled First:** Updated logic to prioritize tasks with no dates over overdue tasks, ensuring full backlog visibility.
+*   [x] **Skip Overdue Items:** Modified AI Scheduler to explicitly exclude already overdue items from the rescheduling pool, ensuring user-defined deadlines are respected.
 
 162: 
