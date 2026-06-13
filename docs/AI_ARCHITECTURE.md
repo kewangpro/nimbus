@@ -65,14 +65,15 @@ CREATE TABLE issue_links (
 *   **Scheduling:** Distributes tasks across the next 5 business days (Mon-Fri), respecting existing load.
 
 ### 4.3 AI Scheduler
-*   **Input:** All open issues within the 10-day horizon (Redistributes the entire active sprint + backlog).
-*   **Output:** Optimized `due_date` for each issue.
+*   **Input:** All open (non-done, non-canceled) issues — regardless of their current due date. This includes unscheduled, overdue, in-sprint, and far-future mis-scheduled tasks.
+*   **Output:** Optimized `due_date` for every issue in the pool.
 *   **Logic:**
-    *   **Capacity:** Scalable to **100+ tasks** using **Stateful Batching** (20 tasks per iteration).
-    *   **Total Sprint Balance:** Unlike simple scheduling, this mode includes tasks already in the 5-day window to ensure the *entire week* is re-balanced if one day is overloaded.
+    *   **Capacity:** Scalable to **100+ tasks** using **Stateful Batching** (20 tasks per batch).
+    *   **Total Sprint Balance:** Redistributes the entire open backlog into the next 5 weekdays, ensuring no day is overloaded.
     *   **Stateful Load Awareness:** Each batch prompt includes a `CURRENT WORKLOAD` summary, allowing the AI to see how many tasks are already assigned to Days 1-5.
     *   **Deterministic Safety Layer:** The backend enforces a strict `Least-Busy-Day` override. If the AI suggests an overloaded day, the system automatically pulls the task to the truly lightest day.
-    *   **100% Coverage Loop:** A final verification pass ensures every single task identified in the redistribution pool receives an update, using round-robin assignment for any items skipped by the AI.
+    *   **100% Coverage Loop:** A final verification pass ensures every single task receives an update, using round-robin assignment for any items the AI skips.
+    *   **Live UI Updates:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight, so the calendar updates incrementally as each batch commits rather than waiting for the full response.
 ...
 *   **De-duplication Mechanism:**
     *   **Layer 1 (Local):** Identical task titles within a single AI response are collapsed.

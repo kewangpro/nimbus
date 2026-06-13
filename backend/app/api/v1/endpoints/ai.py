@@ -136,8 +136,6 @@ async def auto_schedule(
     # Start of today for horizon comparison (timezone aware)
     today_dt = now_in_tz.replace(hour=0, minute=0, second=0, microsecond=0)
     today = today_dt.date()
-    # Look ahead 10 days to be absolutely sure we capture everything in the current sprint
-    horizon = today_dt + timedelta(days=10)
     
     schedulable_issues: list[Issue] = []
     for issue in open_issues:
@@ -152,10 +150,8 @@ async def auto_schedule(
             # Convert to user's timezone for comparison
             due_in_tz = due_dt.astimezone(tz)
             
-            # INCLUDE EVERYTHING: Unscheduled, Overdue, Due Today, OR already scheduled in the current sprint window.
-            # Use inclusive comparison to ensure all 7 days are captured.
-            if due_in_tz <= horizon:
-                schedulable_issues.append(issue)
+            # Include all tasks — overdue, within the sprint window, or far future (mis-scheduled).
+            schedulable_issues.append(issue)
         except Exception:
             schedulable_issues.append(issue)
     

@@ -51,7 +51,7 @@
 
 ## Phase 5: Advanced AI & Planning ✅
 *   [x] **AI Project Planner:** Break down natural language into structured issues.
-*   [x] **AI Scheduler:** Distribute unscheduled, overdue, or far-future (> 7 days) tasks across next 5 business days.
+*   [x] **AI Scheduler:** Redistribute all open tasks (unscheduled, overdue, in-sprint, or mis-scheduled far future) across next 5 business days in stateful batches of 20. Calendar updates live every 4s during the run.
 *   [x] **5-Day Sprint Calendar:** Visual per-user timeline with drag-and-drop rescheduling.
 *   [x] **AI Summary:** Per-issue summary with next steps (cached by content hash).
 *   [x] **AI Filters:** Natural language to structured issue filters (List View).

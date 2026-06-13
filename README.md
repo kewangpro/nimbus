@@ -10,11 +10,12 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **🤖 AI Project Planner:** Turn natural language "brain dumps" into structured project tasks, **automatically scheduling them** with balanced due dates across the work week.
         *   **Project Selection:** Pick an existing project or create a new one before creating issues.
     *   **📅 AI Schedule:** 
-        *   **Input:** All open issues that are unscheduled, past due, or scheduled far in the future (> 7 days).
-        *   **Output:** Updated `due_date` for each affected issue.
-        *   **Capacity:** High-performance processing of up to **40 tasks** per batch, optimized for local inference.
+        *   **Input:** All open (non-done, non-canceled) issues — unscheduled, overdue, within the current sprint window, or mis-scheduled far in the future.
+        *   **Output:** Updated `due_date` for every affected issue.
+        *   **Capacity:** Processes **20 tasks per batch** with stateful load-awareness across batches, scalable to 100+ tasks.
+        *   **Live Calendar Updates:** The calendar polls every 4 seconds during scheduling, so you see tasks populate in real time as each batch commits — no waiting for the full run to finish.
         *   **Precision Intelligence:** Employs **Index Mapping** and **Day Number** strategies to ensure 100% scheduling accuracy even with smaller local models (1B/3B).
-        *   **Logic:** Prioritizes unscheduled tasks first, followed by urgent items. Pulls all provided tasks into the next 5 days, strictly avoiding weekends and future-date hallucinations.
+        *   **Logic:** Prioritizes urgent tasks first. Redistributes the entire open backlog into the next 5 weekdays, strictly avoiding weekends and future-date hallucinations.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using Gemma 3 via MLX.
@@ -197,14 +198,6 @@ Local AI completion uses the Apple Silicon GPU via MLX. If you hit a `std::runti
 *   [Deployment Guide](docs/DEPLOYMENT.md)
 *   [Audit Logs Reference](docs/AUDITS.md)
 
-##  License
-
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-T.md)
-*   [Audit Logs Reference](docs/AUDITS.md)
-
-##  License
-
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

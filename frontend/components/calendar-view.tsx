@@ -75,14 +75,16 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
 
     const handleAutoSchedule = async () => {
         setScheduling(true)
+        const pollInterval = setInterval(fetchIssues, 4000)
         try {
             const res = await api.post("/ai/schedule")
             toast.success(res.data.message)
-            fetchIssues()
         } catch (err) {
             console.error(err)
             toast.error("Failed to schedule tasks")
         } finally {
+            clearInterval(pollInterval)
+            fetchIssues()
             setScheduling(false)
         }
     }

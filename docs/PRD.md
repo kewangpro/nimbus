@@ -43,7 +43,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 
 ### 2.4 AI-Native Core (Local MLX + Gemma 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
-*   **AI Scheduler:** Distributes open, overdue, or far-future tasks across the next 5 business days (Mon-Fri only). Processes tasks in optimized batches of **40 items** to ensure high accuracy with local LLMs.
+*   **AI Scheduler:** Redistributes all open (non-done, non-canceled) tasks — unscheduled, overdue, in-sprint, or mis-scheduled far in the future — across the next 5 business days (Mon-Fri only). Processes in stateful batches of **20 tasks**, scalable to 100+. The calendar updates live every 4 seconds during the run.
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
 *   **Auto-Triage:** Suggests issue priority using Gemma 3 via MLX.
 *   **Similar Issues:** Detects likely duplicates during issue creation.
