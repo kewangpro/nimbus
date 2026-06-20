@@ -554,20 +554,20 @@ async def summarize_issue(
     if not response:
         raise HTTPException(status_code=500, detail="Failed to generate summary")
 
-    import json
-    try:
-        clean_json = response.replace("```json", "").replace("```", "").strip()
-        data = json.loads(clean_json)
-        summary = data.get("summary", "").strip()
-        next_steps = data.get("next_steps", [])
-        if not isinstance(next_steps, list):
-            next_steps = []
-        next_steps = [str(step).strip() for step in next_steps if str(step).strip()]
-        if not summary:
-            raise ValueError("Empty summary")
-    except Exception as e:
-        print(f"Summary parse error: {e}")
+    parsed = ai.parse_json_robust(response)
+    if isinstance(parsed, list) and parsed:
+        parsed = parsed[0]
+    
+    if not isinstance(parsed, dict):
         raise HTTPException(status_code=500, detail="Failed to parse summary")
+
+    summary = parsed.get("summary", "").strip()
+    next_steps = parsed.get("next_steps", [])
+    if not isinstance(next_steps, list):
+        next_steps = []
+    next_steps = [str(step).strip() for step in next_steps if str(step).strip()]
+    if not summary:
+        raise HTTPException(status_code=500, detail="Empty summary returned by AI")
 
     await crud_issue_summary.upsert(
         db,
@@ -628,12 +628,10 @@ async def ai_query_to_filters(
     if not response:
         raise HTTPException(status_code=500, detail="Failed to interpret query")
 
-    import json
-    try:
-        clean_json = response.replace("```json", "").replace("```", "").strip()
-        data = json.loads(clean_json)
-    except Exception as e:
-        print(f"Query parse error: {e}")
+    data = ai.parse_json_robust(response)
+    if isinstance(data, list) and data:
+        data = data[0]
+    if not isinstance(data, dict):
         raise HTTPException(status_code=500, detail="Failed to parse query")
 
     def _normalize_enum(value: Optional[str], enum_cls):
@@ -784,30 +782,25 @@ async def auto_triage(
     if not response:
         raise HTTPException(status_code=500, detail="Failed to generate triage")
     
-    # Simple parsing (robust apps use structured output or Pydantic parsers)
-    import json
-    import re
+    data = ai.parse_json_robust(response)
+    if isinstance(data, list) and data:
+        data = data[0]
     
-    try:
-        # cleanup markdown code blocks
-        clean_json = response.replace("```json", "").replace("```", "").strip()
-        data = json.loads(clean_json)
-        
-        # Normalize priority
-        priority = data.get("priority", "MEDIUM").upper()
-        if priority not in IssuePriority.__members__:
-            priority = "MEDIUM"
-            
-        labels = data.get("labels", [])
-
-        if request.issue_id and labels:
-            from app.crud import crud_label
-            await crud_label.set_issue_labels(db, request.issue_id, labels)
-
-        return {
-            "priority": IssuePriority[priority],
-            "labels": labels
-        }
-    except Exception as e:
-        print(f"Triage parse error: {e}")
+    if not isinstance(data, dict):
         return {"priority": IssuePriority.MEDIUM, "labels": []}
+        
+    # Normalize priority
+    priority = data.get("priority", "MEDIUM").upper()
+    if priority not in IssuePriority.__members__:
+        priority = "MEDIUM"
+        
+    labels = data.get("labels", [])
+
+    if request.issue_id and labels:
+        from app.crud import crud_label
+        await crud_label.set_issue_labels(db, request.issue_id, labels)
+
+    return {
+        "priority": IssuePriority[priority],
+        "labels": labels
+    }

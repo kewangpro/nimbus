@@ -1,6 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional
+from typing import List, Optional, Union
 import os
 import logging
 
@@ -98,3 +98,98 @@ async def generate_completion(
     except Exception as e:
         logger.error(f"Error generating completion: {e}")
         return None
+
+
+def parse_json_robust(text: str) -> Optional[Union[dict, list]]:
+    if not text or not text.strip():
+        return None
+
+    import json
+    import re
+    import ast
+    from typing import Union
+
+    # Pre-clean
+    clean_text = text.strip()
+    # Remove markdown code blocks if present (more robustly)
+    clean_text = re.sub(r'```(?:json)?\s*(.*?)\s*```', r'\1', clean_text, flags=re.DOTALL | re.IGNORECASE)
+    clean_text = re.sub(r'^```(?:json)?\s*', '', clean_text, flags=re.MULTILINE | re.IGNORECASE)
+    clean_text = re.sub(r'\s*```$', '', clean_text, flags=re.MULTILINE)
+    
+    # Remove trailing comments (e.g., # or //) that break JSON
+    clean_text = re.sub(r'[ \t]+[#//].*$', '', clean_text, flags=re.MULTILINE)
+    clean_text = clean_text.strip()
+
+    # Try full parse first (either as object or array)
+    try:
+        return json.loads(clean_text)
+    except Exception:
+        pass
+
+    # Try ast.literal_eval for single-quoted "JSON"
+    try:
+        eval_text = clean_text.replace('null', 'None').replace('true', 'True').replace('false', 'False')
+        parsed = ast.literal_eval(eval_text)
+        if isinstance(parsed, (dict, list)):
+            return parsed
+    except Exception:
+        pass
+
+    # Brace-matching recovery for JSON object {...} or array [...]
+    try:
+        recovered_objects = []
+        potential_jsons = re.findall(r'(\{.*\}|\[.*\])', clean_text, re.DOTALL)
+        
+        for candidate in potential_jsons:
+            try:
+                start_brace = candidate.find('{')
+                end_brace = candidate.rfind('}')
+                if start_brace != -1 and end_brace != -1:
+                    obj_text = candidate[start_brace:end_brace+1]
+                    # Clean comments again within the object text
+                    obj_text = re.sub(r'\s*[#//].*$', '', obj_text, flags=re.MULTILINE)
+                    obj = json.loads(obj_text)
+                    if isinstance(obj, dict):
+                        recovered_objects.append(obj)
+                    elif isinstance(obj, list):
+                        recovered_objects.extend([o for o in obj if isinstance(o, dict)])
+            except Exception:
+                continue
+
+        if recovered_objects:
+            if len(recovered_objects) == 1 and not clean_text.strip().startswith('['):
+                return recovered_objects[0]
+            return recovered_objects
+
+        # Last ditch effort: simple brace matching for multiple objects
+        last_end_idx = 0
+        for match in re.finditer(r'\{', clean_text):
+            start_idx = match.start()
+            if start_idx < last_end_idx:
+                continue
+            depth = 0
+            for i in range(start_idx, len(clean_text)):
+                if clean_text[i] == '{':
+                    depth += 1
+                elif clean_text[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        candidate = clean_text[start_idx:i+1]
+                        try:
+                            obj = json.loads(candidate)
+                            if isinstance(obj, dict):
+                                recovered_objects.append(obj)
+                                last_end_idx = i + 1
+                        except Exception:
+                            pass
+                        break
+        
+        if recovered_objects:
+            if len(recovered_objects) == 1 and not clean_text.strip().startswith('['):
+                return recovered_objects[0]
+            return recovered_objects
+    except Exception:
+        pass
+
+    return None
+

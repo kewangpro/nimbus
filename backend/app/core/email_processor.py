@@ -65,95 +65,14 @@ class EmailProcessor:
         if not response_text or not response_text.strip():
             return None
         
-        # Pre-clean: remove common AI errors like comments
-        clean_text = response_text.strip()
-        # Remove markdown code blocks if present (more robustly)
-        clean_text = re.sub(r'```(?:json)?\s*(.*?)\s*```', r'\1', clean_text, flags=re.DOTALL | re.IGNORECASE)
-        # If still has one-sided markers
-        clean_text = re.sub(r'^```(?:json)?\s*', '', clean_text, flags=re.MULTILINE | re.IGNORECASE)
-        clean_text = re.sub(r'\s*```$', '', clean_text, flags=re.MULTILINE)
-        
-        # Remove trailing comments (e.g., # or //) that break JSON, but only if they are at the end of a line
-        # and not part of a string (this is naive but handles common AI output)
-        clean_text = re.sub(r'[ \t]+[#//].*$', '', clean_text, flags=re.MULTILINE)
-        clean_text = clean_text.strip()
-
-        # Try full parse first (either as object or array)
-        tasks = None
-        try:
-            tasks = json.loads(clean_text)
-        except Exception:
-            # Try ast.literal_eval for single-quoted "JSON"
-            try:
-                import ast
-                # Prepare for Python eval by mapping JSON constants
-                eval_text = clean_text.replace('null', 'None').replace('true', 'True').replace('false', 'False')
-                tasks = ast.literal_eval(eval_text)
-            except Exception:
-                pass
-
+        # Use robust shared JSON parser helper
+        tasks = ai.parse_json_robust(response_text)
         if tasks is not None:
             if isinstance(tasks, dict):
                 tasks = [tasks]
             if isinstance(tasks, list):
                 # Filter out any non-dict items and validate required keys
                 return [t for t in tasks if isinstance(t, dict) and "title" in t]
-
-        # If full parse failed, use a robust brace-matching parser to recover individual objects
-        try:
-            recovered_objects = []
-            # Look for JSON objects {...} or arrays [...]
-            potential_jsons = re.findall(r'(\{.*\}|\[.*\])', clean_text, re.DOTALL)
-            
-            for candidate in potential_jsons:
-                try:
-                    start_brace = candidate.find('{')
-                    end_brace = candidate.rfind('}')
-                    if start_brace != -1 and end_brace != -1:
-                        obj_text = candidate[start_brace:end_brace+1]
-                        # Clean comments again within the object text
-                        obj_text = re.sub(r'\s*[#//].*$', '', obj_text, flags=re.MULTILINE)
-                        obj = json.loads(obj_text)
-                        if isinstance(obj, dict):
-                            recovered_objects.append(obj)
-                        elif isinstance(obj, list):
-                            recovered_objects.extend([o for o in obj if isinstance(o, dict)])
-                except Exception:
-                    continue
-
-            if recovered_objects:
-                return [t for t in recovered_objects if "title" in t]
-            
-            # Last ditch effort: simple brace matching for multiple objects
-            last_end_idx = 0
-            for match in re.finditer(r'\{', clean_text):
-                start_idx = match.start()
-                if start_idx < last_end_idx:
-                    continue
-                depth = 0
-                for i in range(start_idx, len(clean_text)):
-                    if clean_text[i] == '{':
-                        depth += 1
-                    elif clean_text[i] == '}':
-                        depth -= 1
-                        if depth == 0:
-                            candidate = clean_text[start_idx:i+1]
-                            try:
-                                obj = json.loads(candidate)
-                                if isinstance(obj, dict):
-                                    recovered_objects.append(obj)
-                                    last_end_idx = i + 1
-                            except Exception:
-                                pass
-                            break
-            
-            if recovered_objects:
-                return [t for t in recovered_objects if "title" in t]
-
-            print(f"Failed to recover any JSON objects from AI response. Raw response: {response_text}")
-        except Exception as e:
-            print(f"Error recovering JSON objects from AI response: {e}. Raw response: {response_text}")
-
         return None
 
 
