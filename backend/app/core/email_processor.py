@@ -57,7 +57,11 @@ class EmailProcessor:
         )
         prompt = f"Email Subject: {subject}\n\nEmail Body:\n{body}"
         
-        response_text = await ai.generate_completion(prompt, system_prompt=system_prompt)
+        response_text = await ai.generate_completion(
+            prompt, 
+            system_prompt=system_prompt,
+            model_name="mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
+        )
         if not response_text or not response_text.strip():
             return None
         

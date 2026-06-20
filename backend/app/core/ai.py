@@ -9,25 +9,24 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-ai/nomic-embed-text-v1")
 
 logger = logging.getLogger(__name__)
 
-_mlx_model = None
-_mlx_tokenizer = None
+_mlx_models = {}
 _embedding_model = None
 # MLX is not thread-safe; single worker ensures sequential GPU access
 _executor = ThreadPoolExecutor(max_workers=1)
 
 
-def _get_chat_model():
-    global _mlx_model, _mlx_tokenizer
-    if _mlx_model is None:
+def _get_chat_model(model_name: str):
+    if model_name not in _mlx_models:
         try:
             from mlx_lm import load
-            logger.info(f"Loading chat model: {CHAT_MODEL}")
-            _mlx_model, _mlx_tokenizer = load(CHAT_MODEL)
+            logger.info(f"Loading chat model: {model_name}")
+            model, tokenizer = load(model_name)
+            _mlx_models[model_name] = (model, tokenizer)
         except (ImportError, ModuleNotFoundError) as e:
-            logger.error(f"MLX model loading failed: {e}")
+            logger.error(f"MLX model loading failed for {model_name}: {e}")
             print(f"MLX model loading failed: {e}. Note that MLX is Apple Silicon exclusive and cannot run inside a Linux Docker container.")
             raise
-    return _mlx_model, _mlx_tokenizer
+    return _mlx_models[model_name]
 
 
 def _get_embedding_model():
@@ -39,9 +38,9 @@ def _get_embedding_model():
     return _embedding_model
 
 
-def _sync_generate(prompt: str, system_prompt: str) -> str:
+def _sync_generate(prompt: str, system_prompt: str, model_name: str) -> str:
     from mlx_lm import generate
-    model, tokenizer = _get_chat_model()
+    model, tokenizer = _get_chat_model(model_name)
 
     messages = []
     if system_prompt:
@@ -80,12 +79,18 @@ async def generate_embedding(text: str) -> Optional[List[float]]:
         return None
 
 
-async def generate_completion(prompt: str, system_prompt: str = "") -> Optional[str]:
+async def generate_completion(
+    prompt: str, system_prompt: str = "", model_name: Optional[str] = None
+) -> Optional[str]:
     try:
-        logger.info("Starting AI completion generation")
+        if model_name is None:
+            model_name = CHAT_MODEL
+        logger.info(f"Starting AI completion generation with model: {model_name}")
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(_executor, _sync_generate, prompt, system_prompt)
-        logger.info("AI completion generation finished")
+        result = await loop.run_in_executor(
+            _executor, _sync_generate, prompt, system_prompt, model_name
+        )
+        logger.info(f"AI completion generation finished for model: {model_name}")
         return result
     except Exception as e:
         logger.error(f"Error generating completion: {e}")
