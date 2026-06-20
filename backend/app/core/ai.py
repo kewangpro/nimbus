@@ -4,8 +4,11 @@ from typing import List, Optional
 import os
 import logging
 
-CHAT_MODEL = os.getenv("MLX_CHAT_MODEL", "mlx-community/Llama-3.2-1B-Instruct-4bit")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-ai/nomic-embed-text-v1")
+from app.core.config import settings
+
+CHAT_MODEL = settings.MLX_CHAT_MODEL
+EMAIL_MODEL = settings.MLX_EMAIL_MODEL
+EMBEDDING_MODEL = settings.EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
 
