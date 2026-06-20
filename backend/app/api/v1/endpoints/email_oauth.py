@@ -53,6 +53,8 @@ async def _get_full_email_body(db: AsyncSession, user: User, msg_id: str) -> Opt
         response = await imap.protocol.execute(Command("AUTHENTICATE", imap.protocol.new_tag(), "XOAUTH2", auth_string))
         if response.result != "OK":
             return None
+        
+        imap.protocol.state = "AUTH"
 
         await imap.select("INBOX")
         _, data = await imap.fetch(msg_id, "RFC822")
