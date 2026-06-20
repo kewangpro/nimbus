@@ -77,9 +77,6 @@ CREATE TABLE issue_links (
     *   **100% Coverage Loop:** A final verification pass ensures every single task receives an update, using round-robin assignment for any items the AI skips.
     *   **Live UI Updates:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight, so the calendar updates incrementally as each batch commits rather than waiting for the full response.
 ...
-*   **De-duplication Mechanism:**
-    *   **Layer 1 (Local):** Identical task titles within a single AI response are collapsed.
-    *   **Layer 2 (Global):** Before creation, the system queries the DB for existing issues with the same title for that user, preventing "Email Loop" duplicates from marketing bundles or redundant polls.
 *   **Validation:** Every extracted task is validated for required fields (`title`) and sanitized before database insertion.
 
 *   **Input:** User query string.
@@ -109,15 +106,15 @@ CREATE TABLE issue_links (
 
 ### 4.10 Email Task Extraction
 *   **Input:** Email `subject` + `body` snippet.
-*   **Output:** One or more structured tasks with `title`, `description`, `priority`, and optional `due_date`.
-*   **Prompting Strategy:** Uses an advanced system prompt with explicit **negative constraints** (ignore boilerplate, marketing footers, "Unsubscribe" links) and **few-shot examples** of both actionable tasks and non-actionable advertisements (which should return `[]`).
+*   **Output:** A structured task with `title`, `description`, `priority`, and optional `due_date`.
+*   **Prompting Strategy:** Uses an advanced system prompt with explicit **negative constraints** (ignore boilerplate, marketing footers, "Unsubscribe" links) and **few-shot examples** of both actionable tasks and non-actionable advertisements (which should return `{}`).
 *   **Parsing Resilience:**
     *   **Level 1:** Standard JSON parse after pre-cleaning (removing markdown code blocks and trailing comments).
     *   **Level 2:** Fallback to `ast.literal_eval` to handle AI-generated "JSON" that uses single quotes.
     *   **Level 3:** Regex-based block extraction (handles conversational filler before/after JSON).
     *   **Level 4:** Manual brace-matching parser for partial or multiple JSON objects.
 *   **Validation:** Every extracted task is validated for required fields (`title`) and sanitized before database insertion.
-*   **Fallback Mechanism:** If all AI parsing levels fail or return zero tasks for an email that was expected to be actionable, the system falls back to creating a single task with the title `Auto-Task: <Subject>` and the full email body as the description. This ensures zero data loss.
+*   **Fallback Mechanism:** If all AI parsing levels fail, the system falls back to creating a single task with the title `Auto-Task: <Subject>` and the full email body as the description. This ensures zero data loss.
 *   **Used by:** Both manual inbox task creation and automatic background email polling.
 
 
