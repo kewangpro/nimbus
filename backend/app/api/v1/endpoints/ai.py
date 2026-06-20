@@ -514,6 +514,78 @@ async def find_similar_issues(
 
     return issues
 
+def fallback_parse_summary(text: str) -> dict:
+    if not text:
+        return {"summary": "No summary available.", "next_steps": ["Review issue details."]}
+        
+    lines = [line.strip() for line in text.split("\n")]
+    summary_lines = []
+    next_steps = []
+    
+    in_next_steps = False
+    
+    for line in lines:
+        if not line:
+            continue
+        
+        lower_line = line.lower()
+        if any(keyword in lower_line for keyword in ("next step", "action item", "actions", "todo")):
+            in_next_steps = True
+            continue
+        elif (line.startswith("#") or line.startswith("**")) and in_next_steps:
+            if any(keyword in lower_line for keyword in ("key takeaway", "summary", "context")):
+                in_next_steps = False
+        
+        # Parse list items (e.g. 1. Deployment or - Deployment or * Deployment)
+        is_list_item = False
+        match = re.match(r'^(?:\d+\.|\*|-)\s+(.*)', line)
+        if match:
+            item_text = match.group(1).strip()
+            # Clean bold text wrapper at starting if any e.g. **Deployment:** -> Deployment:
+            item_text = re.sub(r'^\*\*(.*?)\*\*\s*(?::|-)?\s*', r'\1: ', item_text)
+            item_text = re.sub(r'\s+', ' ', item_text).strip()
+            next_steps.append(item_text)
+            is_list_item = True
+            
+        if not is_list_item and not in_next_steps:
+            # Regular text paragraph is summary content, skip titles
+            if not (line.startswith("#") or (line.startswith("**") and line.endswith("**"))):
+                summary_lines.append(line)
+                
+    summary = " ".join(summary_lines).strip()
+    if not summary:
+        # Fallback: find first non-empty line
+        non_empty = [l for l in lines if l and not l.startswith("#")]
+        summary = non_empty[0] if non_empty else "No summary available."
+        
+    # If no next steps were gathered because we were not in_next_steps, collect any list items in the text
+    if not next_steps:
+        for line in lines:
+            match = re.match(r'^(?:\d+\.|\*|-)\s+(.*)', line)
+            if match:
+                item_text = match.group(1).strip()
+                item_text = re.sub(r'^\*\*(.*?)\*\*\s*(?::|-)?\s*', r'\1: ', item_text)
+                item_text = re.sub(r'\s+', ' ', item_text).strip()
+                next_steps.append(item_text)
+                
+    # Unique non-empty next steps
+    seen = set()
+    cleaned_steps = []
+    for step in next_steps:
+        s_clean = step.strip()
+        if s_clean and s_clean.lower() not in seen:
+            seen.add(s_clean.lower())
+            cleaned_steps.append(s_clean)
+            
+    if not cleaned_steps:
+        cleaned_steps = ["Review issue details.", "Determine next implementation steps."]
+        
+    return {
+        "summary": summary,
+        "next_steps": cleaned_steps[:5]
+    }
+
+
 @router.post("/summary", response_model=SummaryResponse)
 async def summarize_issue(
     *,
@@ -559,7 +631,7 @@ async def summarize_issue(
         parsed = parsed[0]
     
     if not isinstance(parsed, dict):
-        raise HTTPException(status_code=500, detail="Failed to parse summary")
+        parsed = fallback_parse_summary(response)
 
     summary = parsed.get("summary", "").strip()
     next_steps = parsed.get("next_steps", [])
@@ -567,7 +639,7 @@ async def summarize_issue(
         next_steps = []
     next_steps = [str(step).strip() for step in next_steps if str(step).strip()]
     if not summary:
-        raise HTTPException(status_code=500, detail="Empty summary returned by AI")
+        summary = "Summary generated."
 
     await crud_issue_summary.upsert(
         db,
