@@ -322,7 +322,7 @@ async def create_tasks_bulk(
         # Ensure we have a list of task data even if AI returned a single object
         tasks_to_create = []
         if isinstance(task_data_raw, list) and task_data_raw:
-            tasks_to_create = task_data_raw
+            tasks_to_create = [task_data_raw[0]]
         elif isinstance(task_data_raw, dict):
             tasks_to_create = [task_data_raw]
         else:

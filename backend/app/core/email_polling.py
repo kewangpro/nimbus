@@ -151,7 +151,7 @@ async def process_email_source(db: AsyncSession, user: User):
                         if isinstance(extracted_tasks, dict):
                             tasks = [extracted_tasks]
                         elif isinstance(extracted_tasks, list):
-                            tasks = extracted_tasks
+                            tasks = [extracted_tasks[0]] if extracted_tasks else []
                         else:
                             logger.warning(f"Invalid format returned by AI extraction for msg_id {msg_id}. Falling back.")
                             tasks = [{
