@@ -42,7 +42,7 @@ async def get_multi(
         joinedload(Issue.project),
         joinedload(Issue.assignee),
         selectinload(Issue.labels)
-    ).order_by(Issue.created_at.desc()).offset(skip).limit(limit)
+    )
     
     if owner_id:
         query = query.where(Issue.owner_id == owner_id)
@@ -70,6 +70,8 @@ async def get_multi(
                 Issue.status.notin_(["done", "canceled"]),
             )
         )
+        
+    query = query.order_by(Issue.created_at.desc()).offset(skip).limit(limit)
         
     result = await db.execute(query)
     return result.scalars().all()
