@@ -155,7 +155,7 @@ async def test_poll_emails_sanitizes_lists(db: AsyncSession):
 
     assert issue is not None
     assert issue.title == "SpaceX Starship Launch TLDR Newsletter Growth"
-    assert issue.description == "Part 1 of email\nPart 2 of email"
+    assert issue.description == "Part 1 of email\nPart 2 of email\n\n---\n**Original Email Content:**\nBody content"
     assert issue.priority == "high"
     assert issue.due_date is not None
     assert issue.due_date.strftime("%Y-%m-%d") == "2026-06-01"

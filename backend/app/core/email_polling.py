@@ -193,12 +193,15 @@ async def process_email_source(db: AsyncSession, user: User):
                             logger.info(f"Skipping task creation, title already exists in DB: {title_val}")
                             continue
 
-                        desc_val = task_data.get("description", body)
-                        if isinstance(desc_val, list):
-                            desc_val = "\n".join(str(item) for item in desc_val)
-                        elif desc_val is not None:
-                            desc_val = str(desc_val)
-                        if not desc_val:
+                        ai_desc = task_data.get("description")
+                        if isinstance(ai_desc, list):
+                            ai_desc = "\n".join(str(item) for item in ai_desc)
+                        elif ai_desc is not None:
+                            ai_desc = str(ai_desc)
+                            
+                        if ai_desc:
+                            desc_val = f"{ai_desc}\n\n---\n**Original Email Content:**\n{body}"
+                        else:
                             desc_val = body
 
                         priority_val = task_data.get("priority", "medium")

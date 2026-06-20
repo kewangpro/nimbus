@@ -221,7 +221,15 @@ async def create_task_from_email(
             body_to_process = full_body
     
     # Process with AI
-    task_data = await email_processor.extract_task(subject, body_to_process)
+    task_data_raw = await email_processor.extract_task(subject, body_to_process)
+    
+    # Extract task data dictionary safely
+    if isinstance(task_data_raw, list):
+        task_data = task_data_raw[0] if task_data_raw else {}
+    elif isinstance(task_data_raw, dict):
+        task_data = task_data_raw
+    else:
+        task_data = {}
     
     # Find user's "General" project
     res = await db.execute(select(Project).where(and_(Project.owner_id == current_user.id, Project.name == "General")))
@@ -241,9 +249,16 @@ async def create_task_from_email(
     if due_date_val == "null":
         due_date_val = None
 
+    # Construct task description to include full email context
+    ai_desc = task_data.get("description")
+    if ai_desc:
+        final_desc = f"{ai_desc}\n\n---\n**Original Email Content:**\n{body_to_process}"
+    else:
+        final_desc = body_to_process
+
     issue_in = IssueCreate(
         title=task_data.get("title", subject),
-        description=task_data.get("description", body_to_process),
+        description=final_desc,
         priority=task_data.get("priority", "medium"),
         due_date=due_date_val,
         project_id=proj.id,
@@ -318,9 +333,16 @@ async def create_tasks_bulk(
             if due_date_val == "null":
                 due_date_val = None
 
+            # Construct task description to include full email context
+            ai_desc = task_data.get("description")
+            if ai_desc:
+                final_desc = f"{ai_desc}\n\n---\n**Original Email Content:**\n{body_to_process}"
+            else:
+                final_desc = body_to_process
+
             issue_in = IssueCreate(
                 title=task_data.get("title", subject),
-                description=task_data.get("description", body_to_process),
+                description=final_desc,
                 priority=task_data.get("priority", "medium"),
                 due_date=due_date_val,
                 project_id=proj.id,
