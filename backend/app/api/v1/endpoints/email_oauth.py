@@ -251,16 +251,9 @@ async def create_task_from_email(
     if due_date_val == "null":
         due_date_val = None
 
-    # Construct task description to include full email context
-    ai_desc = task_data.get("description")
-    if ai_desc:
-        final_desc = f"{ai_desc}\n\n---\n**Original Email Content:**\n{body_to_process}"
-    else:
-        final_desc = body_to_process
-
     issue_in = IssueCreate(
         title=task_data.get("title", subject),
-        description=final_desc,
+        description=task_data.get("description", body_to_process),
         priority=task_data.get("priority", "medium"),
         due_date=due_date_val,
         project_id=proj.id,
@@ -335,16 +328,9 @@ async def create_tasks_bulk(
             if due_date_val == "null":
                 due_date_val = None
 
-            # Construct task description to include full email context
-            ai_desc = task_data.get("description")
-            if ai_desc:
-                final_desc = f"{ai_desc}\n\n---\n**Original Email Content:**\n{body_to_process}"
-            else:
-                final_desc = body_to_process
-
             issue_in = IssueCreate(
                 title=task_data.get("title", subject),
-                description=final_desc,
+                description=task_data.get("description", body_to_process),
                 priority=task_data.get("priority", "medium"),
                 due_date=due_date_val,
                 project_id=proj.id,

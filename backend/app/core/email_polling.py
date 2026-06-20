@@ -137,129 +137,96 @@ async def process_email_source(db: AsyncSession, user: User):
                             body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
 
                     # Process with AI
-                    extracted_tasks = await email_processor.extract_task(subject, body)
-                    if extracted_tasks is None:
+                    # Process with AI
+                    task_data = await email_processor.extract_task(subject, body)
+                    if task_data is None:
                         logger.warning(f"AI extraction failed for email '{subject}' (msg_id {msg_id}). Falling back to raw task creation.")
                         # Fallback: create a single task from the email subject/body
-                        tasks = [{
+                        task_data = {
                             "title": f"Auto-Task: {subject}",
                             "description": body,
                             "priority": "medium",
                             "due_date": None
-                        }]
-                    else:
-                        if isinstance(extracted_tasks, dict):
-                            tasks = [extracted_tasks]
-                        elif isinstance(extracted_tasks, list):
-                            tasks = [extracted_tasks[0]] if extracted_tasks else []
-                        else:
-                            logger.warning(f"Invalid format returned by AI extraction for msg_id {msg_id}. Falling back.")
-                            tasks = [{
-                                "title": f"Auto-Task: {subject}",
-                                "description": body,
-                                "priority": "medium",
-                                "due_date": None
-                            }]
+                        }
+                    elif not task_data:
+                        # Ad/newsletter filtering (AI returned empty list or dict)
+                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                        continue
 
-                    created_issues = []
-                    seen_titles = set()
-                    for task_data in tasks:
-                        # Sanitize task_data
-                        title_val = task_data.get("title", subject)
-                        if isinstance(title_val, list):
-                            title_val = " ".join(str(item) for item in title_val)
-                        elif title_val is not None:
-                            title_val = str(title_val)
-                        if not title_val or not title_val.strip():
-                            title_val = subject
-                        
-                        title_val = title_val.strip()
-
-                        # 1. Local de-duplication (within the same email)
-                        if title_val.lower() in seen_titles:
-                            logger.info(f"Skipping duplicate task title in same email: {title_val}")
-                            continue
-                        seen_titles.add(title_val.lower())
-
-                        # 2. Database de-duplication (check if title already exists for this user)
-                        existing_query = select(Issue).where(
-                            and_(
-                                Issue.owner_id == user_id,
-                                Issue.title == title_val
-                            )
-                        )
-                        existing_res = await db.execute(existing_query)
-                        if existing_res.scalars().first():
-                            logger.info(f"Skipping task creation, title already exists in DB: {title_val}")
-                            continue
-
-                        ai_desc = task_data.get("description")
-                        if isinstance(ai_desc, list):
-                            ai_desc = "\n".join(str(item) for item in ai_desc)
-                        elif ai_desc is not None:
-                            ai_desc = str(ai_desc)
-                            
-                        if ai_desc:
-                            desc_val = f"{ai_desc}\n\n---\n**Original Email Content:**\n{body}"
-                        else:
-                            desc_val = body
-
-                        priority_val = task_data.get("priority", "medium")
-                        if isinstance(priority_val, str):
-                            priority_val = priority_val.strip().lower()
-                        else:
-                            priority_val = "medium"
-                        if priority_val not in ["low", "medium", "high", "urgent"]:
-                            priority_val = "medium"
-
-                        due_date_val = task_data.get("due_date")
-                        parsed_due_date = None
-                        if due_date_val:
-                            if isinstance(due_date_val, list):
-                                due_date_val = str(due_date_val[0]) if due_date_val else None
-                            if isinstance(due_date_val, str):
-                                due_date_val = due_date_val.strip()
-                                for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
-                                    try:
-                                        parsed_due_date = datetime.strptime(due_date_val, fmt)
-                                        parsed_due_date = parsed_due_date.replace(tzinfo=timezone.utc)
-                                        break
-                                    except ValueError:
-                                        continue
-
-                        # Find user's "General" project
-                        res = await db.execute(select(Project).where(and_(Project.owner_id == user_id, Project.name == "General")))
-                        proj = res.scalars().first()
-
-                        if not proj:
-                            raise ValueError(f"Default 'General' project not found for user {email_address}")
-
-                        issue_in = IssueCreate(
-                            title=title_val,
-                            description=desc_val,
-                            priority=priority_val,
-                            due_date=parsed_due_date,
-                            project_id=proj.id,
-                            assignee_id=user_id
-                        )
-
-                        issue = await create_issue(db, obj_in=issue_in, owner_id=user_id)
-                        created_issues.append(issue)
+                    # Sanitize task_data
+                    title_val = task_data.get("title", subject)
+                    if isinstance(title_val, list):
+                        title_val = " ".join(str(item) for item in title_val)
+                    elif title_val is not None:
+                        title_val = str(title_val)
+                    if not title_val or not title_val.strip():
+                        title_val = subject
                     
-                    # Explicitly mark as seen only after DB commit of all issues
+                    title_val = title_val.strip()
+
+                    desc_val = task_data.get("description", body)
+                    if isinstance(desc_val, list):
+                        desc_val = "\n".join(str(item) for item in desc_val)
+                    elif desc_val is not None:
+                        desc_val = str(desc_val)
+                    if not desc_val:
+                        desc_val = body
+
+                    priority_val = task_data.get("priority", "medium")
+                    if isinstance(priority_val, str):
+                        priority_val = priority_val.strip().lower()
+                    else:
+                        priority_val = "medium"
+                    if priority_val not in ["low", "medium", "high", "urgent"]:
+                        priority_val = "medium"
+
+                    due_date_val = task_data.get("due_date")
+                    parsed_due_date = None
+                    if due_date_val:
+                        if isinstance(due_date_val, list):
+                            due_date_val = str(due_date_val[0]) if due_date_val else None
+                        if isinstance(due_date_val, str):
+                            due_date_val = due_date_val.strip()
+                            for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+                                try:
+                                    parsed_due_date = datetime.strptime(due_date_val, fmt)
+                                    parsed_due_date = parsed_due_date.replace(tzinfo=timezone.utc)
+                                    break
+                                except ValueError:
+                                    continue
+
+                    # Find user's "General" project
+                    res = await db.execute(select(Project).where(and_(Project.owner_id == user_id, Project.name == "General")))
+                    proj = res.scalars().first()
+
+                    if not proj:
+                        raise ValueError(f"Default 'General' project not found for user {email_address}")
+
+                    issue_in = IssueCreate(
+                        title=title_val,
+                        description=desc_val,
+                        priority=priority_val,
+                        due_date=parsed_due_date,
+                        project_id=proj.id,
+                        assignee_id=user_id
+                    )
+
+                    issue = await create_issue(db, obj_in=issue_in, owner_id=user_id)
+                    
+                    # Explicitly mark as seen only after DB commit
                     await imap.store(msg_id, "+FLAGS", "(\\Seen)")
                     
-                    # Audit log for each automated email task creation
-                    for issue in created_issues:
-                        await crud_audit.log_action(
-                            db, 
-                            "email.task_created", 
-                            user_id, 
-                            "issue", 
-                            issue.id,
-                            details={"title": issue.title, "email_subject": subject, "source": "automation"}
-                        )
-                        logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue.title}")
+                    # Audit log for automated email task creation
+                    await crud_audit.log_action(
+                        db, 
+                        "email.task_created", 
+                        user_id, 
+                        "issue", 
+                        issue.id,
+                        details={"title": issue.title, "email_subject": subject, "source": "automation"}
+                    )
+                    
+                    logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue.title}")
 
                 except Exception as email_err:
                     logger.error(f"Failed to process email msg_id {msg_id} for user {email_address}: {email_err}", exc_info=True)

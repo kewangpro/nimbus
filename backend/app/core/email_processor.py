@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import datetime
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any, Optional
 from app.core import ai
 from app.schemas.issue import IssueCreate
 from app.models.issue import IssuePriority
@@ -10,39 +10,16 @@ class EmailProcessor:
     def __init__(self):
         self.base_system_prompt = (
             "You are an AI assistant for Nimbus, a project management tool.\n"
-            "Your goal is to extract REAL, ACTIONABLE tasks from the email provided below.\n\n"
-            "### CRITICAL EXTRACTION RULES ###\n"
-            "1. ACTIONABLE ONLY: Only extract items that require a specific action from the user (e.g., 'Reply to client', 'Fix bug', 'Prepare presentation').\n"
-            "2. IGNORE BOILERPLATE: Absolutely ignore all marketing footers, navigation links, and legal text. Examples of things to IGNORE:\n"
-            "   - 'Unsubscribe', 'Manage Preferences', 'View in Browser'\n"
-            "   - 'Help Center', 'Questions?', 'Contact Support', 'More Info'\n"
-            "   - 'Privacy Policy', 'Terms of Service', 'Copyright 2026'\n"
-            "   - Social media links (Facebook, Twitter, etc.)\n"
-            "3. NO HALLUCINATIONS: Only extract tasks mentioned in the email body. Do not invent tasks.\n"
-            "4. EMPTY LIST: If the email is an advertisement, newsletter, receipt, or notification with NO actionable tasks for the user, return an empty list: [].\n"
-            "   - EXAMPLE: An email announcing a new movie on Netflix with links like 'Watch Trailer' or 'Add to My List' is NOT actionable. Return [].\n\n"
-            "### OUTPUT FORMAT ###\n"
-            "Respond ONLY with a valid JSON list of objects. No comments, no markdown code blocks, no preamble.\n"
-            "Each object must have these keys:\n"
+            "Convert the following email into a structured task.\n"
+            "Extract a clear title, a detailed description, a priority, and a suggested due date if mentioned.\n\n"
+            "Respond ONLY with a single JSON object with these keys:\n"
             "- 'title': concise summary\n"
             "- 'description': detailed explanation\n"
             "- 'priority': 'low', 'medium', 'high', or 'urgent'\n"
-            "- 'due_date': 'YYYY-MM-DD' or null\n\n"
-            "### EXAMPLES ###\n\n"
-            "Email Subject: Action Needed: Approve Expense Report\n"
-            "Email Body: Please approve the latest report by Friday.\n"
-            "Response: "
-            '[{"title": "Approve Expense Report", "description": "Approve the latest report mentioned in the email", "priority": "high", "due_date": "2026-06-12"}]\n\n'
-            "Email Subject: New Movies this Weekend\n"
-            "Email Body: Netflix: Watch Trailer | Add to My List | Unsubscribe\n"
-            "Response: []\n\n"
-            "### CRITICAL REMINDER ###\n"
-            "IGNORE ALL FOOTERS. DO NOT EXTRACT 'Unsubscribe', 'Questions?', 'More Info', etc. "
-            "If no real work task exists, return [].\n"
-            "Respond ONLY with JSON."
+            "- 'due_date': 'YYYY-MM-DD' or null"
         )
 
-    async def extract_task(self, subject: str, body: str) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    async def extract_task(self, subject: str, body: str) -> Optional[Dict[str, Any]]:
         # Truncate extremely long email bodies to prevent stalling or crashing the local LLM
         max_body_len = 10000
         if len(body) > max_body_len:
@@ -66,13 +43,15 @@ class EmailProcessor:
             return None
         
         # Use robust shared JSON parser helper
-        tasks = ai.parse_json_robust(response_text)
-        if tasks is not None:
-            if isinstance(tasks, dict):
-                tasks = [tasks]
-            if isinstance(tasks, list):
-                # Filter out any non-dict items and validate required keys
-                return [t for t in tasks if isinstance(t, dict) and "title" in t]
+        task_data = ai.parse_json_robust(response_text)
+        if isinstance(task_data, list):
+            task_data = task_data[0] if task_data else {}
+            
+        if isinstance(task_data, dict):
+            if not task_data:
+                return {}
+            if "title" in task_data:
+                return task_data
         return None
 
 
