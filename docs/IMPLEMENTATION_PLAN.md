@@ -148,8 +148,9 @@
 *   [x] **Worker Reconnection:** Implemented error handling and retry loops in the background worker for Redis/Postgres connection drops.
 *   [x] **Job Idempotency:** Added a check to prevent redundant periodic jobs (e.g., email polling) from accumulating in the queue when the worker is offline.
 *   [x] **Improved Monitoring:** Added standard logging commands and monitoring guides to `README.md` and `DEPLOYMENT.md`.
+
 ---
-151: 
+
 ## Phase 12: External AI Integration (MCP) ✅
 **Goal:** Enable external AI assistants (e.g., Claude Desktop) to directly manage Nimbus data via the Model Context Protocol.
 
@@ -182,5 +183,3 @@
 *   [x] **Day Number Strategy:** Directed AI to output `day_number` (1-5) instead of date strings, preventing hallucinated future months.
 *   [x] **Priority Mapping:** Implemented numerical prioritization (`URGENT=0`, `HIGH=1`) to ensure correct sorting in batch processing.
 *   [x] **Skip Overdue Items:** Modified AI Scheduler to explicitly exclude already overdue items from the rescheduling pool, ensuring user-defined deadlines are respected.
-
-162: 

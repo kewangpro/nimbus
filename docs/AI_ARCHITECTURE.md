@@ -3,18 +3,19 @@
 ## 1. Overview
 The AI layer is **additive** — the core project management system works without it. Intelligence is applied asynchronously using **local LLMs via MLX on Apple Silicon**, ensuring complete privacy and zero inference cost. Long-running AI tasks are processed by a Redis-backed background worker.
 
-Email intelligence is powered by the same AI pipeline: incoming emails are parsed and structured by Gemma 3 into tasks, using the user's IMAP inbox via XOAUTH2.
+Email intelligence is powered by the same AI pipeline: incoming emails are parsed and structured by Llama 3.1 8B (via `MLX_EMAIL_MODEL`) into tasks, using the user's IMAP inbox via XOAUTH2.
 
 ---
 
 ## 2. Models & Providers
 
-| Model | Purpose | Library |
-|:---|:---|:---|
-| `mlx-community/gemma-3-4b-it-4bit` | Planning, triage, summarization, email extraction | `mlx-lm` (Apple Silicon GPU) |
-| `nomic-ai/nomic-embed-text-v1` | Issue embeddings for semantic search | `sentence-transformers` |
+| Model | Purpose | Library | Config Variable |
+|:---|:---|:---|:---|
+| `mlx-community/Llama-3.2-1B-Instruct-4bit` | Conversational task balancing, planning, triage, and scheduling | `mlx-lm` (Apple Silicon GPU) | `MLX_CHAT_MODEL` |
+| `mlx-community/Meta-Llama-3.1-8B-Instruct-4bit` | High-fidelity email task extraction (noise rejection, context parsing) | `mlx-lm` (Apple Silicon GPU) | `MLX_EMAIL_MODEL` |
+| `nomic-ai/nomic-embed-text-v1` | Issue embeddings for semantic search | `sentence-transformers` | `EMBEDDING_MODEL` |
 
-Models are downloaded from Hugging Face on first use and cached locally. Use `HF_TOKEN` in your environment to enable higher rate limits. The chat model is configurable via the `MLX_CHAT_MODEL` env var; the embedding model via `EMBEDDING_MODEL`.
+Models are downloaded from Hugging Face on first use and cached locally. Use `HF_TOKEN` in your environment to enable higher rate limits. The chat models are configurable via the `MLX_CHAT_MODEL` and `MLX_EMAIL_MODEL` env vars; the embedding model via `EMBEDDING_MODEL`.
 
 ---
 
@@ -156,24 +157,24 @@ CREATE TABLE issue_links (
 *   **Caching:** Issue summaries are content-hash cached; regenerated only when issue content changes.
 *   **Memory Management:** The system releases unused Metal GPU memory after each generation by calling `mlx.core.metal.clear_cache()`. This minimizes unified memory fragmentation and prevents OutOfMemory errors in the persistent backend process.
 ---
-136: 
-137: ## 7. External AI Integration (MCP)
-138: Nimbus implements a **Model Context Protocol (MCP)** server via the `FastMCP` framework. This allows external AI assistants (like Claude) to securely access and modify the user's project data.
-139: 
-140: ### Tools Provided:
-141: | Tool | Purpose |
-142: |:---|:---|
-143: | `list_calendar_events` | Fetch tasks within a timeframe, sorted by due date. Excludes completed items. |
-144: | `search_tasks` | Executes natural language semantic search against the vector database. |
-145: | `create_calendar_task` | Create new issues with dynamic project selection support. |
-146: | `schedule_task` | Update task deadlines. |
-147: | `get_task_details` | Retrieve full issue metadata. |
-148: 
-149: ### Transport:
-150: *   **Protocol:** SSE (Server-Sent Events).
-151: *   **Endpoint:** `/mcp/sse` (Mounted within the main FastAPI application).
-152: 
-153: ### Security:
-154: *   Currently uses environment-based user lookup (`NIMBUS_USER_EMAIL`) for MCP context.
-155: *   Strictly filters data by `owner_id` to ensure isolation.
+
+## 7. External AI Integration (MCP)
+Nimbus implements a **Model Context Protocol (MCP)** server via the `FastMCP` framework. This allows external AI assistants (like Claude) to securely access and modify the user's project data.
+
+### Tools Provided:
+| Tool | Purpose |
+|:---|:---|
+| `list_calendar_events` | Fetch tasks within a timeframe, sorted by due date. Excludes completed items. |
+| `search_tasks` | Executes natural language semantic search against the vector database. |
+| `create_calendar_task` | Create new issues with dynamic project selection support. |
+| `schedule_task` | Update task deadlines. |
+| `get_task_details` | Retrieve full issue metadata. |
+
+### Transport:
+*   **Protocol:** SSE (Server-Sent Events).
+*   **Endpoint:** `/mcp/sse` (Mounted within the main FastAPI application).
+
+### Security:
+*   Currently uses environment-based user lookup (`NIMBUS_USER_EMAIL`) for MCP context.
+*   Strictly filters data by `owner_id` to ensure isolation.
 156: 

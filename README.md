@@ -19,7 +19,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
         *   **Logic:** Prioritizes urgent tasks first. Redistributes the entire open backlog into the next 5 weekdays, strictly avoiding weekends and future-date hallucinations.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
-    *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using Gemma 3 via MLX.
+    *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using Llama 3.2 via MLX.
     *   **📝 AI Summary:** Generates a concise issue summary with next steps.
     *   **🔎 AI Filters:** Convert natural language into structured filters in List view.
     *   **🧾 Client Updates:** Drafts weekly client updates per project.
@@ -41,7 +41,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Single Sign-On:** Login seamlessly with **Google** or **Outlook**.
     *   **Auto-Project Creation:** On first login, Nimbus automatically creates a **"General"** project for you.
     *   **Email-to-Task Mastery:**
-        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses Gemma 3 (via MLX) to extract structured tasks into your **General** project. The implementation uses atomic flagging (`BODY.PEEK`) to ensure emails are only marked as read after the task is successfully committed, preventing data loss during network or AI timeouts.
+        *   **Automation:** Toggle automatic task generation in your User Settings. The background worker polls for new unseen emails every 60 seconds and uses Llama 3.1 8B (via MLX) to extract structured tasks into your **General** project. The implementation uses atomic flagging (`BODY.PEEK`) to ensure emails are only marked as read after the task is successfully committed, preventing data loss during network or AI timeouts.
         *   **Smart Filtering:** The AI is trained to **ignore marketing boilerplate**, unsubscribe links, and newsletter footers. It focuses exclusively on extracting real, actionable tasks from the email body.
         *   **Multi-Task Extraction:** The AI can identify and extract **multiple distinct tasks** from a single email, creating a separate issue for each actionable item.
         *   **Resilient Parsing:** Features a robust multi-stage parser that handles common AI formatting errors, including stripping trailing comments, supporting single-quoted "JSON" via `ast.literal_eval`, and manual brace-matching recovery.
@@ -72,13 +72,13 @@ Nimbus is a modern, high-performance project management tool designed to replace
 *   **Backend:** FastAPI (Python), SQLAlchemy (Async), Alembic.
 *   **Database:** PostgreSQL with `pgvector`.
 *   **Infrastructure:** Docker Compose, Redis, MinIO.
-*   **AI:** MLX + `mlx-lm` (Gemma 3, Apple Silicon), `sentence-transformers` (embeddings).
+*   **AI:** MLX + `mlx-lm` (Llama 3.2 & 3.1, Apple Silicon), `sentence-transformers` (embeddings).
 
 ## 📦 Prerequisites
 
 1.  **Docker & Docker Compose**
 2.  **Node.js 18+ & npm**
-3.  **Python 3.10+** (Required for MLX & Gemma 3 support)
+3.  **Python 3.10+** (Required for MLX & Llama 3 support)
 4.  **Apple Silicon Mac** (M1/M2/M3/M4) — required for MLX inference
 
 ## 🏃‍♂️ Quick Start
@@ -140,11 +140,12 @@ AI runs entirely on-device via **MLX** on Apple Silicon — no external server r
 
 | Env Var | Default | Purpose |
 |:---|:---|:---|
-| `MLX_CHAT_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Planning, triage, summarization |
+| `MLX_CHAT_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Conversational task balancing, planning, triage, and scheduling |
+| `MLX_EMAIL_MODEL` | `mlx-community/Meta-Llama-3.1-8B-Instruct-4bit` | High-fidelity email task extraction (noise rejection, context parsing) |
 | `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |
 | `HF_TOKEN` | (optional) | Set this to your Hugging Face token to enable higher rate limits and faster downloads. |
 
-To use a different model (e.g. a larger 4B or 8B model), set `MLX_CHAT_MODEL` in `backend/.env`.
+To override these defaults, set `MLX_CHAT_MODEL` or `MLX_EMAIL_MODEL` in your `backend/.env` file.
 
 > **Note:** MLX only runs natively on macOS with Apple Silicon. Inside the Linux Docker container, MLX is not available (as the C++ library is macOS exclusive). Consequently, standard MLX chat completions will fail with a descriptive ModuleNotFoundError if run inside the container. For full GPU performance and MLX chat features, you should run the backend natively on your host Apple Silicon Mac (using `make backend` or `make run`). Inference will still run locally via `sentence-transformers` on CPU inside the container for vector embeddings.
 

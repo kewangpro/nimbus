@@ -14,7 +14,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 | **Primary Focus** | Enterprise config | Developer velocity | **Local AI + Email Automation** |
 | **Data Entry** | Manual forms | Fast forms | **Natural Language + Email** |
 | **Search** | Keyword / JQL | Fast keyword | **Semantic / Vector search** |
-| **AI Integration** | Bolt-on | Minimal | **Core architecture (Local MLX/Gemma 3)** |
+| **AI Integration** | Bolt-on | Minimal | **Core architecture (Local MLX / Llama 3)** |
 | **Email Integration** | None | None | **SSO-linked IMAP inbox** |
 
 ---
@@ -41,11 +41,11 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 *   **Resilient Fallback:** If AI extraction fails or returns malformed data, Nimbus automatically creates a "Raw" task from the email subject and body to ensure zero data loss.
 *   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for new unseen emails every minute.
 
-### 2.4 AI-Native Core (Local MLX + Gemma 3)
+### 2.4 AI-Native Core (Local MLX + Llama 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
 *   **AI Scheduler:** Redistributes open (non-done, non-canceled) tasks — unscheduled, scheduled for today/future, or mis-scheduled far in the future — across the next 5 business days (Mon-Fri only). **Overdue tasks (due before today) are skipped** to prevent moving them automatically. Processes in stateful batches of **20 tasks**, scalable to 100+. The calendar updates live every 4 seconds during the run.
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
-*   **Auto-Triage:** Suggests issue priority using Gemma 3 via MLX.
+*   **Auto-Triage:** Suggests issue priority using Llama 3.2 via MLX.
 *   **Similar Issues:** Detects likely duplicates during issue creation.
 *   **Issue Summaries:** Generates per-issue AI summaries with next steps.
 *   **AI Filters:** Natural language to structured issue filters.
@@ -67,7 +67,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 *   **Backend:** FastAPI (Python), SQLAlchemy (Async), Alembic.
 *   **Database:** PostgreSQL 16 with `pgvector`.
 *   **Infrastructure:** Docker Compose, Redis, MinIO.
-*   **AI Engine:** Local MLX (`mlx-lm` + Gemma 3 for inference, `sentence-transformers` + nomic-embed-text-v1 for embeddings).
+*   **AI Engine:** Local MLX (`mlx-lm` + Llama 3.2 & 3.1 for inference, `sentence-transformers` + nomic-embed-text-v1 for embeddings).
 *   **Email:** IMAP/XOAUTH2 via `aioimaplib` using SSO tokens.
 
 ---
