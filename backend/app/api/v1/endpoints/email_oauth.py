@@ -31,6 +31,63 @@ def _strip_html(text: str) -> str:
     return text.strip()
 
 
+async def _get_full_email_body(db: AsyncSession, user: User, msg_id: str) -> Optional[str]:
+    if not user.oauth_access_token:
+        return None
+    from app.core.email_polling import refresh_token_v2, generate_xoauth2_string
+    token = await refresh_token_v2(db, user)
+    if not token:
+        return None
+
+    provider = user.oauth_provider
+    host = "imap.gmail.com" if provider == "gmail" else "outlook.office365.com"
+    
+    import aioimaplib
+    from email import message_from_string
+    from aioimaplib import Command
+
+    try:
+        imap = aioimaplib.IMAP4_SSL(host=host)
+        await imap.wait_hello_from_server()
+        auth_string = generate_xoauth2_string(user.email, token)
+        response = await imap.protocol.execute(Command("AUTHENTICATE", imap.protocol.new_tag(), "XOAUTH2", auth_string))
+        if response.result != "OK":
+            return None
+
+        await imap.select("INBOX")
+        _, data = await imap.fetch(msg_id, "RFC822")
+        await imap.logout()
+
+        if not data or len(data) < 2:
+            return None
+
+        raw_email = data[1].decode() if isinstance(data[1], (bytes, bytearray)) else data[1]
+        msg = message_from_string(raw_email)
+
+        body = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                ct = part.get_content_type()
+                if ct == "text/plain":
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
+                    break
+                elif ct == "text/html" and not body:
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body = _strip_html(payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                raw_body = payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload
+                body = raw_body if msg.get_content_type() == "text/plain" else _strip_html(raw_body)
+
+        return body
+    except Exception:
+        return None
+
+
 @router.get("/inbox", response_model=List[dict])
 async def get_inbox(
     current_user: User = Depends(deps.get_current_active_user),
@@ -155,9 +212,16 @@ async def create_task_from_email(
 
     subject = email_data.get("subject", "")
     snippet = email_data.get("snippet", "")
+    msg_id = email_data.get("id")
+
+    body_to_process = snippet
+    if msg_id:
+        full_body = await _get_full_email_body(db, current_user, msg_id)
+        if full_body:
+            body_to_process = full_body
     
     # Process with AI
-    task_data = await email_processor.extract_task(subject, snippet)
+    task_data = await email_processor.extract_task(subject, body_to_process)
     
     # Find user's "General" project
     res = await db.execute(select(Project).where(and_(Project.owner_id == current_user.id, Project.name == "General")))
@@ -179,7 +243,7 @@ async def create_task_from_email(
 
     issue_in = IssueCreate(
         title=task_data.get("title", subject),
-        description=task_data.get("description", snippet),
+        description=task_data.get("description", body_to_process),
         priority=task_data.get("priority", "medium"),
         due_date=due_date_val,
         project_id=proj.id,
@@ -227,9 +291,16 @@ async def create_tasks_bulk(
     for email_data in emails_data:
         subject = email_data.get("subject", "")
         snippet = email_data.get("snippet", "")
+        msg_id = email_data.get("id")
+        
+        body_to_process = snippet
+        if msg_id:
+            full_body = await _get_full_email_body(db, current_user, msg_id)
+            if full_body:
+                body_to_process = full_body
         
         # Process with AI
-        task_data_raw = await email_processor.extract_task(subject, snippet)
+        task_data_raw = await email_processor.extract_task(subject, body_to_process)
         
         # Ensure we have a list of task data even if AI returned a single object
         tasks_to_create = []
@@ -239,7 +310,7 @@ async def create_tasks_bulk(
             tasks_to_create = [task_data_raw]
         else:
             # Fallback if AI fails
-            tasks_to_create = [{"title": subject, "description": snippet}]
+            tasks_to_create = [{"title": subject, "description": body_to_process}]
 
         for task_data in tasks_to_create:
             # AI sometimes returns "null" as a string, which breaks Pydantic validation
@@ -249,7 +320,7 @@ async def create_tasks_bulk(
 
             issue_in = IssueCreate(
                 title=task_data.get("title", subject),
-                description=task_data.get("description", snippet),
+                description=task_data.get("description", body_to_process),
                 priority=task_data.get("priority", "medium"),
                 due_date=due_date_val,
                 project_id=proj.id,
