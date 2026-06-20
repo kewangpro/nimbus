@@ -140,12 +140,12 @@ AI runs entirely on-device via **MLX** on Apple Silicon — no external server r
 
 | Env Var | Default | Purpose |
 |:---|:---|:---|
-| `MLX_CHAT_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Conversational task balancing, planning, triage, and scheduling |
-| `MLX_EMAIL_MODEL` | `mlx-community/Meta-Llama-3.1-8B-Instruct-4bit` | High-fidelity email task extraction (noise rejection, context parsing) |
+| `MLX_CHAT_MODEL` | `mlx-community/gemma-3-4b-it-4bit` | Conversational task balancing, planning, triage, scheduling, summary, email extraction |
+| `MLX_FAST_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Fast fallback model if primary generation fails |
 | `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |
 | `HF_TOKEN` | (optional) | Set this to your Hugging Face token to enable higher rate limits and faster downloads. |
 
-To override these defaults, set `MLX_CHAT_MODEL` or `MLX_EMAIL_MODEL` in your `backend/.env` file.
+To override these defaults, set `MLX_CHAT_MODEL` or `MLX_FAST_MODEL` in your `backend/.env` file.
 
 > **Note:** MLX only runs natively on macOS with Apple Silicon. Inside the Linux Docker container, MLX is not available (as the C++ library is macOS exclusive). Consequently, standard MLX chat completions will fail with a descriptive ModuleNotFoundError if run inside the container. For full GPU performance and MLX chat features, you should run the backend natively on your host Apple Silicon Mac (using `make backend` or `make run`). Inference will still run locally via `sentence-transformers` on CPU inside the container for vector embeddings.
 

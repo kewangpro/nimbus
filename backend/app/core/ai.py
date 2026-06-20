@@ -7,7 +7,7 @@ import logging
 from app.core.config import settings
 
 CHAT_MODEL = settings.MLX_CHAT_MODEL
-EMAIL_MODEL = settings.MLX_EMAIL_MODEL
+FAST_MODEL = settings.MLX_FAST_MODEL
 EMBEDDING_MODEL = settings.EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
@@ -85,9 +85,9 @@ async def generate_embedding(text: str) -> Optional[List[float]]:
 async def generate_completion(
     prompt: str, system_prompt: str = "", model_name: Optional[str] = None
 ) -> Optional[str]:
+    if model_name is None:
+        model_name = CHAT_MODEL
     try:
-        if model_name is None:
-            model_name = CHAT_MODEL
         logger.info(f"Starting AI completion generation with model: {model_name}")
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
@@ -96,7 +96,18 @@ async def generate_completion(
         logger.info(f"AI completion generation finished for model: {model_name}")
         return result
     except Exception as e:
-        logger.error(f"Error generating completion: {e}")
+        logger.error(f"Error generating completion with {model_name}: {e}")
+        if model_name != FAST_MODEL and FAST_MODEL:
+            logger.info(f"Attempting fallback generation with fast model: {FAST_MODEL}")
+            try:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    _executor, _sync_generate, prompt, system_prompt, FAST_MODEL
+                )
+                logger.info(f"AI completion generation finished for fallback model: {FAST_MODEL}")
+                return result
+            except Exception as fe:
+                logger.error(f"Error generating completion with fallback model {FAST_MODEL}: {fe}")
         return None
 
 

@@ -3,7 +3,7 @@
 ## 1. Overview
 The AI layer is **additive** — the core project management system works without it. Intelligence is applied asynchronously using **local LLMs via MLX on Apple Silicon**, ensuring complete privacy and zero inference cost. Long-running AI tasks are processed by a Redis-backed background worker.
 
-Email intelligence is powered by the same AI pipeline: incoming emails are parsed and structured by Llama 3.1 8B (via `MLX_EMAIL_MODEL`) into tasks, using the user's IMAP inbox via XOAUTH2.
+Email intelligence is powered by the same AI pipeline: incoming emails are parsed and structured by the default chat model into tasks, using the user's IMAP inbox via XOAUTH2.
 
 ---
 
@@ -11,11 +11,11 @@ Email intelligence is powered by the same AI pipeline: incoming emails are parse
 
 | Model | Purpose | Library | Config Variable |
 |:---|:---|:---|:---|
-| `mlx-community/Llama-3.2-1B-Instruct-4bit` | Conversational task balancing, planning, triage, and scheduling | `mlx-lm` (Apple Silicon GPU) | `MLX_CHAT_MODEL` |
-| `mlx-community/Meta-Llama-3.1-8B-Instruct-4bit` | High-fidelity email task extraction (noise rejection, context parsing) | `mlx-lm` (Apple Silicon GPU) | `MLX_EMAIL_MODEL` |
+| `mlx-community/gemma-3-4b-it-4bit` | Default primary model: Conversational task balancing, planning, triage, scheduling, summary, email extraction | `mlx-lm` (Apple Silicon GPU) | `MLX_CHAT_MODEL` |
+| `mlx-community/Llama-3.2-1B-Instruct-4bit` | Fast fallback model if primary generation fails | `mlx-lm` (Apple Silicon GPU) | `MLX_FAST_MODEL` |
 | `nomic-ai/nomic-embed-text-v1` | Issue embeddings for semantic search | `sentence-transformers` | `EMBEDDING_MODEL` |
 
-Models are downloaded from Hugging Face on first use and cached locally. Use `HF_TOKEN` in your environment to enable higher rate limits. The chat models are configurable via the `MLX_CHAT_MODEL` and `MLX_EMAIL_MODEL` env vars; the embedding model via `EMBEDDING_MODEL`.
+Models are downloaded from Hugging Face on first use and cached locally. Use `HF_TOKEN` in your environment to enable higher rate limits. The chat models are configurable via the `MLX_CHAT_MODEL` and `MLX_FAST_MODEL` env vars; the embedding model via `EMBEDDING_MODEL`.
 
 ---
 

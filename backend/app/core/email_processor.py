@@ -60,7 +60,7 @@ class EmailProcessor:
         response_text = await ai.generate_completion(
             prompt, 
             system_prompt=system_prompt,
-            model_name=ai.EMAIL_MODEL
+            model_name=ai.CHAT_MODEL
         )
         if not response_text or not response_text.strip():
             return None
