@@ -321,12 +321,12 @@ async def create_tasks_bulk(
         
         # Ensure we have a list of task data even if AI returned a single object
         tasks_to_create = []
-        if isinstance(task_data_raw, list):
+        if isinstance(task_data_raw, list) and task_data_raw:
             tasks_to_create = task_data_raw
         elif isinstance(task_data_raw, dict):
             tasks_to_create = [task_data_raw]
         else:
-            # Fallback if AI fails
+            # Fallback if AI fails or returns empty list for manually selected email
             tasks_to_create = [{"title": subject, "description": body_to_process}]
 
         for task_data in tasks_to_create:

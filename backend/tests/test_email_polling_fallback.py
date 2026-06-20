@@ -72,3 +72,58 @@ async def test_poll_emails_fallback_on_ai_failure(db):
     log_entry = res.scalars().first()
     assert log_entry is not None
     assert log_entry.details.get("title") == issue.title
+
+
+@pytest.mark.asyncio
+async def test_poll_emails_ad_returns_empty_list_no_task_created(db):
+    # 1. Setup User
+    from datetime import datetime, timedelta, timezone
+    user = User(
+        email="adtest@example.com",
+        is_active=True,
+        email_automation_enabled=True,
+        oauth_access_token="dummy",
+        oauth_provider="google",
+        oauth_token_expires_at=datetime.now(timezone.utc) + timedelta(days=1)
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    user_id = user.id
+
+    # 2. Setup "General" Project
+    project = Project(
+        name="General",
+        owner_id=user_id
+    )
+    db.add(project)
+    await db.commit()
+    await db.refresh(project)
+
+    # 3. Mock IMAP Protocol
+    mock_imap = MagicMock()
+    mock_imap.wait_hello_from_server = AsyncMock()
+    mock_imap.protocol = MagicMock()
+    mock_imap.protocol.new_tag = MagicMock(return_value="A1")
+    mock_imap.protocol.execute = AsyncMock(side_effect=[
+        MagicMock(result="OK"),                       # AUTHENTICATE
+        make_search_response(["4"]),                  # SEARCH
+    ])
+    mock_imap.select = AsyncMock()
+    mock_imap.fetch = AsyncMock(return_value=("OK", [None, b"Subject: Ad Test\n\nAd Body"]))
+    mock_imap.store = AsyncMock()
+    mock_imap.logout = AsyncMock()
+
+    # Mock extract_task to return [] (simulating AI advertisement filtering)
+    with patch("aioimaplib.IMAP4_SSL", return_value=mock_imap), \
+         patch("app.core.email_processor.email_processor.extract_task", AsyncMock(return_value=[])):
+
+        await poll_emails(db)
+
+    # 4. Verify that NO task was created
+    res = await db.execute(select(Issue).where(Issue.owner_id == user_id))
+    issues = res.scalars().all()
+    assert len(issues) == 0
+
+    # 5. Verify the email is still marked as seen
+    mock_imap.store.assert_called_once_with("4", "+FLAGS", "(\\Seen)")
