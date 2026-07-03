@@ -115,7 +115,7 @@
 
 ### 9.4 Email Automation (Background Polling)
 *   [x] `email_automation_enabled` toggle in User Settings (checkbox).
-*   [x] Background worker polls every 60 seconds for UNSEEN emails from the last 3 days.
+*   [x] Background worker polls every 60 seconds for emails from the last 3 days, using lightweight header-fetching and Message-ID database audit logs to check if they were already processed.
 *   [x] `email_processor.extract_task()` extracts title, description, and priority using Gemma 3 via MLX.
 *   [x] Created tasks are assigned to the inbox owner and placed in their "General" project.
 *   [x] Graceful fallback: if `UNSEEN SINCE <date>` fails, retries with `UNSEEN` only.

@@ -138,8 +138,12 @@ CREATE TABLE issue_links (
 ### Polling Flow
 1. Background worker enqueues a poll job every 60 seconds.
 2. Query all users with `oauth_access_token IS NOT NULL AND email_automation_enabled = TRUE`.
-3. For each user: refresh token if needed → connect to IMAP → search `UNSEEN SINCE <3 days ago>`.
-4. For each email: extract task with `email_processor` → create issue in user's "General" project → assign to user.
+3. For each user: refresh token if needed → connect to IMAP → search `SINCE <3 days ago>` (both seen/unseen) → query `AuditLog` for `email.%` actions in the last 3 days to build a set of processed `Message-ID`s.
+4. For each email found:
+   - Fetch only lightweight headers (`Message-ID`, `Subject`, `Date`) first to extract the unique `Message-ID`.
+   - If the `Message-ID` is in the processed set, skip it.
+   - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project → assign to user → mark as read → save `Message-ID` to `AuditLog`.
+   - Filtered ads/newsletters and failed processing attempts also write to `AuditLog` to prevent future re-processing.
 
 
 ---

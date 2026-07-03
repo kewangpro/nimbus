@@ -14,6 +14,7 @@ from app.schemas.issue import IssueCreate
 from app.models.issue import Issue
 from app.models.project import Project
 from app.models.user import User
+from app.models.audit_log import AuditLog
 from app.crud.crud_issue import create as create_issue
 from app.crud import crud_audit
 
@@ -86,15 +87,31 @@ async def process_email_source(db: AsyncSession, user: User):
 
         await imap.select("INBOX")
 
+        # Get all processed email Message-IDs from the last 3 days
+        three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
+        log_query = select(AuditLog).where(
+            and_(
+                AuditLog.action.like("email.%"),
+                AuditLog.created_at >= three_days_ago
+            )
+        )
+        log_result = await db.execute(log_query)
+        processed_logs = log_result.scalars().all()
         
-        # Search for UNSEEN emails from last 3 days
+        processed_ids = set()
+        for log in processed_logs:
+            details = log.details or {}
+            m_id = details.get("message_id")
+            if m_id:
+                processed_ids.add(m_id)
+
+        # Search for emails from last 3 days (seen or unseen)
         # Use protocol.execute directly to avoid aioimaplib injecting UTF-8 charset
         # which causes Outlook to respond with BADCHARSET error.
-        three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         date_str = f"{three_days_ago.day:02d}-{months[three_days_ago.month-1]}-{three_days_ago.year}"
         
-        search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), f"UNSEEN SINCE {date_str}"))
+        search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), f"SINCE {date_str}"))
         if search_resp.result != "OK":
             # Fallback: try just UNSEEN
             search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), "UNSEEN"))
@@ -109,12 +126,30 @@ async def process_email_source(db: AsyncSession, user: User):
                     if val.isdigit():
                         msg_ids.append(val)
 
-        
         if msg_ids:
             from email import message_from_bytes
             for msg_id in msg_ids:
+                message_id = None
                 try:
-                    # Use BODY.PEEK[] to fetch without marking as Seen
+                    # Fetch only headers first to check if already processed
+                    _, header_data = await imap.fetch(msg_id, "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT DATE)]")
+                    if not header_data or len(header_data) < 2:
+                        continue
+                    header_bytes = header_data[1] if isinstance(header_data[1], (bytes, bytearray)) else header_data[1].encode(errors='replace')
+                    header_msg = message_from_bytes(header_bytes)
+                    
+                    subject = decode_mime_header(header_msg["Subject"] or "(No Subject)")
+                    message_id = header_msg["Message-ID"]
+                    if not message_id:
+                        message_id = f"fallback:{subject}:{header_msg['Date']}"
+                    else:
+                        message_id = str(message_id).strip()
+
+                    if message_id in processed_ids:
+                        logger.debug(f"Email '{subject}' (Message-ID: {message_id}) already processed by Nimbus, skipping.")
+                        continue
+
+                    # Fetch full body since it is a new email
                     _, data = await imap.fetch(msg_id, "BODY.PEEK[]")
                     if not data or len(data) < 2:
                         continue
@@ -122,7 +157,6 @@ async def process_email_source(db: AsyncSession, user: User):
                     raw_email_bytes = data[1] if isinstance(data[1], (bytes, bytearray)) else data[1].encode(errors='replace')
                     msg = message_from_bytes(raw_email_bytes)
 
-                    subject = decode_mime_header(msg["Subject"] or "(No Subject)")
                     body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
@@ -137,7 +171,6 @@ async def process_email_source(db: AsyncSession, user: User):
                             body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
 
                     # Process with AI
-                    # Process with AI
                     task_data = await email_processor.extract_task(subject, body)
                     if task_data is None:
                         logger.warning(f"AI extraction failed for email '{subject}' (msg_id {msg_id}). Falling back to raw task creation.")
@@ -151,6 +184,13 @@ async def process_email_source(db: AsyncSession, user: User):
                     elif not task_data:
                         # Ad/newsletter filtering (AI returned empty list or dict)
                         await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                        await crud_audit.log_action(
+                            db,
+                            "email.ignored",
+                            user_id=user_id,
+                            details={"email_subject": subject, "message_id": message_id, "reason": "ad_or_newsletter"}
+                        )
+                        processed_ids.add(message_id)
                         continue
 
                     # Sanitize task_data
@@ -223,10 +263,16 @@ async def process_email_source(db: AsyncSession, user: User):
                         user_id, 
                         "issue", 
                         issue.id,
-                        details={"title": issue.title, "email_subject": subject, "source": "automation"}
+                        details={
+                            "title": issue.title, 
+                            "email_subject": subject, 
+                            "source": "automation",
+                            "message_id": message_id
+                        }
                     )
                     
                     logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue.title}")
+                    processed_ids.add(message_id)
 
                 except Exception as email_err:
                     logger.error(f"Failed to process email msg_id {msg_id} for user {email_address}: {email_err}", exc_info=True)
@@ -238,7 +284,7 @@ async def process_email_source(db: AsyncSession, user: User):
                             db,
                             "email.task_creation_failed",
                             user_id=user_id,
-                            details={"msg_id": msg_id, "error": str(email_err)}
+                            details={"msg_id": msg_id, "message_id": message_id, "error": str(email_err)}
                         )
                     except Exception as audit_err:
                         logger.error(f"Failed to write failure audit log for {email_address}: {audit_err}")
@@ -250,6 +296,9 @@ async def process_email_source(db: AsyncSession, user: User):
                         logger.info(f"Marked email msg_id {msg_id} as seen to prevent queue lockup.")
                     except Exception as imap_err:
                         logger.error(f"Failed to mark email msg_id {msg_id} as seen: {imap_err}")
+
+                    if message_id:
+                        processed_ids.add(message_id)
 
         await imap.logout()
 

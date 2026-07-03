@@ -38,7 +38,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 *   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project.
 *   **Intelligent Extraction:** AI identifies and extracts a structured task from a single email, creating a new issue for it.
 *   **Resilient Fallback:** If AI extraction fails or returns malformed data, Nimbus automatically creates a "Raw" task from the email subject and body to ensure zero data loss.
-*   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for new unseen emails every minute.
+*   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for emails since the last 3 days every minute, checking for unique Message-IDs in database audit logs to process new emails regardless of their read status.
 
 ### 2.4 AI-Native Core (Local MLX + Llama 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.

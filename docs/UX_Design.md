@@ -102,7 +102,7 @@ Consistent across Board, List, and Calendar:
 
 ### 5.2 "Email to Task" (Automatic)
 1. User enables **"Email Automation"** in User Settings.
-2. System polls the inbox every minute for new unseen emails from the last 3 days.
+2. System polls the inbox every minute for emails from the last 3 days, filtering out already processed ones using unique Message-IDs.
 3. AI processes each email → creates a task in the **General** project, assigned to the user.
 
 
