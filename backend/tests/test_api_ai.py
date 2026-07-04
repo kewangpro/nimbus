@@ -37,6 +37,19 @@ async def test_ai_schedule_endpoint(
         # We check for >= 3 to ensure the core tasks are handled, 
         # allowing for slight variations in total count due to the redistribution logic.
         assert data["scheduled_count"] >= 3
+        
+        # Verify that audit logs were written
+        audit_res = await client.get("/api/v1/audit-logs/", headers=normal_user_token_headers)
+        assert audit_res.status_code == 200
+        audit_data = audit_res.json()
+        
+        # Check if we have logs with via = ai_scheduler
+        ai_logs = [log for log in audit_data if log["action"] == "issue.update" and log["details"].get("via") == "ai_scheduler"]
+        assert len(ai_logs) > 0
+        assert ai_logs[0]["details"]["via"] == "ai_scheduler"
+        assert "changes" in ai_logs[0]["details"]
+        assert "due_date" in ai_logs[0]["details"]["changes"]
+
 @pytest.mark.asyncio
 async def test_ai_schedule_priority_sorting(
     client: AsyncClient, normal_user_token_headers: dict, db: AsyncSession
