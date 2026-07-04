@@ -291,19 +291,20 @@ async def auto_schedule(
 
                 issue_obj = await crud_issue.get(db, id=issue_id)
                 if issue_obj:
-                    await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
-                    await crud_audit.log_action(
-                        db,
-                        action="issue.update",
-                        user_id=current_user.id,
-                        entity_type="issue",
-                        entity_id=issue_obj.id,
-                        details={
-                            "title": issue_obj.title,
-                            "changes": ["due_date"],
-                            "via": "ai_scheduler",
-                        },
-                    )
+                    if issue_obj.due_date != due_date:
+                        await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
+                        await crud_audit.log_action(
+                            db,
+                            action="issue.update",
+                            user_id=current_user.id,
+                            entity_type="issue",
+                            entity_id=issue_obj.id,
+                            details={
+                                "title": issue_obj.title,
+                                "changes": ["due_date"],
+                                "via": "ai_scheduler",
+                            },
+                        )
                     day_counts[day_num] += 1
                     total_updated += 1
             except Exception: continue
@@ -320,19 +321,20 @@ async def auto_schedule(
                     due_date = datetime.combine(due_day, time.min, tzinfo=tz)
                     issue_obj = await crud_issue.get(db, id=issue_id)
                     if issue_obj:
-                        await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
-                        await crud_audit.log_action(
-                            db,
-                            action="issue.update",
-                            user_id=current_user.id,
-                            entity_type="issue",
-                            entity_id=issue_obj.id,
-                            details={
-                                "title": issue_obj.title,
-                                "changes": ["due_date"],
-                                "via": "ai_scheduler",
-                            },
-                        )
+                        if issue_obj.due_date != due_date:
+                            await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
+                            await crud_audit.log_action(
+                                db,
+                                action="issue.update",
+                                user_id=current_user.id,
+                                entity_type="issue",
+                                entity_id=issue_obj.id,
+                                details={
+                                    "title": issue_obj.title,
+                                    "changes": ["due_date"],
+                                    "via": "ai_scheduler",
+                                },
+                            )
                         day_counts[day_num] += 1
                         total_updated += 1
                 except Exception: continue
