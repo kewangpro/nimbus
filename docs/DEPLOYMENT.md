@@ -168,4 +168,5 @@ make stop
 ### Resilience
 - **Worker Reconnection:** The background worker includes automatic reconnection logic. If Redis or the database becomes temporarily unavailable, the worker will enter a retry loop (5-10s delay) rather than exiting.
 - **Worker Crash Recovery:** The worker target in the `Makefile` is run inside an auto-restart loop. If the Python process is aborted or terminated (e.g., due to local GPU memory exceptions), it will automatically restart after 5 seconds to resume processing.
+- **Worker Timeout Safety:** To prevent the background worker from hanging indefinitely due to half-closed sockets or un-timed-out connections (e.g., when the IMAP server drops the connection silently), long-running jobs like email polling are wrapped in a 120-second timeout. If the job times out, it is aborted and logged, freeing the worker to process other queued tasks.
 - **Job Idempotency:** Scheduled jobs (like email polling) use a Redis-based idempotency check. New jobs are only enqueued if a job of the same type isn't already pending, preventing task accumulation during infrastructure downtime.

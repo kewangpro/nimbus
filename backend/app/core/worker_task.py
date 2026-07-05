@@ -51,8 +51,12 @@ async def _process_job(raw: str) -> None:
 
     if job_type == JOB_POLL_EMAILS:
         async with AsyncSessionLocal() as db:
-            await poll_emails(db)
-        logger.info("Email polling completed.")
+            try:
+                # Wrap email polling in wait_for to prevent aioimaplib from hanging indefinitely on dead connections
+                await asyncio.wait_for(poll_emails(db), timeout=120)
+                logger.info("Email polling completed.")
+            except asyncio.TimeoutError:
+                logger.error("Email polling timed out after 120 seconds.")
         return
 
     logger.warning(f"Unknown job type: {job_type}")
