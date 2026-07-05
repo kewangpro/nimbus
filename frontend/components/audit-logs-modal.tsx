@@ -27,7 +27,8 @@ import {
     MailCheck, 
     Paperclip,
     HelpCircle,
-    Sparkles
+    Sparkles,
+    AlertCircle
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { AuditLog } from "@/types"
@@ -47,6 +48,7 @@ const ACTION_CONFIG: Record<string, { label: string, icon: any, color: string }>
     "email.task_created_manual": { label: "Manual-Task (Email)", icon: MailCheck, color: "text-sky-500" },
     "file.upload": { label: "File Uploaded", icon: Paperclip, color: "text-teal-500" },
     "ai_schedule": { label: "AI Schedule", icon: Sparkles, color: "text-purple-500" },
+    "email.task_creation_failed": { label: "Auto-Task Failed", icon: AlertCircle, color: "text-red-500" },
 }
 
 function getActionInfo(log: AuditLog) {
@@ -87,6 +89,9 @@ function getLogDetailSummary(log: AuditLog) {
     }
     if (log.action === "issue.backfill") {
         parts.push(`Job ID: ${log.details.job_id?.split('-')[0]}...`)
+    }
+    if (log.action === "email.task_creation_failed") {
+        if (log.details.error) parts.push(`Error: ${log.details.error}`)
     }
 
     // 3. Highlight changes
