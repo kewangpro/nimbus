@@ -230,7 +230,13 @@ async def process_email_source(db: AsyncSession, user: User):
                             for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
                                 try:
                                     parsed_due_date = datetime.strptime(due_date_val, fmt)
-                                    parsed_due_date = parsed_due_date.replace(tzinfo=timezone.utc)
+                                    user_tz_str = getattr(user, "timezone", "UTC")
+                                    try:
+                                        from zoneinfo import ZoneInfo
+                                        tz = ZoneInfo(user_tz_str)
+                                    except Exception:
+                                        tz = timezone.utc
+                                    parsed_due_date = parsed_due_date.replace(tzinfo=tz)
                                     break
                                 except ValueError:
                                     continue
