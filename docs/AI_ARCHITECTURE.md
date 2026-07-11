@@ -108,6 +108,7 @@ CREATE TABLE issue_links (
 *   **Input:** Email `subject` + `body` snippet.
 *   **Output:** A structured task with `title`, `description`, `priority`, and optional `due_date`.
 *   **Prompting Strategy:** Uses an advanced system prompt with explicit **negative constraints** (ignore boilerplate, marketing footers, "Unsubscribe" links) and **few-shot examples** of both actionable tasks and non-actionable advertisements (which should return `{}`).
+*   **Due Date Extraction Policy:** To prevent tasks from being created as already-overdue, the system enforces a strict policy for `due_date`. A due date is ONLY suggested if there is a clear, explicit actionable deadline mentioned in the email (e.g., "submit by July 15", "due next Tuesday"). General dates like newsletter publication dates, sent dates, or chronological references in updates are ignored and mapped to `null` (unscheduled).
 *   **Parsing Resilience:**
     *   **Level 1:** Standard JSON parse after pre-cleaning (removing markdown code blocks and trailing comments).
     *   **Level 2:** Fallback to `ast.literal_eval` to handle AI-generated "JSON" that uses single quotes.

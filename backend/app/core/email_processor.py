@@ -16,7 +16,7 @@ class EmailProcessor:
             "- 'title': concise summary\n"
             "- 'description': detailed explanation\n"
             "- 'priority': 'low', 'medium', 'high', or 'urgent'\n"
-            "- 'due_date': 'YYYY-MM-DD' or null"
+            "- 'due_date': 'YYYY-MM-DD' or null. ONLY suggest a due date if there is a clear, explicit actionable deadline mentioned in the email (e.g., 'submit by July 15', 'due next Tuesday'). DO NOT use the email's publication date, sent date, or general calendar dates mentioned in newsletters/updates as a due date. If no explicit deadline is mentioned, return null."
         )
 
     async def extract_task(self, subject: str, body: str) -> Optional[Dict[str, Any]]:
