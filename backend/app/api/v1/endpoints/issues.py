@@ -29,7 +29,7 @@ async def backfill_embeddings(
 async def read_issues(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000,
     project_id: Optional[UUID] = None,
     assignee_id: Optional[UUID] = None,
     status: Optional[IssueStatus] = None,
