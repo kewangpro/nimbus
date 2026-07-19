@@ -181,27 +181,27 @@ async def auto_schedule(
         x.created_at or datetime.min.replace(tzinfo=timezone.utc)
     ))
     
-    # Generate next 5 weekdays in user's timezone
-    next_5_weekdays = []
+    # Generate next 10 weekdays in user's timezone
+    next_10_weekdays = []
     # today variable is already defined as now_in_tz.date()
     current_date = today
-    while len(next_5_weekdays) < 5:
+    while len(next_10_weekdays) < 10:
         if current_date.weekday() < 5: # 0-4 are Mon-Fri
-            next_5_weekdays.append(current_date.strftime("%Y-%m-%d"))
+            next_10_weekdays.append(current_date.strftime("%Y-%m-%d"))
         current_date += timedelta(days=1)
 
     # 2. Process in batches with Enforced Balancing
     batch_size = 20
     total_updated = 0
     
-    # Track task counts per day for global balancing (Day 1-5)
-    day_counts = {str(i+1): 0 for i in range(5)}
+    # Track task counts per day for global balancing (Day 1-10)
+    day_counts = {str(i+1): 0 for i in range(10)}
     
-    # Map Day 1-5 to dates
-    day_map = {str(i+1): d for i, d in enumerate(next_5_weekdays)}
+    # Map Day 1-10 to dates
+    day_map = {str(i+1): d for i, d in enumerate(next_10_weekdays)}
     
     # Strict quota: No day should have significantly more than average
-    ideal_per_day = len(schedulable_issues) // 5
+    ideal_per_day = len(schedulable_issues) // 10
     max_hard_limit = ideal_per_day + 3 # Allow slight flexibility for priorities
 
     for i in range(0, len(schedulable_issues), batch_size):
@@ -221,15 +221,20 @@ async def auto_schedule(
         {counts_summary}
         (Target: ~{ideal_per_day} per day)
         
-        ### THE ONLY 5 ALLOWED BUCKETS ###
-        1 ({next_5_weekdays[0]})
-        2 ({next_5_weekdays[1]})
-        3 ({next_5_weekdays[2]})
-        4 ({next_5_weekdays[3]})
-        5 ({next_5_weekdays[4]})
+        ### THE ONLY 10 ALLOWED BUCKETS ###
+        1 ({next_10_weekdays[0]})
+        2 ({next_10_weekdays[1]})
+        3 ({next_10_weekdays[2]})
+        4 ({next_10_weekdays[3]})
+        5 ({next_10_weekdays[4]})
+        6 ({next_10_weekdays[5]})
+        7 ({next_10_weekdays[6]})
+        8 ({next_10_weekdays[7]})
+        9 ({next_10_weekdays[8]})
+        10 ({next_10_weekdays[9]})
         
         ### INSTRUCTIONS ###
-        1. FILL LIGHT DAYS: Day 1-5 must be roughly equal. Fill the days with fewer tasks first.
+        1. FILL LIGHT DAYS: Day 1-10 must be roughly equal. Fill the days with fewer tasks first.
         2. NO OVERLOADING: Do not put tasks on a day that already has {max_hard_limit} tasks if possible.
         3. PRIORITY: 'URGENT' tasks MUST go in Day 1 or 2.
         
@@ -240,7 +245,7 @@ async def auto_schedule(
         Respond ONLY with a JSON array: [{{"index": 0, "day_number": 1}}, ...]
         """
         
-        system_message = "You are a task balancer. Distribute tasks across buckets 1-5 to ensure even workload."
+        system_message = "You are a task balancer. Distribute tasks across buckets 1-10 to ensure even workload."
         response = await ai.generate_completion(prompt, system_prompt=system_message)
         
         batch_data = []
@@ -269,7 +274,7 @@ async def auto_schedule(
             try:
                 d_int = int(day_num_raw)
                 if d_int < 1: d_int = 1
-                if d_int > 5: d_int = 5
+                if d_int > 10: d_int = 10
                 day_num = str(d_int)
             except (ValueError, TypeError):
                 day_num = "1"
@@ -342,7 +347,7 @@ async def auto_schedule(
         await db.commit()
 
     logger.info(f"Successfully balanced {total_updated} issues across the sprint.")
-    return {"scheduled_count": total_updated, "message": f"Successfully balanced {total_updated} tasks across 5 days."}
+    return {"scheduled_count": total_updated, "message": f"Successfully balanced {total_updated} tasks across 10 days."}
 
 @router.post("/plan", response_model=List[PlannedIssue])
 async def plan_tasks(
@@ -363,15 +368,15 @@ async def plan_tasks(
     now_in_tz = datetime.now(tz)
     today = now_in_tz.date()
     
-    # Generate next 5 weekdays for context
-    next_5_weekdays = []
+    # Generate next 10 weekdays for context
+    next_10_weekdays = []
     current_date = today
-    while len(next_5_weekdays) < 5:
+    while len(next_10_weekdays) < 10:
         if current_date.weekday() < 5: # 0-4 are Mon-Fri
-            next_5_weekdays.append(current_date.strftime("%Y-%m-%d"))
+            next_10_weekdays.append(current_date.strftime("%Y-%m-%d"))
         current_date += timedelta(days=1)
     
-    days_str = ", ".join(next_5_weekdays)
+    days_str = ", ".join(next_10_weekdays)
 
     prompt = f"""
     You are an expert Project Manager. Break down the following user input into distinct, actionable software tasks.

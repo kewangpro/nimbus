@@ -120,10 +120,9 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
         }
     }
 
-    // Calculate dynamic date range
     const days = useMemo(() => {
-        let minDate = todayInTz
-        let maxDate = addDays(todayInTz, 4) // Minimum 5 days
+        let minDate: Date | null = null
+        let maxDate: Date | null = null
 
         issues.forEach(issue => {
             if (!issue.due_date) return
@@ -132,14 +131,31 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
             // Ensure we use the user's timezone when determining which "day" an issue belongs to
             const date = startOfDay(toZoned(issue.due_date))
 
-            if (isBefore(date, minDate)) minDate = date
-            if (isAfter(date, maxDate)) maxDate = date
+            if (!minDate || isBefore(date, minDate)) minDate = date
+            if (!maxDate || isAfter(date, maxDate)) maxDate = date
         })
+
+        let start = todayInTz
+        let end = addDays(todayInTz, 4)
+
+        if (minDate && maxDate) {
+            // Check if today is close to the scheduled dates (within 45 days)
+            const diffFromToday = Math.abs(minDate.getTime() - todayInTz.getTime()) / (1000 * 60 * 60 * 24)
+            if (diffFromToday < 45) {
+                // Today is close, merge today and issues range normally
+                start = isBefore(todayInTz, minDate) ? todayInTz : minDate
+                end = isAfter(addDays(todayInTz, 4), maxDate) ? addDays(todayInTz, 4) : maxDate
+            } else {
+                // Today is extremely far (e.g., mock clock mismatch), ignore today to prevent rendering a giant calendar
+                start = minDate
+                end = maxDate
+            }
+        }
 
         // Generate range
         const dayList = []
-        let current = minDate
-        while (current <= maxDate) {
+        let current = start
+        while (current <= end) {
             // Filter weekends if toggle is off
             const isWeekend = current.getDay() === 0 || current.getDay() === 6
             if (showWeekends || !isWeekend) {
