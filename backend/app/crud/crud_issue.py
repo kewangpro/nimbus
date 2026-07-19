@@ -4,7 +4,7 @@ import hashlib
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from app.models.issue import Issue
 from app.schemas.issue import IssueCreate, IssueUpdate
 from app.core import ai
@@ -72,14 +72,29 @@ async def get_multi(
             )
         )
     if search_query:
-        from sqlalchemy import or_
-        search_filter = f"%{search_query}%"
-        query = query.where(
-            or_(
-                Issue.title.ilike(search_filter),
-                Issue.description.ilike(search_filter)
+        words = [w.strip() for w in search_query.split() if w.strip()]
+        stop_words = {"and", "or", "the", "a", "an", "in", "on", "at", "to", "for", "with", "by", "of", "&"}
+        search_words = [w for w in words if w.lower() not in stop_words]
+        
+        if search_words:
+            word_filters = []
+            for word in search_words:
+                word_filter = f"%{word}%"
+                word_filters.append(
+                    or_(
+                        Issue.title.ilike(word_filter),
+                        Issue.description.ilike(word_filter)
+                    )
+                )
+            query = query.where(and_(*word_filters))
+        else:
+            search_filter = f"%{search_query}%"
+            query = query.where(
+                or_(
+                    Issue.title.ilike(search_filter),
+                    Issue.description.ilike(search_filter)
+                )
             )
-        )
         
     query = query.order_by(Issue.created_at.desc()).offset(skip).limit(limit)
         
