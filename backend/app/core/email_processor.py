@@ -10,9 +10,8 @@ class EmailProcessor:
     def __init__(self):
         self.base_system_prompt = (
             "You are an AI assistant for Nimbus, a project management tool.\n"
-            "Convert the following email into a structured task.\n"
-            "Extract a clear title, a detailed description, a priority, and a suggested due date if mentioned.\n\n"
-            "Respond ONLY with a single JSON object with these keys:\n"
+            "Your first job is to filter the email. If the email is a general newsletter, marketing email, advertisement, promotional offer, automated system notification, receipt, or does not contain personal actionable work items or direct requests for the user, you MUST ignore it by returning an empty JSON object {}.\n\n"
+            "For emails that DO contain personal actionable requests or tasks for the user, convert them into a structured task and respond ONLY with a single JSON object containing these keys:\n"
             "- 'title': concise summary\n"
             "- 'description': detailed explanation\n"
             "- 'priority': 'low', 'medium', 'high', or 'urgent'\n"

@@ -73,6 +73,7 @@ class QueryResponse(BaseModel):
     priority: Optional[IssuePriority] = None
     overdue: Optional[bool] = None
     unscheduled: Optional[bool] = None
+    search_query: Optional[str] = None
 
 class ClientUpdateRequest(BaseModel):
     project_id: Optional[UUID] = None
@@ -710,6 +711,7 @@ async def ai_query_to_filters(
     - priority: one of LOW, MEDIUM, HIGH, URGENT or null
     - overdue: true/false or null
     - unscheduled: true/false or null
+    - search_query: string representing keywords to search for in titles/descriptions, or null. If the user mentions a specific task topic, project keywords, or title, extract it here.
 
     Examples:
     - "urgent items" -> {{ "priority": "URGENT" }}
@@ -717,6 +719,8 @@ async def ai_query_to_filters(
     - "done tasks" -> {{ "status": "DONE" }}
     - "unscheduled work" -> {{ "unscheduled": true }}
     - "urgent for Alice" -> {{ "priority": "URGENT", "assignee_id": "<alice_id>" }}
+    - "Jira integration tasks" -> {{ "search_query": "Jira integration" }}
+    - "find ChatGPT task" -> {{ "search_query": "ChatGPT" }}
 
     Projects:
     {projects_text}
@@ -749,6 +753,7 @@ async def ai_query_to_filters(
     priority = _normalize_enum(data.get("priority"), IssuePriority)
     overdue = data.get("overdue")
     unscheduled = data.get("unscheduled")
+    search_query = data.get("search_query")
 
     if status in [IssueStatus.DONE, IssueStatus.CANCELED]:
         overdue = None
@@ -764,6 +769,7 @@ async def ai_query_to_filters(
         "priority": priority,
         "overdue": overdue if isinstance(overdue, bool) else None,
         "unscheduled": unscheduled if isinstance(unscheduled, bool) else None,
+        "search_query": search_query,
     }
 
 @router.post("/client-update", response_model=ClientUpdateResponse)

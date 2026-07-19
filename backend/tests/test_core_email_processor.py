@@ -115,3 +115,13 @@ async def test_extract_task_empty_list(mock_ai_generate) -> None:
     
     task = await email_processor.extract_task("Subject", "Body")
     assert task == {}
+
+
+@pytest.mark.asyncio
+@patch("app.core.ai.generate_completion", new_callable=AsyncMock)
+async def test_extract_task_ignored_ad_or_newsletter(mock_ai_generate) -> None:
+    # Test empty dict response indicating ignored newsletter
+    mock_ai_generate.return_value = "{}"
+    
+    task = await email_processor.extract_task("Subject", "Body")
+    assert task == {}

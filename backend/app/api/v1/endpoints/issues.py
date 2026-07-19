@@ -36,6 +36,7 @@ async def read_issues(
     priority: Optional[IssuePriority] = None,
     overdue: Optional[bool] = None,
     unscheduled: Optional[bool] = None,
+    search_query: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
@@ -56,6 +57,7 @@ async def read_issues(
         priority=priority.value if priority else None,
         overdue=overdue,
         unscheduled=unscheduled,
+        search_query=search_query,
     )
     return issues
 

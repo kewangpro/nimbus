@@ -37,6 +37,7 @@ async def get_multi(
     priority: Optional[str] = None,
     overdue: Optional[bool] = None,
     unscheduled: Optional[bool] = None,
+    search_query: Optional[str] = None,
 ) -> List[Issue]:
     query = select(Issue).options(
         joinedload(Issue.project),
@@ -68,6 +69,15 @@ async def get_multi(
             and_(
                 Issue.due_date.is_(None),
                 Issue.status.notin_(["done", "canceled"]),
+            )
+        )
+    if search_query:
+        from sqlalchemy import or_
+        search_filter = f"%{search_query}%"
+        query = query.where(
+            or_(
+                Issue.title.ilike(search_filter),
+                Issue.description.ilike(search_filter)
             )
         )
         
