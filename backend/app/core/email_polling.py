@@ -87,12 +87,12 @@ async def process_email_source(db: AsyncSession, user: User):
 
         await imap.select("INBOX")
 
-        # Get all processed email Message-IDs from the last 3 days
-        three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
+        # Get all processed email Message-IDs from the last 14 days to prevent boundary duplicates
+        fourteen_days_ago = datetime.now(timezone.utc) - timedelta(days=14)
         log_query = select(AuditLog).where(
             and_(
                 AuditLog.action.like("email.%"),
-                AuditLog.created_at >= three_days_ago
+                AuditLog.created_at >= fourteen_days_ago
             )
         )
         log_result = await db.execute(log_query)
@@ -108,6 +108,7 @@ async def process_email_source(db: AsyncSession, user: User):
         # Search for emails from last 3 days (seen or unseen)
         # Use protocol.execute directly to avoid aioimaplib injecting UTF-8 charset
         # which causes Outlook to respond with BADCHARSET error.
+        three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         date_str = f"{three_days_ago.day:02d}-{months[three_days_ago.month-1]}-{three_days_ago.year}"
         
