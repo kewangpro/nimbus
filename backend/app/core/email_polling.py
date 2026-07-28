@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import aioimaplib
 import logging
@@ -150,6 +151,12 @@ async def process_email_source(db: AsyncSession, user: User):
                         logger.debug(f"Email '{subject}' (Message-ID: {message_id}) already processed by Nimbus, skipping.")
                         continue
 
+                    # Mark email as seen immediately to prevent retry queue lockup if download/processing fails
+                    try:
+                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                    except Exception as seen_err:
+                        logger.error(f"Failed to mark msg_id {msg_id} as seen early: {seen_err}")
+
                     # Fetch full body since it is a new email
                     _, data = await imap.fetch(msg_id, "BODY.PEEK[]")
                     if not data or len(data) < 2:
@@ -184,7 +191,6 @@ async def process_email_source(db: AsyncSession, user: User):
                         }
                     elif not task_data:
                         # Ad/newsletter filtering (AI returned empty list or dict)
-                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
                         await crud_audit.log_action(
                             db,
                             "email.ignored",
@@ -260,9 +266,6 @@ async def process_email_source(db: AsyncSession, user: User):
 
                     issue = await create_issue(db, obj_in=issue_in, owner_id=user_id)
                     
-                    # Explicitly mark as seen only after DB commit
-                    await imap.store(msg_id, "+FLAGS", "(\\Seen)")
-                    
                     # Audit log for automated email task creation
                     await crud_audit.log_action(
                         db, 
@@ -297,17 +300,15 @@ async def process_email_source(db: AsyncSession, user: User):
                         logger.error(f"Failed to write failure audit log for {email_address}: {audit_err}")
                         await db.rollback()
                     
-                    try:
-                        # Ensure we mark the email as Seen to prevent it from blocking the queue
-                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
-                        logger.info(f"Marked email msg_id {msg_id} as seen to prevent queue lockup.")
-                    except Exception as imap_err:
-                        logger.error(f"Failed to mark email msg_id {msg_id} as seen: {imap_err}")
+                    pass
 
                     if message_id:
                         processed_ids.add(message_id)
 
-        await imap.logout()
+        try:
+            await asyncio.wait_for(imap.logout(), timeout=5.0)
+        except Exception as logout_err:
+            logger.warning(f"IMAP logout timed out or failed: {logout_err}")
 
     except Exception as e:
         logger.exception(f"Error processing emails for {email_address}")
