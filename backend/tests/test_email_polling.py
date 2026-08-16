@@ -224,3 +224,40 @@ async def test_poll_emails_exception_marks_seen(db: AsyncSession):
     log_entry = res.scalars().first()
     assert log_entry is not None
     assert "Simulated DB failure" in log_entry.details.get("error", "")
+
+
+@pytest.mark.asyncio
+async def test_poll_emails_aborts_loop_on_command_timeout(db: AsyncSession):
+    from aioimaplib import CommandTimeout, Command
+    user = User(
+        email="timeout-test@example.com",
+        full_name="Timeout Tester",
+        oauth_provider="gmail",
+        oauth_access_token="valid-token",
+        oauth_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        email_automation_enabled=True
+    )
+    db.add(user)
+    await db.commit()
+
+    mock_imap = MagicMock()
+    mock_imap.wait_hello_from_server = AsyncMock()
+    mock_imap.protocol = MagicMock()
+    mock_imap.protocol.new_tag = MagicMock(return_value="A1")
+    mock_imap.protocol.execute = AsyncMock(side_effect=[
+        MagicMock(result="OK"),
+        make_search_response(["101", "102", "103", "104"]),
+    ])
+    mock_imap.select = AsyncMock()
+    # Raise CommandTimeout on the first fetch
+    cmd = Command("FETCH", "LHCE1", "101", "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT DATE)]")
+    mock_imap.fetch = AsyncMock(side_effect=CommandTimeout(cmd))
+    mock_imap.logout = AsyncMock()
+
+    with patch("aioimaplib.IMAP4_SSL", return_value=mock_imap):
+        await poll_emails(db)
+
+    # Verify fetch was called only ONCE for "101" and then aborted without calling 102, 103, 104
+    assert mock_imap.fetch.call_count == 1
+    mock_imap.fetch.assert_called_once_with("101", "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT DATE)]")
+

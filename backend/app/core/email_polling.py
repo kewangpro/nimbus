@@ -3,7 +3,7 @@ import base64
 import aioimaplib
 import logging
 from email.header import decode_header, make_header
-from aioimaplib import Command
+from aioimaplib import Command, AioImapException, CommandTimeout
 import httpx
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional
@@ -65,9 +65,9 @@ async def process_email_source(db: AsyncSession, user: User):
         if not token:
             return
 
-        # Connect to provider
+        # Connect to provider with increased timeout (30 seconds)
         host = "imap.gmail.com" if provider == "gmail" else "outlook.office365.com"
-        imap = aioimaplib.IMAP4_SSL(host=host)
+        imap = aioimaplib.IMAP4_SSL(host=host, timeout=30.0)
         await imap.wait_hello_from_server()
         
         # XOAUTH2 Authentication
@@ -134,8 +134,8 @@ async def process_email_source(db: AsyncSession, user: User):
                 message_id = None
                 try:
                     # Fetch only headers first to check if already processed
-                    _, header_data = await imap.fetch(msg_id, "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT DATE)]")
-                    if not header_data or len(header_data) < 2:
+                    fetch_res, header_data = await imap.fetch(msg_id, "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT DATE)]")
+                    if fetch_res != "OK" or not header_data or len(header_data) < 2:
                         continue
                     header_bytes = header_data[1] if isinstance(header_data[1], (bytes, bytearray)) else header_data[1].encode(errors='replace')
                     header_msg = message_from_bytes(header_bytes)
@@ -300,10 +300,13 @@ async def process_email_source(db: AsyncSession, user: User):
                         logger.error(f"Failed to write failure audit log for {email_address}: {audit_err}")
                         await db.rollback()
                     
-                    pass
-
                     if message_id:
                         processed_ids.add(message_id)
+
+                    # Abort remaining batch poll if IMAP connection or command timed out to prevent cascading failures
+                    if isinstance(email_err, (AioImapException, CommandTimeout, asyncio.TimeoutError, ConnectionError, OSError)):
+                        logger.warning(f"IMAP connection/timeout failure ({email_err}) for user {email_address}. Aborting remaining batch email poll.")
+                        break
 
         try:
             await asyncio.wait_for(imap.logout(), timeout=5.0)

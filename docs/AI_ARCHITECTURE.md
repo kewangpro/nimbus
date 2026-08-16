@@ -126,6 +126,7 @@ CREATE TABLE issue_links (
 ### IMAP Connection
 *   **Library:** `aioimaplib` (async IMAP client).
 *   **Auth:** XOAUTH2 using the user's SSO `oauth_access_token`.
+*   **Timeout & Fault Tolerance:** Configured with a 30.0s command timeout (`IMAP4_SSL(timeout=30.0)`). If an IMAP socket timeout (`CommandTimeout`) or network error occurs during a batch poll, the polling loop aborts immediately to avoid repeating 10s timeout delays across remaining queued messages.
 *   **Token Refresh:** Tokens are checked before every IMAP connection. If expired (within 5 minutes), they are refreshed automatically via the provider's token endpoint.
 
 ### IMAP Search (Outlook Compatibility)

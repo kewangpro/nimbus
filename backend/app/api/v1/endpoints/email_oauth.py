@@ -47,7 +47,7 @@ async def _get_full_email_body(db: AsyncSession, user: User, msg_id: str) -> Opt
     from aioimaplib import Command
 
     try:
-        imap = aioimaplib.IMAP4_SSL(host=host)
+        imap = aioimaplib.IMAP4_SSL(host=host, timeout=30.0)
         await imap.wait_hello_from_server()
         auth_string = generate_xoauth2_string(user.email, token)
         response = await imap.protocol.execute(Command("AUTHENTICATE", imap.protocol.new_tag(), "XOAUTH2", auth_string))
@@ -111,7 +111,7 @@ async def get_inbox(
     from email import message_from_bytes
     
     try:
-        imap = aioimaplib.IMAP4_SSL(host=host)
+        imap = aioimaplib.IMAP4_SSL(host=host, timeout=30.0)
         await imap.wait_hello_from_server()
         auth_string = generate_xoauth2_string(current_user.email, token)
         response = await imap.protocol.execute(Command("AUTHENTICATE", imap.protocol.new_tag(), "XOAUTH2", auth_string))
