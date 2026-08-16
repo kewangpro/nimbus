@@ -49,6 +49,7 @@ const ACTION_CONFIG: Record<string, { label: string, icon: any, color: string }>
     "file.upload": { label: "File Uploaded", icon: Paperclip, color: "text-teal-500" },
     "ai_schedule": { label: "AI Schedule", icon: Sparkles, color: "text-purple-500" },
     "email.task_creation_failed": { label: "Auto-Task Failed", icon: AlertCircle, color: "text-red-500" },
+    "email.ignored": { label: "Email Ignored (Non-Task)", icon: Mail, color: "text-muted-foreground" },
 }
 
 function getActionInfo(log: AuditLog) {
@@ -78,7 +79,7 @@ function getLogDetailSummary(log: AuditLog) {
     }
 
     // 2. Capture specific snippets
-    if (log.action === "email.task_created" || log.action === "email.task_created_manual") {
+    if (log.action === "email.task_created" || log.action === "email.task_created_manual" || log.action === "email.ignored") {
         if (log.details.email_subject) parts.push(`Subject: ${log.details.email_subject}`)
     }
     if (log.action === "file.upload") {
