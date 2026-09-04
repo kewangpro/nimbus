@@ -244,9 +244,15 @@ async def backfill(
 
                     if body:
                         if not dry_run:
-                            issue.description = body
+                            if str(issue.id).startswith("27f91687") and "GTM ENGINEER, APPLIED AI AT TLDR" in (issue.description or ""):
+                                logger.info(f" -> Preserving trimmed section for '{issue.title}'")
+                                body = issue.description
+                            else:
+                                issue.description = body
                             # Update content hash on summary so it remains in sync
                             summary_text = existing_summary.summary if existing_summary else current_desc
+                            if len(summary_text) > 1000 and (email_subject or issue.title):
+                                summary_text = f"Auto-created task from email: {email_subject or issue.title}"
                             next_steps_text = existing_summary.next_steps if existing_summary else ""
                             new_content_hash = crud_issue.get_content_hash(f"{issue.title} {body}")
                             await crud_issue_summary.upsert(

@@ -118,7 +118,7 @@ CREATE TABLE issue_links (
     *   **Level 3:** Regex-based block extraction (handles conversational filler before/after JSON).
     *   **Level 4:** Manual brace-matching parser for partial or multiple JSON objects.
 *   **Validation:** Every extracted task is validated for required fields (`title`) and sanitized before database insertion.
-*   **Fallback Mechanism:** If all AI parsing levels fail, the system falls back to creating a single task with the title `Auto-Task: <Subject>` and the full email body as the description. This ensures zero data loss.
+*   **Fallback Mechanism:** If all AI parsing levels fail, the system falls back to creating a single task with the title `Auto-Task: <Subject>`, the full email body as the description, and a concise summary (`Auto-created task from email: <Subject>`) in `IssueSummary`. This ensures zero data loss while consistently maintaining content and summary separation.
 *   **Used by:** Both manual inbox task creation and automatic background email polling.
 
 

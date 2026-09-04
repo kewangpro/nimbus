@@ -175,7 +175,7 @@ async def process_email_source(db: AsyncSession, user: User):
                         # Fallback: create a single task from the email subject/body
                         task_data = {
                             "title": f"Auto-Task: {subject}",
-                            "description": body,
+                            "summary": f"Auto-created task from email: {subject}",
                             "priority": "medium",
                             "due_date": None
                         }
@@ -202,7 +202,15 @@ async def process_email_source(db: AsyncSession, user: User):
                     title_val = title_val.strip()
 
                     # Summary from AI
-                    raw_summary = task_data.get("summary") or task_data.get("description")
+                    raw_summary = task_data.get("summary")
+                    if not raw_summary and task_data.get("description"):
+                        candidate = task_data.get("description")
+                        if isinstance(candidate, list):
+                            raw_summary = candidate
+                        elif isinstance(candidate, str) and candidate.strip() != body.strip():
+                            raw_summary = candidate
+                        elif not raw_summary:
+                            raw_summary = f"Auto-created task from email: {subject}"
                     if isinstance(raw_summary, list):
                         summary_val = "\n".join(str(item) for item in raw_summary)
                     elif raw_summary is not None:

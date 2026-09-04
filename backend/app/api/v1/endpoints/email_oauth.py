@@ -214,7 +214,15 @@ async def create_task_from_email(
     if due_date_val == "null":
         due_date_val = None
 
-    raw_summary = task_data.get("summary") or task_data.get("description")
+    raw_summary = task_data.get("summary")
+    if not raw_summary and task_data.get("description"):
+        candidate = task_data.get("description")
+        if isinstance(candidate, list):
+            raw_summary = candidate
+        elif isinstance(candidate, str) and candidate.strip() != body_to_process.strip():
+            raw_summary = candidate
+        elif not raw_summary:
+            raw_summary = f"Auto-created from email: {subject}"
     if isinstance(raw_summary, list):
         summary_val = "\n".join(str(item) for item in raw_summary)
     elif raw_summary is not None:
@@ -318,7 +326,15 @@ async def create_tasks_bulk(
             if due_date_val == "null":
                 due_date_val = None
 
-            raw_summary = task_data.get("summary") or task_data.get("description")
+            raw_summary = task_data.get("summary")
+            if not raw_summary and task_data.get("description"):
+                candidate = task_data.get("description")
+                if isinstance(candidate, list):
+                    raw_summary = candidate
+                elif isinstance(candidate, str) and candidate.strip() != body_to_process.strip():
+                    raw_summary = candidate
+                elif not raw_summary:
+                    raw_summary = f"Auto-created from email: {subject}"
             if isinstance(raw_summary, list):
                 summary_val = "\n".join(str(item) for item in raw_summary)
             elif raw_summary is not None:
