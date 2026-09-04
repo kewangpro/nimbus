@@ -107,8 +107,8 @@ CREATE TABLE issue_links (
 ### 4.10 Email Task Extraction
 *   **Input:** Email `subject` + `body` snippet.
 *   **Output:** A structured task containing `title`, `summary`, `priority`, and optional `due_date`.
-*   **Content Separation:**
-    *   **Task Description:** Stores the original raw email content/body to preserve full email context.
+*   **Content Separation & Sanitization:**
+    *   **Task Description:** Stores the original email body to preserve full email context. All emails pass through `app.core.email_utils.extract_email_body_from_message` to strip `<style>`/`<script>` blocks, normalize whitespace, and detect/recover readable text from emails that dump CSS stylesheets into plain text.
     *   **AI Summary (`IssueSummary`):** Stores the AI-generated concise summary and key takeaways, which is linked to the issue and immediately rendered under the **AI Summary** section in the UI.
 *   **Prompting Strategy:** Uses an advanced system prompt with explicit **negative constraints** (ignore boilerplate, marketing footers, "Unsubscribe" links) and **few-shot examples** of both actionable tasks and non-actionable advertisements (which should return `{}`).
 *   **Due Date Extraction Policy:** To prevent tasks from being created as already-overdue, the system enforces a strict policy for `due_date`. A due date is ONLY suggested if there is a clear, explicit actionable deadline mentioned in the email (e.g., "submit by July 15", "due next Tuesday"). General dates like newsletter publication dates, sent dates, or chronological references in updates are ignored and mapped to `null` (unscheduled).

@@ -118,7 +118,8 @@
 *   [x] Background worker polls every 60 seconds for emails from the last 3 days, using lightweight header-fetching and Message-ID database audit logs to check if they were already processed.
 *   [x] `email_processor.extract_task()` extracts title, summary, priority, and deadline using Gemma 3 via MLX.
 *   [x] Clean content separation: raw email body is saved to `issue.description`, while AI analysis is saved to `IssueSummary` and rendered in the modal's AI Summary section.
-*   [x] Backfill utility (`scripts/backfill_email_tasks.py`) provided to backfill existing email tasks.
+*   [x] HTML/CSS sanitization & CSS dump recovery: `app.core.email_utils` strips `<style>` and `<script>` blocks, normalizes whitespace, and detects/recovers readable text from marketing newsletters.
+*   [x] Backfill utility (`scripts/backfill_email_tasks.py`) supporting `--status <todo|active|done|all>` and `--cutoff-time <yesterday|today|YYYY-MM-DD|relative>` alongside `--summaries-only` and `--fetch-bodies`.
 *   [x] Created tasks are assigned to the inbox owner and placed in their "General" project.
 *   [x] Graceful fallback: if `UNSEEN SINCE <date>` fails, retries with `UNSEEN` only.
 

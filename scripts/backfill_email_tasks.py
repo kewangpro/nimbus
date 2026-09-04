@@ -12,10 +12,13 @@ Usage:
   # 1. Backfill AI summaries into IssueSummary table (Fast, offline, 100% of tasks):
   venv/bin/python scripts/backfill_email_tasks.py --summaries-only
 
-  # 2. Test restoring original email bodies for 5 tasks:
+  # 2. Backfill original email bodies for todo tasks created on or before yesterday:
+  venv/bin/python scripts/backfill_email_tasks.py --fetch-bodies --status todo --cutoff-time yesterday
+
+  # 3. Test restoring original email bodies for 5 tasks:
   venv/bin/python scripts/backfill_email_tasks.py --fetch-bodies --limit 5
 
-  # 3. Full backfill (summaries + original bodies from IMAP):
+  # 4. Full backfill (summaries + original bodies from IMAP for all tasks):
   venv/bin/python scripts/backfill_email_tasks.py --fetch-bodies
 """
 
@@ -27,7 +30,7 @@ import logging
 import re
 from typing import Optional, Dict, Any
 from email import message_from_bytes
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Add backend directory to sys.path
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
@@ -52,33 +55,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("backfill")
 
 
-def strip_html(text: str) -> str:
-    text = re.sub(r'<[^>]+>', ' ', text)
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+from app.core.email_utils import clean_email_html, extract_email_body_from_message
 
-
-def extract_email_body(msg) -> str:
-    body = ""
-    if msg.is_multipart():
-        for part in msg.walk():
-            ct = part.get_content_type()
-            if ct == "text/plain":
-                payload = part.get_payload(decode=True)
-                if payload:
-                    body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-                break
-            elif ct == "text/html" and not body:
-                payload = part.get_payload(decode=True)
-                if payload:
-                    raw_html = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-                    body = strip_html(raw_html)
-    else:
-        payload = msg.get_payload(decode=True)
-        if payload:
-            raw_payload = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-            body = raw_payload if msg.get_content_type() == "text/plain" else strip_html(raw_payload)
-    return body.strip()
+extract_email_body = extract_email_body_from_message
+strip_html = clean_email_html
 
 
 async def get_imap_connection(user: User, token: str) -> Optional[IMAP4_SSL]:
@@ -161,22 +141,44 @@ async def fetch_body_for_task(imap: IMAP4_SSL, message_id: Optional[str], subjec
         return None
 
 
-async def backfill(summaries_only: bool, fetch_bodies: bool, limit: Optional[int], dry_run: bool):
+async def backfill(
+    summaries_only: bool,
+    fetch_bodies: bool,
+    status: Optional[str] = None,
+    cutoff_time: Optional[datetime] = None,
+    limit: Optional[int] = None,
+    dry_run: bool = False,
+):
     async with AsyncSessionLocal() as session:
-        # 1. Fetch all email tasks and their audit logs
+        # 1. Fetch email tasks matching criteria
         logger.info("Finding email-generated tasks in database...")
         query = (
             select(Issue, AuditLog.details, AuditLog.user_id)
             .join(AuditLog, AuditLog.entity_id == Issue.id)
             .where(AuditLog.action.like("email.task_created%"))
-            .order_by(Issue.created_at.desc())
         )
+        if status and status.lower() != "all":
+            s = status.lower()
+            if s == "active":
+                query = query.where(Issue.status.notin_(["done", "canceled"]))
+            else:
+                query = query.where(Issue.status == s)
+        if cutoff_time:
+            query = query.where(Issue.created_at <= cutoff_time)
+
+        query = query.order_by(Issue.created_at.desc())
         if limit:
             query = query.limit(limit)
 
         result = await session.execute(query)
         records = result.all()
-        logger.info(f"Found {len(records)} email-created tasks to process.")
+        filter_desc = []
+        if status and status.lower() != "all":
+            filter_desc.append(f"status={status}")
+        if cutoff_time:
+            filter_desc.append(f"cutoff_time<={cutoff_time.isoformat()}")
+        filters_str = f" [{', '.join(filter_desc)}]" if filter_desc else ""
+        logger.info(f"Found {len(records)} email-created tasks to process{filters_str}.")
 
         if not records:
             logger.info("No tasks found to backfill.")
@@ -227,18 +229,31 @@ async def backfill(summaries_only: bool, fetch_bodies: bool, limit: Optional[int
                 imap = imap_clients.get(str(user_id))
                 if imap:
                     logger.info(f"[{idx}/{len(records)}] Fetching email body for '{issue.title[:40]}'...")
-                    body = await fetch_body_for_task(imap, message_id, email_subject)
+                    body = None
+                    try:
+                        body = await fetch_body_for_task(imap, message_id, email_subject)
+                    except Exception as err:
+                        logger.warning(f"IMAP fetch error: {err}. Reconnecting...")
+                        u = (await session.execute(select(User).where(User.id == user_id))).scalars().first()
+                        if u:
+                            token = await refresh_token_v2(session, u)
+                            imap = await get_imap_connection(u, token)
+                            if imap:
+                                imap_clients[str(user_id)] = imap
+                                body = await fetch_body_for_task(imap, message_id, email_subject)
+
                     if body:
                         if not dry_run:
                             issue.description = body
                             # Update content hash on summary so it remains in sync
                             summary_text = existing_summary.summary if existing_summary else current_desc
+                            next_steps_text = existing_summary.next_steps if existing_summary else ""
                             new_content_hash = crud_issue.get_content_hash(f"{issue.title} {body}")
                             await crud_issue_summary.upsert(
                                 session,
                                 issue_id=issue.id,
                                 summary=summary_text,
-                                next_steps="",
+                                next_steps=next_steps_text,
                                 content_hash=new_content_hash,
                             )
                         bodies_restored += 1
@@ -249,7 +264,7 @@ async def backfill(summaries_only: bool, fetch_bodies: bool, limit: Optional[int
                     logger.warning(f"No IMAP client available for user_id={user_id}")
 
             # Periodic commit
-            if not dry_run and idx % 25 == 0:
+            if not dry_run and idx % 10 == 0:
                 await session.commit()
                 logger.info(f"Committed progress ({idx}/{len(records)})...")
 
@@ -278,10 +293,50 @@ async def backfill(summaries_only: bool, fetch_bodies: bool, limit: Optional[int
         logger.info("=" * 60)
 
 
+def parse_cutoff_time(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    val_lower = value.strip().lower()
+    now_utc = datetime.now(timezone.utc)
+    if val_lower == "yesterday":
+        yesterday = now_utc.date() - timedelta(days=1)
+        return datetime.combine(yesterday, datetime.max.time(), tzinfo=timezone.utc)
+    elif val_lower == "today":
+        return datetime.combine(now_utc.date(), datetime.min.time(), tzinfo=timezone.utc)
+    elif val_lower.endswith("h") and val_lower[:-1].isdigit():
+        return now_utc - timedelta(hours=int(val_lower[:-1]))
+    elif val_lower.endswith("d") and val_lower[:-1].isdigit():
+        return now_utc - timedelta(days=int(val_lower[:-1]))
+    else:
+        if len(val_lower) == 10 and val_lower.count("-") == 2:
+            d = datetime.strptime(val_lower, "%Y-%m-%d").date()
+            return datetime.combine(d, datetime.max.time(), tzinfo=timezone.utc)
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Backfill existing email tasks in Nimbus.")
     parser.add_argument("--summaries-only", action="store_true", help="Only backfill IssueSummary from existing description")
     parser.add_argument("--fetch-bodies", action="store_true", help="Connect to IMAP and fetch original email bodies into description")
+    parser.add_argument(
+        "--status",
+        type=str,
+        default=None,
+        choices=["todo", "in_progress", "done", "canceled", "active", "all"],
+        help="Filter tasks by status (e.g. todo, in_progress, done, active, all).",
+    )
+    parser.add_argument(
+        "--cutoff-time",
+        "--cutoff",
+        dest="cutoff_time",
+        type=str,
+        default=None,
+        help="Filter tasks created on or before cutoff time. Accepts 'yesterday', 'today', relative (e.g. 24h, 7d), date (YYYY-MM-DD), or ISO timestamp.",
+    )
+    # Backward compatibility aliases
+    parser.add_argument("--active-only", action="store_true", help="Alias for --status active")
+    parser.add_argument("--before-date", type=str, default=None, help="Alias for --cutoff-time")
+    parser.add_argument("--before-yesterdays-changes", action="store_true", help="Alias for --cutoff-time yesterday")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of tasks to process")
     parser.add_argument("--dry-run", action="store_true", help="Simulate without writing changes")
 
@@ -291,7 +346,26 @@ def main():
     if not args.fetch_bodies and not args.summaries_only:
         args.summaries_only = True
 
-    asyncio.run(backfill(args.summaries_only, args.fetch_bodies, args.limit, args.dry_run))
+    status = args.status
+    if not status and args.active_only:
+        status = "active"
+
+    cutoff_str = args.cutoff_time
+    if not cutoff_str and getattr(args, "before_yesterdays_changes", False):
+        cutoff_str = "yesterday"
+    elif not cutoff_str and args.before_date:
+        cutoff_str = args.before_date
+
+    cutoff_dt = parse_cutoff_time(cutoff_str)
+
+    asyncio.run(backfill(
+        summaries_only=args.summaries_only,
+        fetch_bodies=args.fetch_bodies,
+        status=status,
+        cutoff_time=cutoff_dt,
+        limit=args.limit,
+        dry_run=args.dry_run,
+    ))
 
 
 if __name__ == "__main__":

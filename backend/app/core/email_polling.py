@@ -11,6 +11,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.email_processor import email_processor
+from app.core.email_utils import extract_email_body_from_message
 from app.schemas.issue import IssueCreate
 from app.models.issue import Issue
 from app.models.project import Project
@@ -165,18 +166,7 @@ async def process_email_source(db: AsyncSession, user: User):
                     raw_email_bytes = data[1] if isinstance(data[1], (bytes, bytearray)) else data[1].encode(errors='replace')
                     msg = message_from_bytes(raw_email_bytes)
 
-                    body = ""
-                    if msg.is_multipart():
-                        for part in msg.walk():
-                            if part.get_content_type() == "text/plain":
-                                payload = part.get_payload(decode=True)
-                                if payload:
-                                    body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-                                break
-                    else:
-                        payload = msg.get_payload(decode=True)
-                        if payload:
-                            body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
+                    body = extract_email_body_from_message(msg)
 
                     # Process with AI
                     task_data = await email_processor.extract_task(subject, body)

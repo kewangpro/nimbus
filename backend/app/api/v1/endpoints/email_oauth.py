@@ -24,11 +24,11 @@ def _decode_header(raw: Optional[str]) -> str:
     except Exception:
         return raw
 
+from app.core.email_utils import clean_email_html, extract_email_body_from_message
+
 def _strip_html(text: str) -> str:
     """Remove HTML tags and collapse whitespace for clean snippet display."""
-    text = re.sub(r'<[^>]+>', ' ', text)
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+    return clean_email_html(text)
 
 
 async def _get_full_email_body(db: AsyncSession, user: User, msg_id: str) -> Optional[str]:
@@ -66,26 +66,7 @@ async def _get_full_email_body(db: AsyncSession, user: User, msg_id: str) -> Opt
         raw_email = data[1].decode() if isinstance(data[1], (bytes, bytearray)) else data[1]
         msg = message_from_string(raw_email)
 
-        body = ""
-        if msg.is_multipart():
-            for part in msg.walk():
-                ct = part.get_content_type()
-                if ct == "text/plain":
-                    payload = part.get_payload(decode=True)
-                    if payload:
-                        body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-                    break
-                elif ct == "text/html" and not body:
-                    payload = part.get_payload(decode=True)
-                    if payload:
-                        body = _strip_html(payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-        else:
-            payload = msg.get_payload(decode=True)
-            if payload:
-                raw_body = payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload
-                body = raw_body if msg.get_content_type() == "text/plain" else _strip_html(raw_body)
-
-        return body
+        return extract_email_body_from_message(msg)
     except Exception:
         return None
 
@@ -167,25 +148,7 @@ async def get_inbox(
 
 
             
-            # Prefer text/plain part; fall back to stripping html
-            body = ""
-            if msg.is_multipart():
-                for part in msg.walk():
-                    ct = part.get_content_type()
-                    if ct == "text/plain":
-                        payload = part.get_payload(decode=True)
-                        if payload:
-                            body = (payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-                        break
-                    elif ct == "text/html" and not body:
-                        payload = part.get_payload(decode=True)
-                        if payload:
-                            body = _strip_html(payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload)
-            else:
-                payload = msg.get_payload(decode=True)
-                if payload:
-                    raw_body = payload.decode(errors='replace') if isinstance(payload, (bytes, bytearray)) else payload
-                    body = raw_body if msg.get_content_type() == "text/plain" else _strip_html(raw_body)
+            body = extract_email_body_from_message(msg)
 
             results.append({
                 "id": msg_id,
