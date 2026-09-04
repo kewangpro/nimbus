@@ -116,7 +116,9 @@
 ### 9.4 Email Automation (Background Polling)
 *   [x] `email_automation_enabled` toggle in User Settings (checkbox).
 *   [x] Background worker polls every 60 seconds for emails from the last 3 days, using lightweight header-fetching and Message-ID database audit logs to check if they were already processed.
-*   [x] `email_processor.extract_task()` extracts title, description, and priority using Gemma 3 via MLX.
+*   [x] `email_processor.extract_task()` extracts title, summary, priority, and deadline using Gemma 3 via MLX.
+*   [x] Clean content separation: raw email body is saved to `issue.description`, while AI analysis is saved to `IssueSummary` and rendered in the modal's AI Summary section.
+*   [x] Backfill utility (`scripts/backfill_email_tasks.py`) provided to backfill existing email tasks.
 *   [x] Created tasks are assigned to the inbox owner and placed in their "General" project.
 *   [x] Graceful fallback: if `UNSEEN SINCE <date>` fails, retries with `UNSEEN` only.
 

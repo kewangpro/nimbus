@@ -5,7 +5,7 @@ from aioimaplib import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from app.models.user import User
-from app.crud import crud_audit
+from app.crud import crud_audit, crud_issue, crud_issue_summary
 from app.schemas.issue import IssueCreate
 from app.crud.crud_issue import create as create_issue
 from app.models.project import Project
@@ -251,17 +251,44 @@ async def create_task_from_email(
     if due_date_val == "null":
         due_date_val = None
 
+    raw_summary = task_data.get("summary") or task_data.get("description")
+    if isinstance(raw_summary, list):
+        summary_val = "\n".join(str(item) for item in raw_summary)
+    elif raw_summary is not None:
+        summary_val = str(raw_summary).strip()
+    else:
+        summary_val = None
+
+    desc_val = body_to_process.strip() if (body_to_process and body_to_process.strip()) else (summary_val or "")
+
     issue_in = IssueCreate(
         title=task_data.get("title", subject),
-        description=task_data.get("description", body_to_process),
+        description=desc_val,
         priority=task_data.get("priority", "medium"),
         due_date=due_date_val,
         project_id=proj.id,
         assignee_id=current_user.id
     )
 
-    
     issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id)
+
+    # Store AI summary in IssueSummary if available
+    if summary_val:
+        content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
+        raw_next_steps = task_data.get("next_steps", [])
+        if isinstance(raw_next_steps, list):
+            next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
+        elif raw_next_steps:
+            next_steps_str = str(raw_next_steps).strip()
+        else:
+            next_steps_str = ""
+        await crud_issue_summary.upsert(
+            db,
+            issue_id=issue.id,
+            summary=summary_val,
+            next_steps=next_steps_str,
+            content_hash=content_hash,
+        )
     
     # Audit log for manual email task creation
     await crud_audit.log_action(
@@ -320,7 +347,7 @@ async def create_tasks_bulk(
             tasks_to_create = [task_data_raw]
         else:
             # Fallback if AI fails or returns empty list for manually selected email
-            tasks_to_create = [{"title": subject, "description": body_to_process}]
+            tasks_to_create = [{"title": subject, "summary": "Auto-created from email"}]
 
         for task_data in tasks_to_create:
             # AI sometimes returns "null" as a string, which breaks Pydantic validation
@@ -328,9 +355,19 @@ async def create_tasks_bulk(
             if due_date_val == "null":
                 due_date_val = None
 
+            raw_summary = task_data.get("summary") or task_data.get("description")
+            if isinstance(raw_summary, list):
+                summary_val = "\n".join(str(item) for item in raw_summary)
+            elif raw_summary is not None:
+                summary_val = str(raw_summary).strip()
+            else:
+                summary_val = None
+
+            desc_val = body_to_process.strip() if (body_to_process and body_to_process.strip()) else (summary_val or "")
+
             issue_in = IssueCreate(
                 title=task_data.get("title", subject),
-                description=task_data.get("description", body_to_process),
+                description=desc_val,
                 priority=task_data.get("priority", "medium"),
                 due_date=due_date_val,
                 project_id=proj.id,
@@ -338,6 +375,25 @@ async def create_tasks_bulk(
             )
 
             issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id)
+
+            # Store AI summary in IssueSummary if available
+            if summary_val:
+                content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
+                raw_next_steps = task_data.get("next_steps", [])
+                if isinstance(raw_next_steps, list):
+                    next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
+                elif raw_next_steps:
+                    next_steps_str = str(raw_next_steps).strip()
+                else:
+                    next_steps_str = ""
+                await crud_issue_summary.upsert(
+                    db,
+                    issue_id=issue.id,
+                    summary=summary_val,
+                    next_steps=next_steps_str,
+                    content_hash=content_hash,
+                )
+
             created_issues.append(str(issue.id))
             
             # Audit log for manual email task creation

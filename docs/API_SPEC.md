@@ -18,13 +18,12 @@
     *   **Description:** Fetches emails from the **last 3 days** via IMAP/XOAUTH2. Uses raw `protocol.execute` to ensure Outlook compatibility (bypasses `aioimaplib`'s UTF-8 charset injection).
     *   **Response:** `List[dict]` — up to 20 emails, newest first. Each item: `{ id, subject, from, date, snippet }`.
 *   `POST /email-oauth/create-task-from-email`
-    *   **Body:** `{ "subject": "...", "snippet": "..." }`
-    *   **Description:** AI-powered task creation from an email. Creates the issue in the user's **"General"** project, **auto-assigned to the current user**.
-
+    *   **Body:** `{ "subject": "...", "snippet": "...", "id": "..." }`
+    *   **Description:** AI-powered task creation from an email. Stores the raw email body in `description`, saves the AI summary in `IssueSummary`, and creates the issue in the user's **"General"** project, **auto-assigned to the current user**.
     *   **Response:** `{ "status": "success", "issue_id": "uuid" }`
 *   `POST /email-oauth/create-tasks-bulk`
-    *   **Body:** `List[{ "subject": "...", "snippet": "..." }]`
-    *   **Description:** Bulk AI-powered task creation from multiple emails.
+    *   **Body:** `List[{ "subject": "...", "snippet": "...", "id": "..." }]`
+    *   **Description:** Bulk AI-powered task creation from multiple emails. Stores each email body in `description` and saves AI summaries in `IssueSummary`.
     *   **Response:** `{ "status": "success", "issue_ids": ["uuid", "uuid", ...] }`
 
 ## 3. Issues (Core)
@@ -62,8 +61,12 @@
 *   `POST /ai/search`
     *   **Body:** `{ "query": "...", "limit": 5 }`
     *   **Response:** List of Issues (ranked by semantic similarity).
+*   `GET /ai/summary/{issue_id}`
+    *   **Description:** Retrieves existing AI summary and next steps for an issue if already generated (returns `null` if none exists).
+    *   **Response:** `{ "issue_id": "uuid", "summary": "...", "next_steps": ["..."] }` or `null`
 *   `POST /ai/summary`
     *   **Body:** `{ "issue_id": "uuid", "force": false }`
+    *   **Description:** Generates (or regenerates if `force: true`) a concise summary and concrete next steps for an issue using the local chat LLM, caching results in `IssueSummary`.
     *   **Response:** `{ "issue_id": "uuid", "summary": "...", "next_steps": ["..."] }`
 *   `POST /ai/query`
     *   **Body:** `{ "text": "...", "project_id": "uuid?", "assignee_id": "uuid?" }`

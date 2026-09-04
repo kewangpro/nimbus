@@ -89,6 +89,11 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
         api.get(`/issues/${issue.id}/dependencies`)
             .then(res => setDependencies(res.data || []))
             .catch(console.error)
+        api.get(`/ai/summary/${issue.id}`)
+            .then(res => {
+                if (res.data) setAiSummary(res.data)
+            })
+            .catch(console.error)
     }, [isOpen, issue?.id])
 
     const handleSave = async () => {
@@ -170,7 +175,7 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
         if (!issue) return
         setSummaryLoading(true)
         try {
-            const res = await api.post("/ai/summary", { issue_id: issue.id })
+            const res = await api.post("/ai/summary", { issue_id: issue.id, force: true })
             setAiSummary(res.data)
         } catch (err) {
             console.error(err)

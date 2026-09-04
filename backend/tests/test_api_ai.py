@@ -69,3 +69,41 @@ async def test_ai_schedule_priority_sorting(
         assert r.status_code == 200
         await db.refresh(issue_high)
         assert issue_high.due_date is not None
+
+
+@pytest.mark.asyncio
+async def test_get_issue_summary_endpoint(
+    client: AsyncClient, normal_user_token_headers: dict, db: AsyncSession
+) -> None:
+    from app.crud.crud_user import get_by_email
+    from app.crud import crud_issue_summary
+    user = await get_by_email(db, email="user@example.com")
+    project = await crud_project.create(db, obj_in=ProjectCreate(name="Summary Test Project"), owner_id=user.id)
+    issue = await crud_issue.create(
+        db, 
+        obj_in=IssueCreate(title="Summary Task", description="Email body content", project_id=project.id), 
+        owner_id=user.id
+    )
+
+    # 1. When no summary exists, returns 200 with null
+    res = await client.get(f"/api/v1/ai/summary/{issue.id}", headers=normal_user_token_headers)
+    assert res.status_code == 200
+    assert res.json() is None
+
+    # 2. Add summary to database
+    content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
+    await crud_issue_summary.upsert(
+        db,
+        issue_id=issue.id,
+        summary="AI-generated summary of email.",
+        next_steps="Step 1\nStep 2",
+        content_hash=content_hash,
+    )
+
+    # 3. GET should return the summary and next steps
+    res = await client.get(f"/api/v1/ai/summary/{issue.id}", headers=normal_user_token_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data is not None
+    assert data["summary"] == "AI-generated summary of email."
+    assert data["next_steps"] == ["Step 1", "Step 2"]

@@ -683,6 +683,34 @@ async def summarize_issue(
 
     return {"issue_id": issue.id, "summary": summary, "next_steps": next_steps}
 
+
+@router.get("/summary/{issue_id}", response_model=Optional[SummaryResponse])
+async def get_issue_summary(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    issue_id: UUID,
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Get existing AI summary for an issue if one exists.
+    """
+    issue = await crud_issue.get(db, id=issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    if getattr(current_user, "role", None) == "client" and issue.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    existing = await crud_issue_summary.get_by_issue_id(db, issue.id)
+    if not existing:
+        return None
+
+    return {
+        "issue_id": issue.id,
+        "summary": existing.summary,
+        "next_steps": [s for s in existing.next_steps.split("\n") if s.strip()],
+    }
+
+
 @router.post("/query", response_model=QueryResponse)
 async def ai_query_to_filters(
     *,

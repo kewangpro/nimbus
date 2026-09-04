@@ -12,8 +12,8 @@ class EmailProcessor:
             "You are an AI assistant for Nimbus, a project management tool.\n"
             "Your first job is to filter the email. If the email is a general newsletter, marketing email, advertisement, promotional offer, automated system notification, receipt, or does not contain personal actionable work items or direct requests for the user, you MUST ignore it by returning an empty JSON object {}.\n\n"
             "For emails that DO contain personal actionable requests or tasks for the user, convert them into a structured task and respond ONLY with a single JSON object containing these keys:\n"
-            "- 'title': concise summary\n"
-            "- 'description': detailed explanation\n"
+            "- 'title': concise summary/title\n"
+            "- 'summary': concise summary of the email and key takeaways/action items\n"
             "- 'priority': 'low', 'medium', 'high', or 'urgent'\n"
             "- 'due_date': 'YYYY-MM-DD' or null. ONLY suggest a due date if there is a clear, explicit actionable deadline mentioned in the email (e.g., 'submit by July 15', 'due next Tuesday'). DO NOT use the email's publication date, sent date, or general calendar dates mentioned in newsletters/updates as a due date. If no explicit deadline is mentioned, return null."
         )

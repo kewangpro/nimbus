@@ -106,7 +106,10 @@ CREATE TABLE issue_links (
 
 ### 4.10 Email Task Extraction
 *   **Input:** Email `subject` + `body` snippet.
-*   **Output:** A structured task with `title`, `description`, `priority`, and optional `due_date`.
+*   **Output:** A structured task containing `title`, `summary`, `priority`, and optional `due_date`.
+*   **Content Separation:**
+    *   **Task Description:** Stores the original raw email content/body to preserve full email context.
+    *   **AI Summary (`IssueSummary`):** Stores the AI-generated concise summary and key takeaways, which is linked to the issue and immediately rendered under the **AI Summary** section in the UI.
 *   **Prompting Strategy:** Uses an advanced system prompt with explicit **negative constraints** (ignore boilerplate, marketing footers, "Unsubscribe" links) and **few-shot examples** of both actionable tasks and non-actionable advertisements (which should return `{}`).
 *   **Due Date Extraction Policy:** To prevent tasks from being created as already-overdue, the system enforces a strict policy for `due_date`. A due date is ONLY suggested if there is a clear, explicit actionable deadline mentioned in the email (e.g., "submit by July 15", "due next Tuesday"). General dates like newsletter publication dates, sent dates, or chronological references in updates are ignored and mapped to `null` (unscheduled).
 *   **Parsing Resilience:**
@@ -144,7 +147,7 @@ CREATE TABLE issue_links (
 4. For each email found:
    - Fetch only lightweight headers (`Message-ID`, `Subject`, `Date`) first to extract the unique `Message-ID`.
    - If the `Message-ID` is in the processed set, skip it.
-   - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project → assign to user → mark as read → save `Message-ID` to `AuditLog`.
+   - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project with original email body as `description` and AI summary stored in `IssueSummary` → assign to user → mark as read → save `Message-ID` to `AuditLog`.
    - Filtered ads/newsletters and failed processing attempts also write to `AuditLog` to prevent future re-processing.
 
 

@@ -155,11 +155,16 @@ async def test_poll_emails_sanitizes_lists(db: AsyncSession):
 
     assert issue is not None
     assert issue.title == "SpaceX Starship Launch TLDR Newsletter Growth"
-    assert issue.description == "Part 1 of email\nPart 2 of email"
+    assert issue.description == "Body content"
     assert issue.priority == "high"
     assert issue.due_date is not None
     assert issue.due_date.strftime("%Y-%m-%d") == "2026-06-01"
     mock_imap.store.assert_called_once_with("1", "+FLAGS", "(\\Seen)")
+
+    from app.crud import crud_issue_summary
+    issue_summary = await crud_issue_summary.get_by_issue_id(db, issue.id)
+    assert issue_summary is not None
+    assert issue_summary.summary == "Part 1 of email\nPart 2 of email"
 
 
 @pytest.mark.asyncio

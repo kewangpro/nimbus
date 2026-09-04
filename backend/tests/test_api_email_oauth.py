@@ -107,6 +107,15 @@ async def test_create_task_from_email(
     assert resp_data["status"] == "success"
     assert "issue_id" in resp_data
 
+    from uuid import UUID
+    from app.crud import crud_issue, crud_issue_summary
+    created_issue = await crud_issue.get(db, id=UUID(resp_data["issue_id"]))
+    assert created_issue is not None
+    assert created_issue.description == "Original Snippet"
+    issue_summary = await crud_issue_summary.get_by_issue_id(db, created_issue.id)
+    assert issue_summary is not None
+    assert issue_summary.summary == "Extracted Description"
+
 
 @pytest.mark.asyncio
 @patch("app.core.email_processor.email_processor.extract_task", new_callable=AsyncMock)
@@ -154,3 +163,11 @@ async def test_create_tasks_bulk(
     resp_data = r.json()
     assert resp_data["status"] == "success"
     assert len(resp_data["issue_ids"]) == 2
+
+    from uuid import UUID
+    from app.crud import crud_issue, crud_issue_summary
+    issue1 = await crud_issue.get(db, id=UUID(resp_data["issue_ids"][0]))
+    assert issue1.description == "Snippet 1"
+    summary1 = await crud_issue_summary.get_by_issue_id(db, issue1.id)
+    assert summary1 is not None
+    assert summary1.summary == "Desc 1"
