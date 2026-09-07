@@ -266,3 +266,120 @@ async def test_poll_emails_aborts_loop_on_command_timeout(db: AsyncSession):
     assert mock_imap.fetch.call_count == 1
     mock_imap.fetch.assert_called_once_with("101", "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT DATE)]")
 
+
+@pytest.mark.asyncio
+async def test_refresh_token_v2_logs_audit_on_failure(db: AsyncSession):
+    from app.core.email_polling import refresh_token_v2
+    from app.models.audit_log import AuditLog
+    from sqlalchemy.future import select
+
+    user = User(
+        email="secret-expired@example.com",
+        oauth_provider="outlook",
+        oauth_access_token="old-token",
+        oauth_refresh_token="some-refresh-token",
+        oauth_token_expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        email_automation_enabled=True
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 401
+    mock_resp.json.return_value = {
+        "error": "invalid_client",
+        "error_description": "AADSTS7000222: The provided client secret keys are expired."
+    }
+    mock_resp.text = '{"error": "invalid_client"}'
+
+    with patch("httpx.AsyncClient.post", AsyncMock(return_value=mock_resp)):
+        token = await refresh_token_v2(db, user)
+        assert token is None
+
+        # Second call immediately should be throttled and not duplicate audit log
+        token2 = await refresh_token_v2(db, user)
+        assert token2 is None
+
+    res = await db.execute(
+        select(AuditLog).where(
+            AuditLog.user_id == user.id,
+            AuditLog.action == "email.token_refresh_failed"
+        )
+    )
+    logs = res.scalars().all()
+    assert len(logs) == 1
+    assert logs[0].details.get("error") == "invalid_client"
+    assert "AADSTS7000222" in logs[0].details.get("error_description", "")
+    assert logs[0].details.get("status_code") == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_v2_logs_audit_on_missing_refresh_token(db: AsyncSession):
+    from app.core.email_polling import refresh_token_v2
+    from app.models.audit_log import AuditLog
+    from sqlalchemy.future import select
+
+    user = User(
+        email="no-refresh@example.com",
+        oauth_provider="gmail",
+        oauth_access_token="old-token",
+        oauth_refresh_token=None,
+        oauth_token_expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        email_automation_enabled=True
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = await refresh_token_v2(db, user)
+    assert token is None
+
+    res = await db.execute(
+        select(AuditLog).where(
+            AuditLog.user_id == user.id,
+            AuditLog.action == "email.token_refresh_failed"
+        )
+    )
+    logs = res.scalars().all()
+    assert len(logs) == 1
+    assert logs[0].details.get("error") == "missing_refresh_token"
+
+
+@pytest.mark.asyncio
+async def test_poll_emails_logs_auth_failed_on_imap_auth_error(db: AsyncSession):
+    from app.models.audit_log import AuditLog
+    from sqlalchemy.future import select
+
+    user = User(
+        email="bad-auth@example.com",
+        oauth_provider="outlook",
+        oauth_access_token="valid-looking-token",
+        oauth_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        email_automation_enabled=True
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    mock_imap = MagicMock()
+    mock_imap.wait_hello_from_server = AsyncMock()
+    mock_imap.protocol = MagicMock()
+    mock_imap.protocol.new_tag = MagicMock(return_value="A1")
+    # IMAP AUTHENTICATE returns NO (auth failed)
+    mock_imap.protocol.execute = AsyncMock(return_value=MagicMock(result="NO", lines=[b"AUTHENTICATE failed"]))
+
+    with patch("aioimaplib.IMAP4_SSL", return_value=mock_imap):
+        await poll_emails(db)
+
+    res = await db.execute(
+        select(AuditLog).where(
+            AuditLog.user_id == user.id,
+            AuditLog.action == "email.auth_failed"
+        )
+    )
+    logs = res.scalars().all()
+    assert len(logs) == 1
+    assert "IMAP XOAUTH2 authentication failed" in logs[0].details.get("reason", "")
+
+

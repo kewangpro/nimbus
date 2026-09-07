@@ -49,6 +49,9 @@ const ACTION_CONFIG: Record<string, { label: string, icon: any, color: string }>
     "file.upload": { label: "File Uploaded", icon: Paperclip, color: "text-teal-500" },
     "ai_schedule": { label: "AI Schedule", icon: Sparkles, color: "text-purple-500" },
     "email.task_creation_failed": { label: "Auto-Task Failed", icon: AlertCircle, color: "text-red-500" },
+    "email.token_refresh_failed": { label: "Email Token Refresh Failed", icon: AlertCircle, color: "text-red-500" },
+    "email.auth_failed": { label: "Email Auth Failed", icon: AlertCircle, color: "text-red-500" },
+    "email.connection_failed": { label: "Email Connection Failed", icon: AlertCircle, color: "text-red-500" },
     "email.ignored": { label: "Email Ignored (Non-Task)", icon: Mail, color: "text-muted-foreground" },
 }
 
@@ -93,6 +96,11 @@ function getLogDetailSummary(log: AuditLog) {
     }
     if (log.action === "email.task_creation_failed") {
         if (log.details.error) parts.push(`Error: ${log.details.error}`)
+    }
+    if (log.action === "email.token_refresh_failed" || log.action === "email.auth_failed" || log.action === "email.connection_failed") {
+        if (log.details.error_description) parts.push(`Error: ${log.details.error_description}`)
+        else if (log.details.error) parts.push(`Error: ${log.details.error}`)
+        else if (log.details.reason) parts.push(`Reason: ${log.details.reason}`)
     }
 
     // 3. Highlight changes

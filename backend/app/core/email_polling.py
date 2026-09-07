@@ -85,6 +85,33 @@ async def process_email_source(db: AsyncSession, user: User):
             logger.info(f"Forcing token refresh for {email_address} due to auth failure...")
             user.oauth_token_expires_at = None  # invalidate so refresh_token_v2 will attempt refresh
             await db.commit()
+            try:
+                one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+                recent_log = await db.execute(
+                    select(AuditLog).where(
+                        and_(
+                            AuditLog.user_id == user_id,
+                            AuditLog.action == "email.auth_failed",
+                            AuditLog.created_at >= one_hour_ago
+                        )
+                    ).limit(1)
+                )
+                if not recent_log.scalars().first():
+                    await crud_audit.log_action(
+                        db,
+                        "email.auth_failed",
+                        user_id=user_id,
+                        entity_type="user",
+                        entity_id=user_id,
+                        details={
+                            "email": email_address,
+                            "provider": provider,
+                            "reason": f"IMAP XOAUTH2 authentication failed: {response.result}"
+                        }
+                    )
+            except Exception as audit_err:
+                logger.error(f"Failed to write email.auth_failed audit log for {email_address}: {audit_err}")
+                await db.rollback()
             return
 
         await imap.select("INBOX")
@@ -335,6 +362,34 @@ async def process_email_source(db: AsyncSession, user: User):
 
     except Exception as e:
         logger.exception(f"Error processing emails for {email_address}")
+        try:
+            one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+            recent_log = await db.execute(
+                select(AuditLog).where(
+                    and_(
+                        AuditLog.user_id == user_id,
+                        AuditLog.action == "email.connection_failed",
+                        AuditLog.created_at >= one_hour_ago
+                    )
+                ).limit(1)
+            )
+            if not recent_log.scalars().first():
+                await crud_audit.log_action(
+                    db,
+                    "email.connection_failed",
+                    user_id=user_id,
+                    entity_type="user",
+                    entity_id=user_id,
+                    details={
+                        "email": email_address,
+                        "provider": provider,
+                        "error": type(e).__name__,
+                        "error_description": str(e)[:250]
+                    }
+                )
+        except Exception as audit_err:
+            logger.error(f"Failed to write connection_failed audit log: {audit_err}")
+            await db.rollback()
 
 async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
     """
@@ -352,6 +407,34 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
 
     if not user.oauth_refresh_token:
         logger.error(f"No refresh token stored for {user.email} — user must re-login via SSO to restore automation.")
+        try:
+            one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+            recent_log = await db.execute(
+                select(AuditLog).where(
+                    and_(
+                        AuditLog.user_id == user.id,
+                        AuditLog.action == "email.token_refresh_failed",
+                        AuditLog.created_at >= one_hour_ago
+                    )
+                ).limit(1)
+            )
+            if not recent_log.scalars().first():
+                await crud_audit.log_action(
+                    db,
+                    "email.token_refresh_failed",
+                    user_id=user.id,
+                    entity_type="user",
+                    entity_id=user.id,
+                    details={
+                        "email": user.email,
+                        "provider": user.oauth_provider,
+                        "error": "missing_refresh_token",
+                        "error_description": "No refresh token stored — user must re-login via SSO to restore automation."
+                    }
+                )
+        except Exception as audit_err:
+            logger.error(f"Failed to write missing_refresh_token audit log for {user.email}: {audit_err}")
+            await db.rollback()
         return None
 
     provider = user.oauth_provider
@@ -390,8 +473,71 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
                 return user.oauth_access_token
             else:
                 logger.error(f"Token refresh HTTP {response.status_code} for {user.email}: {response.text[:300]}")
+                try:
+                    err_data = response.json()
+                except Exception:
+                    err_data = {}
+                err_desc = (err_data.get("error_description") if isinstance(err_data, dict) else None) or response.text
+                err_name = (err_data.get("error") if isinstance(err_data, dict) else None) or "token_refresh_failed"
+                try:
+                    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+                    recent_log = await db.execute(
+                        select(AuditLog).where(
+                            and_(
+                                AuditLog.user_id == user.id,
+                                AuditLog.action == "email.token_refresh_failed",
+                                AuditLog.created_at >= one_hour_ago
+                            )
+                        ).limit(1)
+                    )
+                    if not recent_log.scalars().first():
+                        await crud_audit.log_action(
+                            db,
+                            "email.token_refresh_failed",
+                            user_id=user.id,
+                            entity_type="user",
+                            entity_id=user.id,
+                            details={
+                                "email": user.email,
+                                "provider": provider,
+                                "status_code": response.status_code,
+                                "error": err_name,
+                                "error_description": str(err_desc)[:250]
+                            }
+                        )
+                except Exception as audit_err:
+                    logger.error(f"Failed to write token_refresh_failed audit log for {user.email}: {audit_err}")
+                    await db.rollback()
         except Exception as e:
             logger.error(f"Token refresh error for {user.email}: {e}")
+            try:
+                one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+                recent_log = await db.execute(
+                    select(AuditLog).where(
+                        and_(
+                            AuditLog.user_id == user.id,
+                            AuditLog.action == "email.token_refresh_failed",
+                            AuditLog.created_at >= one_hour_ago
+                        )
+                    ).limit(1)
+                )
+                if not recent_log.scalars().first():
+                    await crud_audit.log_action(
+                        db,
+                        "email.token_refresh_failed",
+                        user_id=user.id,
+                        entity_type="user",
+                        entity_id=user.id,
+                        details={
+                            "email": user.email,
+                            "provider": provider,
+                            "error": type(e).__name__,
+                            "error_description": str(e)[:250]
+                        }
+                    )
+            except Exception as audit_err:
+                logger.error(f"Failed to write exception audit log for {user.email}: {audit_err}")
+                await db.rollback()
             
     return None
 

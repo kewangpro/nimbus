@@ -43,6 +43,11 @@ Actions related to the email-to-task automation.
 | :--- | :--- |
 | `email.task_created` | When a task is automatically created from a polled email. |
 | `email.task_created_manual` | When a user manually creates a task from their inbox. |
+| `email.task_creation_failed` | When an error occurs while parsing or creating a task from an email. |
+| `email.token_refresh_failed` | When OAuth access token refresh fails (e.g., expired client secret or missing refresh token). Throttled to max 1 per hour per user. |
+| `email.auth_failed` | When IMAP XOAUTH2 authentication is rejected by the mail provider. Throttled to max 1 per hour per user. |
+| `email.connection_failed` | When connection to the IMAP server fails or times out. Throttled to max 1 per hour per user. |
+| `email.ignored` | When a polled email does not contain actionable tasks. |
 
 ### 📂 Files
 Actions related to file management.

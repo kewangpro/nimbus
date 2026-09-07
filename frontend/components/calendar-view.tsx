@@ -124,16 +124,16 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
         let minDate: Date | null = null
         let maxDate: Date | null = null
 
-        issues.forEach(issue => {
-            if (!issue.due_date) return
-            if (!showCompleted && (issue.status === IssueStatus.DONE || issue.status === IssueStatus.CANCELED)) return
+        for (const issue of issues) {
+            if (!issue.due_date) continue
+            if (!showCompleted && (issue.status === IssueStatus.DONE || issue.status === IssueStatus.CANCELED)) continue
 
             // Ensure we use the user's timezone when determining which "day" an issue belongs to
             const date = startOfDay(toZoned(issue.due_date))
 
             if (!minDate || isBefore(date, minDate)) minDate = date
             if (!maxDate || isAfter(date, maxDate)) maxDate = date
-        })
+        }
 
         let start = todayInTz
         let end = addDays(todayInTz, 4)
