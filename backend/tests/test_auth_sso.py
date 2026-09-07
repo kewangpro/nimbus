@@ -53,3 +53,35 @@ async def test_auth_callback_gmail(client: AsyncClient):
             assert "token=" in response.headers["location"]
 
         assert "/login" in response.headers["location"]
+
+
+@pytest.mark.asyncio
+async def test_auth_callback_token_failure_logs_audit(client: AsyncClient, db):
+    from app.models.audit_log import AuditLog
+    from sqlalchemy.future import select
+
+    mock_fail_response = MagicMock()
+    mock_fail_response.status_code = 401
+    mock_fail_response.json.return_value = {
+        "error": "invalid_client",
+        "error_description": "AADSTS7000222: The provided client secret keys are expired."
+    }
+    mock_fail_response.text = '{"error": "invalid_client"}'
+
+    with patch("app.api.v1.endpoints.auth.HttpxAsyncClient") as mock_client_cls:
+        mock_client_instance = AsyncMock()
+        mock_client_instance.post.return_value = mock_fail_response
+        mock_client_cls.return_value.__aenter__.return_value = mock_client_instance
+
+        with patch("app.core.config.settings.MICROSOFT_CLIENT_ID", "test-ms-id"), \
+             patch("app.core.config.settings.MICROSOFT_CLIENT_SECRET", "test-ms-secret"):
+            response = await client.get("/api/v1/auth/callback/outlook?code=bad-code")
+            assert response.status_code == 400
+            assert "Failed to fetch tokens" in response.json()["detail"]
+
+    res = await db.execute(select(AuditLog).where(AuditLog.action == "auth.login_failed"))
+    log_entry = res.scalars().first()
+    assert log_entry is not None
+    assert log_entry.details.get("error") == "invalid_client"
+    assert "AADSTS7000222" in log_entry.details.get("error_description", "")
+

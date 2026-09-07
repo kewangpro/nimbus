@@ -43,6 +43,7 @@ const ACTION_CONFIG: Record<string, { label: string, icon: any, color: string }>
     "issue.delete": { label: "Issue Deleted", icon: Trash2, color: "text-red-500" },
     "issue.backfill": { label: "AI Backfill Started", icon: RefreshCw, color: "text-purple-500" },
     "auth.login": { label: "Successful Login", icon: LogIn, color: "text-indigo-500" },
+    "auth.login_failed": { label: "Login Failed", icon: AlertCircle, color: "text-red-500" },
     "user.update_me": { label: "Profile Updated", icon: UserCircle, color: "text-orange-500" },
     "email.task_created": { label: "Auto-Task (Email)", icon: Mail, color: "text-sky-500" },
     "email.task_created_manual": { label: "Manual-Task (Email)", icon: MailCheck, color: "text-sky-500" },
@@ -90,6 +91,11 @@ function getLogDetailSummary(log: AuditLog) {
     }
     if (log.action === "auth.login") {
         parts.push(`via ${log.details.provider || "SSO"}`)
+    }
+    if (log.action === "auth.login_failed") {
+        parts.push(`via ${log.details.provider || "SSO"}`)
+        if (log.details.error_description) parts.push(`Error: ${log.details.error_description}`)
+        else if (log.details.error) parts.push(`Error: ${log.details.error}`)
     }
     if (log.action === "issue.backfill") {
         parts.push(`Job ID: ${log.details.job_id?.split('-')[0]}...`)

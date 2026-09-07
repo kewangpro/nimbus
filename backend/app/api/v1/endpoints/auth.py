@@ -100,6 +100,26 @@ async def callback_oauth(
     async with HttpxAsyncClient() as client:
         response = await client.post(token_url, data=data)
         if response.status_code != 200:
+            try:
+                err_data = response.json()
+            except Exception:
+                err_data = {}
+            err_desc = (err_data.get("error_description") if isinstance(err_data, dict) else None) or response.text
+            err_name = (err_data.get("error") if isinstance(err_data, dict) else None) or "oauth_token_fetch_failed"
+            try:
+                await crud_audit.log_action(
+                    db,
+                    "auth.login_failed",
+                    details={
+                        "provider": provider,
+                        "status_code": response.status_code,
+                        "error": err_name,
+                        "error_description": str(err_desc)[:250]
+                    }
+                )
+            except Exception as audit_err:
+                print(f"ERROR: Failed to log auth.login_failed audit: {audit_err}")
+                await db.rollback()
             raise HTTPException(status_code=400, detail=f"Failed to fetch tokens: {response.text}")
         
         tokens = response.json()

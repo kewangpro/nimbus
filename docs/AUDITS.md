@@ -34,6 +34,7 @@ Actions related to user accounts and authentication.
 | Action Type | Trigger Description |
 | :--- | :--- |
 | `auth.login` | When a user logs in via SSO (Gmail/Outlook). |
+| `auth.login_failed` | When an SSO login attempt fails during token exchange. |
 | `user.update_me` | When a user updates their own profile details. |
 
 ### ✉️ Email Integrations
