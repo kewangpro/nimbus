@@ -134,12 +134,13 @@ async def process_email_source(db: AsyncSession, user: User):
             if m_id:
                 processed_ids.add(m_id)
 
-        # Search for emails from last 3 days (seen or unseen)
+        # Search for emails from last 7 days (seen or unseen) to catch up after multi-day token failure/outages
+        # Boundary duplicates are prevented by processed_ids (which tracks 14 days).
         # Use protocol.execute directly to avoid aioimaplib injecting UTF-8 charset
         # which causes Outlook to respond with BADCHARSET error.
-        three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
+        search_window = datetime.now(timezone.utc) - timedelta(days=7)
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        date_str = f"{three_days_ago.day:02d}-{months[three_days_ago.month-1]}-{three_days_ago.year}"
+        date_str = f"{search_window.day:02d}-{months[search_window.month-1]}-{search_window.year}"
         
         search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), f"SINCE {date_str}"))
         if search_resp.result != "OK":
