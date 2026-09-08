@@ -186,3 +186,16 @@
 *   [x] **Day Number Strategy:** Directed AI to output `day_number` (1-5) instead of date strings, preventing hallucinated future months.
 *   [x] **Priority Mapping:** Implemented numerical prioritization (`URGENT=0`, `HIGH=1`) to ensure correct sorting in batch processing.
 *   [x] **Skip Overdue Items:** Modified AI Scheduler to explicitly exclude already overdue items from the rescheduling pool, ensuring user-defined deadlines are respected.
+
+---
+
+## Phase 15: Outage Resilience & Audit Observability ✅
+**Goal:** Guarantee automatic recovery from multi-day credential/network outages and surface operational failures directly in the UI.
+
+*   [x] **7-Day Polling Window & 14-Day Deduplication:** Expanded the IMAP search window from 3 days to 7 days, backed by 14-day duplicate filtering via `AuditLog.message_id`. Ensures Nimbus automatically catches up and backfills all missed emails following multi-day token expirations or system downtime.
+*   [x] **Integration Failure Auditing:** Instrument backend email polling and OAuth token exchange to record `email.token_refresh_failed`, `email.auth_failed`, `email.connection_failed`, and `auth.login_failed` directly in the `AuditLog` table with full error descriptions.
+*   [x] **Intelligent Failure Throttling:** Added a 1-hour rate limit per user for integration failure audit events so background 60s polling alerts immediately without flooding the audit table.
+*   [x] **Frontend Observability:** Updated the Activity / Audit Logs modal with dedicated status badges and error detail summaries for all authentication and email failure events.
+*   [x] **Calendar View & Build Stability:** Fixed TypeScript type narrowing in `CalendarView` via `for...of` loops, ensuring clean production builds.
+*   [x] **Comprehensive Test Coverage:** Added unit tests verifying token refresh failure logging, missing refresh token handling, and IMAP auth error auditing (110 passed backend tests).
+

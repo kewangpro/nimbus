@@ -130,7 +130,7 @@ CREATE TABLE issue_links (
 *   **Library:** `aioimaplib` (async IMAP client).
 *   **Auth:** XOAUTH2 using the user's SSO `oauth_access_token`.
 *   **Timeout & Fault Tolerance:** Configured with a 30.0s command timeout (`IMAP4_SSL(timeout=30.0)`). If an IMAP socket timeout (`CommandTimeout`) or network error occurs during a batch poll, the polling loop aborts immediately to avoid repeating 10s timeout delays across remaining queued messages.
-*   **Token Refresh:** Tokens are checked before every IMAP connection. If expired (within 5 minutes), they are refreshed automatically via the provider's token endpoint.
+*   **Token Refresh & Error Observability:** Tokens are checked before every IMAP connection. If expired (within 5 minutes), they are refreshed automatically via the provider's token endpoint. If refresh fails (e.g. expired client secret or missing token), IMAP auth is rejected, or connection fails, the system logs `email.token_refresh_failed`, `email.auth_failed`, or `email.connection_failed` to `AuditLog` (throttled to at most 1 entry per hour per user to prevent log spamming).
 
 ### IMAP Search (Outlook Compatibility)
 *   `aioimaplib`'s `imap.search()` injects a `CHARSET UTF-8` header automatically. Outlook rejects this with `NO [BADCHARSET (US-ASCII)]`.
@@ -141,14 +141,18 @@ CREATE TABLE issue_links (
 *   **Fix:** `isinstance(data, (bytes, bytearray))` check before calling `.decode()`.
 
 ### Polling Flow
-1. Background worker enqueues a poll job every 60 seconds.
+1. Background worker enqueues a poll job every 60 seconds if not already pending in Redis.
 2. Query all users with `oauth_access_token IS NOT NULL AND email_automation_enabled = TRUE`.
-3. For each user: refresh token if needed → connect to IMAP → search `SINCE <3 days ago>` (both seen/unseen) → query `AuditLog` for `email.%` actions in the last 3 days to build a set of processed `Message-ID`s.
+3. For each user:
+   - Refresh token if needed (logging errors to `AuditLog` if refresh fails).
+   - Connect to IMAP over SSL with 30s timeout.
+   - Search `SINCE <7 days ago>` (both seen/unseen) to guarantee catch-up after multi-day outages or credential updates.
+   - Query `AuditLog` for `email.%` actions in the last 14 days to build a set of processed `Message-ID`s (preventing boundary duplicates).
 4. For each email found:
    - Fetch only lightweight headers (`Message-ID`, `Subject`, `Date`) first to extract the unique `Message-ID`.
-   - If the `Message-ID` is in the processed set, skip it.
+   - If the `Message-ID` is in the processed set, skip it immediately.
    - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project with original email body as `description` and AI summary stored in `IssueSummary` → assign to user → mark as read → save `Message-ID` to `AuditLog`.
-   - Filtered ads/newsletters and failed processing attempts also write to `AuditLog` to prevent future re-processing.
+   - Filtered non-actionable emails (`email.ignored`) and failed processing attempts (`email.task_creation_failed`) also write to `AuditLog` to prevent future re-processing and provide full operational transparency.
 
 
 ---

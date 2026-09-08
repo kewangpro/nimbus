@@ -106,3 +106,12 @@
     *   `schedule_task`: Update issue due dates.
     *   `create_calendar_task`: Create a new issue with a deadline and optional project name.
     *   `search_tasks`: Semantic search for issues using natural language.
+
+## 9. Audit Logs
+
+*   `GET /audit-logs/`
+    *   **Auth:** Requires valid Bearer token.
+    *   **Query Params:** `skip` (default 0), `limit` (default 100).
+    *   **Description:** Retrieves recent workspace activity, project/issue mutations, authentication events, email-to-task creations, and failure events (`email.token_refresh_failed`, `email.auth_failed`, `email.connection_failed`, `auth.login_failed`).
+    *   **Response:** `List[AuditLog]` — sorted descending by `created_at`.
+
