@@ -41,7 +41,7 @@ def _get_embedding_model():
     return _embedding_model
 
 
-def _sync_generate(prompt: str, system_prompt: str, model_name: str) -> str:
+def _sync_generate(prompt: str, system_prompt: str, model_name: str, max_tokens: int = 4096) -> str:
     from mlx_lm import generate
     model, tokenizer = _get_chat_model(model_name)
 
@@ -58,11 +58,13 @@ def _sync_generate(prompt: str, system_prompt: str, model_name: str) -> str:
         formatted = f"{system_prompt}\n{prompt}" if system_prompt else prompt
 
     logger.debug(f"Generating completion with prompt: {prompt[:100]}...")
-    # Increased max_tokens to 4096 to ensure full JSON for up to 100 tasks
-    res = generate(model, tokenizer, prompt=formatted, verbose=False, max_tokens=4096)
+    res = generate(model, tokenizer, prompt=formatted, verbose=False, max_tokens=max_tokens)
     try:
         import mlx.core as mx
-        mx.metal.clear_cache()
+        if hasattr(mx, "clear_cache"):
+            mx.clear_cache()
+        elif hasattr(mx.metal, "clear_cache"):
+            mx.metal.clear_cache()
     except Exception:
         pass
     return res
@@ -83,15 +85,18 @@ async def generate_embedding(text: str) -> Optional[List[float]]:
 
 
 async def generate_completion(
-    prompt: str, system_prompt: str = "", model_name: Optional[str] = None
+    prompt: str, system_prompt: str = "", model_name: Optional[str] = None, max_tokens: int = 4096
 ) -> Optional[str]:
     if model_name is None:
         model_name = CHAT_MODEL
     try:
         logger.info(f"Starting AI completion generation with model: {model_name}")
         loop = asyncio.get_event_loop()
+        args = [prompt, system_prompt, model_name]
+        if max_tokens != 4096:
+            args.append(max_tokens)
         result = await loop.run_in_executor(
-            _executor, _sync_generate, prompt, system_prompt, model_name
+            _executor, _sync_generate, *args
         )
         logger.info(f"AI completion generation finished for model: {model_name}")
         return result
@@ -101,8 +106,11 @@ async def generate_completion(
             logger.info(f"Attempting fallback generation with fast model: {FAST_MODEL}")
             try:
                 loop = asyncio.get_event_loop()
+                args = [prompt, system_prompt, FAST_MODEL]
+                if max_tokens != 4096:
+                    args.append(max_tokens)
                 result = await loop.run_in_executor(
-                    _executor, _sync_generate, prompt, system_prompt, FAST_MODEL
+                    _executor, _sync_generate, *args
                 )
                 logger.info(f"AI completion generation finished for fallback model: {FAST_MODEL}")
                 return result

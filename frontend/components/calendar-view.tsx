@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { format, addDays, isSameDay, isToday, startOfDay, parseISO, isBefore, isAfter } from "date-fns"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
+import axios from "axios"
 import { api } from "@/lib/api"
 import { Issue, IssueStatus, IssuePriority } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,16 @@ import { isOverdue } from "@/lib/utils"
 import { useTimezone } from "@/components/timezone-provider"
 import { fromZonedTime } from "date-fns-tz"
 
+const isAbortError = (err: any) => {
+    return (
+        axios.isCancel(err) ||
+        err?.code === "ERR_CANCELED" ||
+        err?.code === "ECONNABORTED" ||
+        err?.message === "Request aborted" ||
+        err?.name === "CanceledError"
+    )
+}
+
 interface CalendarViewProps {
     refreshTrigger?: number
     userId?: string
@@ -28,6 +39,7 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
     const [showCompleted, setShowCompleted] = useState(false)
     const [showWeekends, setShowWeekends] = useState(true)
     const { timezone, toZoned } = useTimezone()
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
     // Stable "today" in user's timezone
     const todayInTz = useMemo(() => startOfDay(toZoned(new Date())), [timezone, refreshTrigger])
@@ -45,6 +57,16 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
 
         const savedWeekends = window.localStorage.getItem("nimbus_calendar_show_weekends")
         if (savedWeekends !== null) setShowWeekends(JSON.parse(savedWeekends))
+    }, [])
+
+    // Clean up poll interval on unmount
+    useEffect(() => {
+        return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current)
+                pollIntervalRef.current = null
+            }
+        }
     }, [])
 
     // Save preferences whenever they change
@@ -68,22 +90,30 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
             if (userId) params.assignee_id = userId
             const res = await api.get("/issues/", { params })
             setIssues(res.data)
-        } catch (err) {
+        } catch (err: any) {
+            if (isAbortError(err)) return
             console.error("Failed to fetch issues", err)
         }
     }
 
     const handleAutoSchedule = async () => {
         setScheduling(true)
-        const pollInterval = setInterval(fetchIssues, 4000)
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current)
+        }
+        pollIntervalRef.current = setInterval(fetchIssues, 4000)
         try {
-            const res = await api.post("/ai/schedule")
+            const res = await api.post("/ai/schedule", {}, { timeout: 180000 })
             toast.success(res.data.message)
-        } catch (err) {
+        } catch (err: any) {
+            if (isAbortError(err)) return
             console.error(err)
             toast.error("Failed to schedule tasks")
         } finally {
-            clearInterval(pollInterval)
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current)
+                pollIntervalRef.current = null
+            }
             fetchIssues()
             setScheduling(false)
         }
@@ -113,7 +143,8 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
             // Convert the target date (YYYY-MM-DD in user timezone) to UTC ISO string
             const targetDate = fromZonedTime(newDate + ' 00:00', timezone)
             await api.patch(`/issues/${draggableId}`, { due_date: targetDate.toISOString() })
-        } catch (err) {
+        } catch (err: any) {
+            if (isAbortError(err)) return
             console.error("Failed to move issue", err)
             toast.error("Failed to update date")
             fetchIssues() // Revert

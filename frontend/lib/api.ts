@@ -27,7 +27,7 @@ export const setAuthToken = (token: string) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && [401, 403, 404].includes(error.response.status)) {
+    if (error.response && error.response.status === 401) {
       // Clear token and redirect to login if session is invalid or user was purged
       delete api.defaults.headers.common['Authorization'];
       if (typeof window !== 'undefined' && typeof window.localStorage?.removeItem === 'function') {

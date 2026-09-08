@@ -181,6 +181,12 @@ async def auto_schedule(
         priority_map.get(str(x.priority).lower(), 9),
         x.created_at or datetime.min.replace(tzinfo=timezone.utc)
     ))
+
+    # Cap to top 60 most urgent/relevant issues to ensure fast generation (<15s) and realistic workload
+    # (maximum 6 tasks per day across the 10-day sprint)
+    if len(schedulable_issues) > 60:
+        logger.info(f"Capping auto-scheduling from {len(schedulable_issues)} to top 60 priority tasks")
+        schedulable_issues = schedulable_issues[:60]
     
     # Generate next 10 weekdays in user's timezone
     next_10_weekdays = []
@@ -216,7 +222,7 @@ async def auto_schedule(
         
         prompt = f"""
         You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
-        Your goal is to bucket the following {len(batch)} tasks into EXACTLY 5 DAYS.
+        Your goal is to bucket the following {len(batch)} tasks across the 10 workdays (Buckets 1 to 10).
         
         ### CURRENT WORKLOAD ###
         {counts_summary}
@@ -247,7 +253,7 @@ async def auto_schedule(
         """
         
         system_message = "You are a task balancer. Distribute tasks across buckets 1-10 to ensure even workload."
-        response = await ai.generate_completion(prompt, system_prompt=system_message)
+        response = await ai.generate_completion(prompt, system_prompt=system_message, max_tokens=512)
         
         batch_data = []
         if response:

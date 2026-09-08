@@ -13,6 +13,16 @@ async def test_generate_completion_success():
 
 
 @pytest.mark.asyncio
+async def test_generate_completion_with_max_tokens():
+    with patch("app.core.ai._sync_generate", return_value="AI Response") as mock_sync_gen:
+        res = await ai.generate_completion("Test prompt", "System prompt", max_tokens=512)
+        assert res == "AI Response"
+        mock_sync_gen.assert_called_once_with(
+            "Test prompt", "System prompt", ai.CHAT_MODEL, 512
+        )
+
+
+@pytest.mark.asyncio
 async def test_generate_completion_fallback():
     # Simulate primary model failing and fallback model succeeding
     def side_effect(prompt, system_prompt, model_name):
