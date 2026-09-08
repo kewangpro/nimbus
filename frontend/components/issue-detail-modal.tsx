@@ -341,24 +341,6 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Description</Label>
-                        {isEditing ? (
-                            <Textarea
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                className="min-h-[150px]"
-                            />
-                        ) : (
-                            <div
-                                onClick={() => setIsEditing(true)}
-                                className="min-h-[100px] p-3 rounded-md border bg-muted/20 text-sm whitespace-pre-wrap cursor-pointer hover:bg-muted/40"
-                            >
-                                {description || <span className="text-muted-foreground italic">No description provided. Click to add one.</span>}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <Label>AI Summary</Label>
                             <AIButton
@@ -391,6 +373,24 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Description</Label>
+                        {isEditing ? (
+                            <Textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="min-h-[150px]"
+                            />
+                        ) : (
+                            <div
+                                onClick={() => setIsEditing(true)}
+                                className="min-h-[100px] p-3 rounded-md border bg-muted/20 text-sm whitespace-pre-wrap cursor-pointer hover:bg-muted/40"
+                            >
+                                {description || <span className="text-muted-foreground italic">No description provided. Click to add one.</span>}
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-2">
