@@ -251,7 +251,7 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                     </div>
                 )}
 
-                <div className="grid gap-4 py-4 overflow-y-auto pr-2 flex-1">
+                <div className="grid gap-4 py-4 overflow-y-auto overflow-x-hidden pr-2 flex-1 min-w-0">
                     <div className="grid grid-cols-2 gap-4">
                         {/* Project Selector */}
                         <div className="space-y-2">
@@ -352,16 +352,16 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                                 {summaryLoading ? "Summarizing..." : "📝 Generate Summary"}
                             </AIButton>
                         </div>
-                        <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[140px] max-h-[200px] overflow-y-auto">
+                        <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[140px] max-h-[200px] overflow-y-auto overflow-x-hidden min-w-0">
                             {aiSummary ? (
                                 <>
-                                    <div>{aiSummary.summary}</div>
+                                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{aiSummary.summary}</div>
                                     {aiSummary.next_steps?.length > 0 && (
-                                        <div>
+                                        <div className="min-w-0">
                                             <div className="text-xs font-medium text-muted-foreground mb-1">Next steps</div>
-                                            <div className="space-y-1">
+                                            <div className="space-y-1 min-w-0">
                                                 {aiSummary.next_steps.map((step, idx) => (
-                                                    <div key={idx} className="text-sm">- {step}</div>
+                                                    <div key={idx} className="text-sm break-words [overflow-wrap:anywhere]">- {step}</div>
                                                 ))}
                                             </div>
                                         </div>
@@ -375,25 +375,25 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                         </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                         <Label>Description</Label>
                         {isEditing ? (
                             <Textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                className="min-h-[150px]"
+                                className="min-h-[150px] break-words [overflow-wrap:anywhere] overflow-x-hidden"
                             />
                         ) : (
                             <div
                                 onClick={() => setIsEditing(true)}
-                                className="min-h-[100px] p-3 rounded-md border bg-muted/20 text-sm whitespace-pre-wrap cursor-pointer hover:bg-muted/40"
+                                className="min-h-[100px] max-h-[400px] overflow-y-auto overflow-x-hidden p-3 rounded-md border bg-muted/20 text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] cursor-pointer hover:bg-muted/40 min-w-0"
                             >
                                 {description || <span className="text-muted-foreground italic">No description provided. Click to add one.</span>}
                             </div>
                         )}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                         <div className="flex items-center justify-between">
                             <Label>Dependencies</Label>
                             <AIButton
@@ -405,11 +405,11 @@ export function IssueDetailModal({ issue, isOpen, onClose, onUpdate }: IssueDeta
                                 {dependencyLoading ? "Detecting..." : "🔗 Detect Dependencies"}
                             </AIButton>
                         </div>
-                        <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[120px] max-h-[200px] overflow-y-auto">
+                        <div className="border rounded-md p-3 bg-muted/20 text-sm space-y-2 min-h-[120px] max-h-[200px] overflow-y-auto overflow-x-hidden min-w-0">
                             {dependencies.length > 0 ? (
                                 dependencies.map((dep) => (
-                                    <div key={dep.id} className="text-sm">
-                                        <div className="font-medium">{dep.title}</div>
+                                    <div key={dep.id} className="text-sm min-w-0">
+                                        <div className="font-medium break-words [overflow-wrap:anywhere]">{dep.title}</div>
                                         <div className="text-xs text-muted-foreground">
                                             {dep.status} • {dep.priority} • {dep.id.slice(0, 8)}
                                         </div>
