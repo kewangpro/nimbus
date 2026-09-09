@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import ssl
 import aioimaplib
 import logging
 from email.header import decode_header, make_header
@@ -21,6 +22,39 @@ from app.crud.crud_issue import create as create_issue
 from app.crud import crud_audit, crud_issue, crud_issue_summary
 
 logger = logging.getLogger(__name__)
+
+# Enhance aioimaplib.IMAP4_SSL to track the connection task, fast-fail on TLS/TCP handshake errors
+# (e.g. SSLError WRONG_VERSION_NUMBER), and prevent unretrieved task exceptions in asyncio/uvloop.
+def _nimbus_create_client(self, host: str, port: int, loop: asyncio.AbstractEventLoop = None,
+                          conn_lost_cb = None, ssl_context = None) -> None:
+    if ssl_context is None:
+        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    local_loop = loop if loop is not None else asyncio.get_running_loop()
+    self.protocol = aioimaplib.IMAP4ClientProtocol(local_loop, conn_lost_cb)
+    self._connect_task = local_loop.create_task(
+        local_loop.create_connection(lambda: self.protocol, host, port, ssl=ssl_context)
+    )
+
+async def _nimbus_wait_hello_from_server(self) -> None:
+    if hasattr(self, "_connect_task"):
+        hello_waiter = asyncio.create_task(self.protocol.wait('AUTH|NONAUTH'))
+        try:
+            # 1. Fast-fail if TCP connection or SSL handshake fails
+            try:
+                await asyncio.wait_for(asyncio.shield(self._connect_task), timeout=self.timeout)
+            except Exception as conn_err:
+                hello_waiter.cancel()
+                raise conn_err
+            # 2. Wait for server greeting
+            await asyncio.wait_for(hello_waiter, timeout=self.timeout)
+        finally:
+            if not hello_waiter.done():
+                hello_waiter.cancel()
+    else:
+        await asyncio.wait_for(self.protocol.wait('AUTH|NONAUTH'), self.timeout)
+
+aioimaplib.IMAP4_SSL.create_client = _nimbus_create_client
+aioimaplib.IMAP4_SSL.wait_hello_from_server = _nimbus_wait_hello_from_server
 
 def decode_mime_header(s: Optional[str]) -> str:
     """
@@ -382,9 +416,10 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
         except Exception as logout_err:
             logger.warning(f"IMAP logout timed out or failed: {logout_err}")
 
-    except (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError, AioImapException, CommandTimeout) as transient_err:
+    except (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError, ssl.SSLError, AioImapException, CommandTimeout) as transient_err:
+        err_label = str(transient_err).strip() or type(transient_err).__name__
         if retry:
-            logger.warning(f"Transient IMAP connection error for {email_address}: {transient_err or type(transient_err).__name__}. Retrying in 3 seconds...")
+            logger.warning(f"Transient IMAP connection error for {email_address}: {err_label}. Retrying in 3 seconds...")
             await asyncio.sleep(3)
             return await process_email_source(db, user, retry=False)
 
@@ -402,9 +437,12 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
             )
             if not recent_log.scalars().first():
                 err_type = type(transient_err).__name__
-                err_desc = str(transient_err)
-                if not err_desc and ("timeout" in err_type.lower()):
-                    err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
+                err_desc = str(transient_err).strip()
+                if not err_desc:
+                    if "timeout" in err_type.lower():
+                        err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
+                    else:
+                        err_desc = f"{err_type} while connecting to {host}."
                 await crud_audit.log_action(
                     db,
                     "email.connection_failed",
@@ -438,13 +476,17 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
             )
             if not recent_log.scalars().first():
                 err_type = type(e).__name__
-                err_desc = str(e)
-                if not err_desc and ("timeout" in err_type.lower()):
-                    err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
+                err_desc = str(e).strip()
+                if not err_desc:
+                    if "timeout" in err_type.lower():
+                        err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
+                    else:
+                        err_desc = f"{err_type} while connecting to {host}."
                 is_trans = (
-                    isinstance(e, (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError, AioImapException, CommandTimeout))
+                    isinstance(e, (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError, ssl.SSLError, AioImapException, CommandTimeout))
                     or "timeout" in err_type.lower()
                     or "connection" in err_type.lower()
+                    or "ssl" in err_type.lower()
                     or "timeout" in err_desc.lower()
                 )
                 await crud_audit.log_action(
