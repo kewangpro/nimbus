@@ -53,6 +53,7 @@ const ACTION_CONFIG: Record<string, { label: string, icon: any, color: string }>
     "email.token_refresh_failed": { label: "Email Token Refresh Failed", icon: AlertCircle, color: "text-red-500" },
     "email.auth_failed": { label: "Email Auth Failed", icon: AlertCircle, color: "text-red-500" },
     "email.connection_failed": { label: "Email Connection Failed", icon: AlertCircle, color: "text-red-500" },
+    "email.connection_recovered": { label: "Email Connection Restored", icon: MailCheck, color: "text-emerald-500" },
     "email.ignored": { label: "Email Ignored (Non-Task)", icon: Mail, color: "text-muted-foreground" },
 }
 
@@ -135,6 +136,10 @@ function getLogDetailSummary(log: AuditLog) {
         const errorTag = isTransient ? "[Transient - Auto-Retrying]" : "[Permanent Failure]"
         if (log.details.error) parts.push(`${errorTag} Error: ${log.details.error}`)
         else parts.push(errorTag)
+    }
+    if (log.action === "email.connection_recovered") {
+        if (log.details.message) parts.push(log.details.message)
+        else parts.push(`Connected to ${log.details.provider || "mail server"} successfully.`)
     }
     if (log.action === "email.token_refresh_failed" || log.action === "email.auth_failed" || log.action === "email.connection_failed") {
         const isTransient = isTransientError(log)

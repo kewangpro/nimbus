@@ -111,6 +111,35 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
         logger.debug(f"AUTHENTICATE result for {email_address}: {response.result}, lines: {response.lines}")
         if response.result == "OK":
             imap.protocol.state = "AUTH"
+            # Check if there was a recent connection_failed error that is now recovered
+            try:
+                one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+                recent_logs = await db.execute(
+                    select(AuditLog).where(
+                        and_(
+                            AuditLog.user_id == user_id,
+                            AuditLog.action.in_(["email.connection_failed", "email.connection_recovered"]),
+                            AuditLog.created_at >= one_day_ago
+                        )
+                    ).order_by(AuditLog.created_at.desc()).limit(1)
+                )
+                last_conn_log = recent_logs.scalars().first()
+                if last_conn_log and last_conn_log.action == "email.connection_failed":
+                    await crud_audit.log_action(
+                        db,
+                        "email.connection_recovered",
+                        user_id=user_id,
+                        entity_type="user",
+                        entity_id=user_id,
+                        details={
+                            "email": email_address,
+                            "provider": provider,
+                            "status": "connected",
+                            "message": f"Connection to {provider.capitalize()} restored successfully."
+                        }
+                    )
+            except Exception as rec_err:
+                logger.debug(f"Could not check/write connection_recovered: {rec_err}")
         else:
             # Log the full server error detail (Outlook often returns a base64 JSON error)
             logger.error(f"XOAUTH2 AUTHENTICATE failed for {email_address}: result={response.result} lines={response.lines}")
