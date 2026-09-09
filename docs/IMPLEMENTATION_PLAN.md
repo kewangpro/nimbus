@@ -215,8 +215,14 @@
 *   [x] **Frontend Visual Differentiation:**
     *   Audit Logs modal renders amber icons with `[Transient - Auto-Retrying]` for transient events, clarifying that the system will automatically self-heal.
     *   Permanent errors render in red with `[Permanent - Action Required]` (e.g. re-login via SSO).
+    *   Implemented `isTransientError()` heuristic fallback for seamless backward compatibility with older database audit logs.
+*   [x] **Connection Recovery Observability:**
+    *   Added `email.connection_recovered` event, automatically logged with a green `MailCheck` icon and confirmation message when the background worker successfully connects and authenticates after an outage.
+*   [x] **SSL Handshake Tracking & Fast Failure:**
+    *   Wrapped `aioimaplib.IMAP4_SSL` to actively monitor connection tasks, instantly catching TLS/TCP handshake drops (such as `SSLError: WRONG_VERSION_NUMBER`), eliminating 60s blocking hangs and preventing unretrieved asyncio task exceptions in uvloop.
 *   [x] **Scheduler & Polling Performance Optimization:**
     *   Restored `UNSEEN SINCE <7 days ago>` query for email polling, reducing scan times from >50s to <4s in large mailboxes (100k+ messages).
     *   Optimized `POST /ai/schedule` prompt by capping payload to the top 60 issues and using `max_tokens=512`, eliminating client request aborts and keeping scheduling times under 10s.
+
 
 
