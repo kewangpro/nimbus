@@ -112,6 +112,11 @@
 *   `GET /audit-logs/`
     *   **Auth:** Requires valid Bearer token.
     *   **Query Params:** `skip` (default 0), `limit` (default 100).
-    *   **Description:** Retrieves recent workspace activity, project/issue mutations, authentication events, email-to-task creations, and failure events (`email.token_refresh_failed`, `email.auth_failed`, `email.connection_failed`, `auth.login_failed`).
+    *   **Description:** Retrieves recent workspace activity, project/issue mutations, authentication events, email-to-task creations, and integration failure events (`email.token_refresh_failed`, `email.auth_failed`, `email.connection_failed`, `email.task_creation_failed`, `auth.login_failed`).
     *   **Response:** `List[AuditLog]` — sorted descending by `created_at`.
+        *   **Schema Details:** Integration error logs include structured classification metadata in `details`:
+            *   `error_class`: `"transient"` (auto-retried in background) or `"permanent"` (requires SSO re-authentication or payload remediation).
+            *   `is_transient`: Boolean flag (`true` / `false`) used by frontend UI for amber vs. red badge styling.
+            *   `error_description`: Human-readable error message (e.g. IMAP timeout reason, OAuth error description).
+
 

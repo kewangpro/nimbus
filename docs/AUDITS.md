@@ -40,15 +40,15 @@ Actions related to user accounts and authentication.
 ### ✉️ Email Integrations
 Actions related to the email-to-task automation.
 
-| Action Type | Trigger Description |
-| :--- | :--- |
-| `email.task_created` | When a task is automatically created from a polled email. |
-| `email.task_created_manual` | When a user manually creates a task from their inbox. |
-| `email.task_creation_failed` | When an error occurs while parsing or creating a task from an email. |
-| `email.token_refresh_failed` | When OAuth access token refresh fails (e.g., expired client secret or missing refresh token). Throttled to max 1 per hour per user. |
-| `email.auth_failed` | When IMAP XOAUTH2 authentication is rejected by the mail provider. Throttled to max 1 per hour per user. |
-| `email.connection_failed` | When connection to the IMAP server fails or times out. Throttled to max 1 per hour per user. |
-| `email.ignored` | When a polled email does not contain actionable tasks. |
+| Action Type | Trigger Description | Error Classification |
+| :--- | :--- | :--- |
+| `email.task_created` | When a task is automatically created from a polled email. | Success |
+| `email.task_created_manual` | When a user manually creates a task from their inbox. | Success |
+| `email.task_creation_failed` | When an error occurs while creating a task from an email. | **Permanent Failure** (`is_transient: false`): Mark email `\Seen` and record in audit log to isolate poison-pill emails and avoid infinite retry loops. |
+| `email.token_refresh_failed` | When OAuth access token refresh fails. Throttled to max 1 per hour per user. | **Transient** (`is_transient: true`) for HTTP 5xx or network drops; **Permanent** (`is_transient: false`) for HTTP 400/401 (e.g. expired client secret or missing token, requiring re-login). |
+| `email.auth_failed` | When IMAP XOAUTH2 authentication is rejected by the mail provider. Throttled to max 1 per hour per user. | **Permanent** (`is_transient: false`): Mail access rejected; user must re-authenticate. |
+| `email.connection_failed` | When connection to the IMAP server fails or times out. Throttled to max 1 per hour per user. | **Transient** (`is_transient: true`): Poller auto-retries in 3s, and background worker retries every 60s. Unread emails remain `UNSEEN` and are preserved for subsequent processing. |
+| `email.ignored` | When a polled email does not contain actionable tasks (e.g., promotional ad or newsletter). | Informational (Non-Task) |
 
 ### 📂 Files
 Actions related to file management.
@@ -69,8 +69,12 @@ Each audit log entry captures:
     - `via`: Identifies the system/tool that triggered the update (e.g., `ai_scheduler`).
     - `email_subject`: For tasks created from email.
     - `filename`: For file uploads.
+    - `error_class`: Classification of integration errors (`"transient"` vs `"permanent"`).
+    - `is_transient`: Boolean flag indicating whether the failure is transient (auto-retrying in background) or permanent (requires user/admin action).
+    - `error_description`: Human-readable explanation of why the failure occurred.
 - `created_at`: The precise UTC timestamp when the action occurred.
 
 ## Extensibility 
 
 The `crud_audit.log_action()` helper makes it simple to extend auditing to other resources (like comments, user management, or integrations).
+

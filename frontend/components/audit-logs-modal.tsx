@@ -67,6 +67,15 @@ function getActionInfo(log: AuditLog) {
             color: "text-purple-500" 
         }
     }
+
+    // Differentiate transient vs permanent email errors
+    if (log.details?.is_transient) {
+        return {
+            label: `${config.label} (Transient)`,
+            icon: AlertCircle,
+            color: "text-amber-500"
+        }
+    }
     
     return config
 }
@@ -101,12 +110,15 @@ function getLogDetailSummary(log: AuditLog) {
         parts.push(`Job ID: ${log.details.job_id?.split('-')[0]}...`)
     }
     if (log.action === "email.task_creation_failed") {
-        if (log.details.error) parts.push(`Error: ${log.details.error}`)
+        const errorTag = log.details.is_transient ? "[Transient - Auto-Retrying]" : "[Permanent Failure]"
+        if (log.details.error) parts.push(`${errorTag} Error: ${log.details.error}`)
+        else parts.push(errorTag)
     }
     if (log.action === "email.token_refresh_failed" || log.action === "email.auth_failed" || log.action === "email.connection_failed") {
-        if (log.details.error_description) parts.push(`Error: ${log.details.error_description}`)
-        else if (log.details.error) parts.push(`Error: ${log.details.error}`)
-        else if (log.details.reason) parts.push(`Reason: ${log.details.reason}`)
+        const errorTag = log.details.is_transient ? "[Transient - Auto-Retrying]" : "[Permanent - Action Required]"
+        const err = log.details.error_description || log.details.error || log.details.reason
+        if (err) parts.push(`${errorTag} Error: ${err}`)
+        else parts.push(errorTag)
     }
 
     // 3. Highlight changes

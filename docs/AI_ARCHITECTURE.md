@@ -129,8 +129,11 @@ CREATE TABLE issue_links (
 ### IMAP Connection
 *   **Library:** `aioimaplib` (async IMAP client).
 *   **Auth:** XOAUTH2 using the user's SSO `oauth_access_token`.
-*   **Timeout & Fault Tolerance:** Configured with a 30.0s command timeout (`IMAP4_SSL(timeout=30.0)`). If an IMAP socket timeout (`CommandTimeout`) or network error occurs during a batch poll, the polling loop aborts immediately to avoid repeating 10s timeout delays across remaining queued messages.
+*   **Timeout & Fault Tolerance:** Configured with a 60.0s command timeout (`IMAP4_SSL(timeout=60.0)`). If an IMAP socket timeout (`CommandTimeout`) or network error occurs during a batch poll, the polling loop aborts immediately to avoid compounding timeout delays across remaining queued messages. Transient connection drops trigger an immediate 3-second retry before reporting.
 *   **Token Refresh & Error Observability:** Tokens are checked before every IMAP connection. If expired (within 5 minutes), they are refreshed automatically via the provider's token endpoint. If refresh fails (e.g. expired client secret or missing token), IMAP auth is rejected, or connection fails, the system logs `email.token_refresh_failed`, `email.auth_failed`, or `email.connection_failed` to `AuditLog` (throttled to at most 1 entry per hour per user to prevent log spamming).
+*   **Transient vs. Permanent Error Classification:**
+    *   **Transient Failures (`is_transient: true`):** IMAP connection timeouts, socket drops, and provider 5xx HTTP gateway errors are classified as transient. The message remains `UNSEEN` in the mailbox and is excluded from `processed_ids`, guaranteeing automatic retry on the next 60-second polling cycle.
+    *   **Permanent Failures (`is_transient: false`):** HTTP 400/401 OAuth rejections (`invalid_client`, `invalid_grant`) and unrecoverable payload/DB parsing errors are classified as permanent. Failed email payloads are marked `\Seen` and recorded in `AuditLog` (`email.task_creation_failed`) to isolate poison pills and prevent infinite retry loops.
 
 ### IMAP Search (Outlook Compatibility)
 *   `aioimaplib`'s `imap.search()` injects a `CHARSET UTF-8` header automatically. Outlook rejects this with `NO [BADCHARSET (US-ASCII)]`.
@@ -144,15 +147,16 @@ CREATE TABLE issue_links (
 1. Background worker enqueues a poll job every 60 seconds if not already pending in Redis.
 2. Query all users with `oauth_access_token IS NOT NULL AND email_automation_enabled = TRUE`.
 3. For each user:
-   - Refresh token if needed (logging errors to `AuditLog` if refresh fails).
-   - Connect to IMAP over SSL with 30s timeout.
-   - Search `SINCE <7 days ago>` (both seen/unseen) to guarantee catch-up after multi-day outages or credential updates.
+   - Refresh token if needed (logging errors to `AuditLog` with `error_class` if refresh fails).
+   - Connect to IMAP over SSL with 60s timeout (auto-retry after 3s on transient network drops).
+   - Search `UNSEEN SINCE <7 days ago>` (falling back to `UNSEEN`) to ensure fast sub-4-second mailbox scans while guaranteeing catch-up after multi-day outages or credential updates.
    - Query `AuditLog` for `email.%` actions in the last 14 days to build a set of processed `Message-ID`s (preventing boundary duplicates).
 4. For each email found:
    - Fetch only lightweight headers (`Message-ID`, `Subject`, `Date`) first to extract the unique `Message-ID`.
    - If the `Message-ID` is in the processed set, skip it immediately.
-   - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project with original email body as `description` and AI summary stored in `IssueSummary` → assign to user → mark as read → save `Message-ID` to `AuditLog`.
-   - Filtered non-actionable emails (`email.ignored`) and failed processing attempts (`email.task_creation_failed`) also write to `AuditLog` to prevent future re-processing and provide full operational transparency.
+   - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project with original email body as `description` and AI summary stored in `IssueSummary` → assign to user → mark as read (`\Seen`) → save `Message-ID` to `AuditLog`.
+   - Filtered non-actionable emails (`email.ignored`) and permanent processing errors (`email.task_creation_failed`) mark the email `\Seen` and write to `AuditLog` to prevent future re-processing and isolate poison pills.
+   - Transient network/timeout errors during message processing leave the email `UNSEEN` and abort the remaining batch, allowing the 60-second worker to automatically retry.
 
 
 ---
@@ -161,6 +165,7 @@ CREATE TABLE issue_links (
 *   **Async:** All AI calls run in a single-worker `ThreadPoolExecutor` wrapped with `asyncio.run_in_executor` — non-blocking to the FastAPI event loop. MLX requires sequential GPU access, hence `max_workers=1`.
 *   **Lazy loading:** Models are loaded on first inference call and kept in memory for the process lifetime.
 *   **Debounce:** UI updates are immediate (optimistic); vector updates happen on save.
+*   **Scheduler Batch Capping:** Task auto-scheduling caps the prompt payload to the top 60 highest priority/earliest due issues and sets `max_tokens=512`, preventing request aborts and keeping LLM response times well under 10 seconds.
 *   **Context Window:** Completion calls use a `max_tokens` limit of **4096** (increased from 2048) to support large structured outputs (e.g., 100+ task schedules).
 *   **Fallback:** If inference fails (e.g. model not yet downloaded), AI endpoints return HTTP 500. No keyword fallback — treat AI features as optional.
 *   **Consolidated Background Jobs:** Embedding backfills and email polling run via an integrated async worker task inside the main FastAPI process to minimize memory footprint.

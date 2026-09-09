@@ -106,7 +106,9 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                         details={
                             "email": email_address,
                             "provider": provider,
-                            "reason": f"IMAP XOAUTH2 authentication failed: {response.result}"
+                            "reason": f"IMAP XOAUTH2 authentication failed: {response.result}",
+                            "error_class": "permanent",
+                            "is_transient": False,
                         }
                     )
             except Exception as audit_err:
@@ -184,12 +186,6 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                         logger.debug(f"Email '{subject}' (Message-ID: {message_id}) already processed by Nimbus, skipping.")
                         continue
 
-                    # Mark email as seen immediately to prevent retry queue lockup if download/processing fails
-                    try:
-                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
-                    except Exception as seen_err:
-                        logger.error(f"Failed to mark msg_id {msg_id} as seen early: {seen_err}")
-
                     # Fetch full body since it is a new email
                     _, data = await imap.fetch(msg_id, "BODY.PEEK[]")
                     if not data or len(data) < 2:
@@ -213,6 +209,10 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                         }
                     elif not task_data:
                         # Ad/newsletter filtering (AI returned empty list or dict)
+                        try:
+                            await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                        except Exception:
+                            pass
                         await crud_audit.log_action(
                             db,
                             "email.ignored",
@@ -333,31 +333,48 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                         }
                     )
                     
+                    try:
+                        await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                    except Exception as seen_err:
+                        logger.error(f"Failed to mark msg_id {msg_id} as seen: {seen_err}")
+
                     logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue.title}")
                     processed_ids.add(message_id)
 
                 except Exception as email_err:
+                    is_network_err = isinstance(email_err, (AioImapException, CommandTimeout, asyncio.TimeoutError, TimeoutError, ConnectionError, OSError))
                     logger.error(f"Failed to process email msg_id {msg_id} for user {email_address}: {email_err}", exc_info=True)
                     # Rollback db session to clean up any failed transaction
                     await db.rollback()
-                    try:
-                        # Log audit event for failure in a clean transaction
-                        await crud_audit.log_action(
-                            db,
-                            "email.task_creation_failed",
-                            user_id=user_id,
-                            details={"msg_id": msg_id, "message_id": message_id, "error": str(email_err)}
-                        )
-                    except Exception as audit_err:
-                        logger.error(f"Failed to write failure audit log for {email_address}: {audit_err}")
-                        await db.rollback()
                     
-                    if message_id:
-                        processed_ids.add(message_id)
-
-                    # Abort remaining batch poll if IMAP connection or command timed out to prevent cascading failures
-                    if isinstance(email_err, (AioImapException, CommandTimeout, asyncio.TimeoutError, ConnectionError, OSError)):
-                        logger.warning(f"IMAP connection/timeout failure ({email_err}) for user {email_address}. Aborting remaining batch email poll.")
+                    if not is_network_err:
+                        # Non-network error (e.g. malformed data or permanent failure): mark seen and log so it does not loop forever
+                        try:
+                            await imap.store(msg_id, "+FLAGS", "(\\Seen)")
+                        except Exception:
+                            pass
+                        try:
+                            await crud_audit.log_action(
+                                db,
+                                "email.task_creation_failed",
+                                user_id=user_id,
+                                details={
+                                    "msg_id": msg_id,
+                                    "message_id": message_id,
+                                    "error": str(email_err),
+                                    "error_class": "permanent",
+                                    "is_transient": False,
+                                }
+                            )
+                        except Exception as audit_err:
+                            logger.error(f"Failed to write failure audit log for {email_address}: {audit_err}")
+                            await db.rollback()
+                        
+                        if message_id:
+                            processed_ids.add(message_id)
+                    else:
+                        # Network error: abort remaining batch so this and subsequent emails remain UNSEEN and will be retried
+                        logger.warning(f"IMAP connection/timeout failure ({email_err}) for user {email_address}. Aborting remaining batch email poll to retry later.")
                         break
 
         try:
@@ -398,7 +415,9 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                         "email": email_address,
                         "provider": provider,
                         "error": err_type,
-                        "error_description": err_desc[:250]
+                        "error_description": err_desc[:250],
+                        "error_class": "transient",
+                        "is_transient": True,
                     }
                 )
         except Exception as audit_err:
@@ -422,6 +441,7 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                 err_desc = str(e)
                 if not err_desc and err_type in ("TimeoutError", "asyncio.TimeoutError"):
                     err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
+                is_trans = isinstance(e, (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError))
                 await crud_audit.log_action(
                     db,
                     "email.connection_failed",
@@ -432,7 +452,9 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                         "email": email_address,
                         "provider": provider,
                         "error": err_type,
-                        "error_description": err_desc[:250]
+                        "error_description": err_desc[:250],
+                        "error_class": "transient" if is_trans else "permanent",
+                        "is_transient": is_trans,
                     }
                 )
         except Exception as audit_err:
@@ -477,7 +499,9 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
                         "email": user.email,
                         "provider": user.oauth_provider,
                         "error": "missing_refresh_token",
-                        "error_description": "No refresh token stored — user must re-login via SSO to restore automation."
+                        "error_description": "No refresh token stored — user must re-login via SSO to restore automation.",
+                        "error_class": "permanent",
+                        "is_transient": False,
                     }
                 )
         except Exception as audit_err:
@@ -527,6 +551,7 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
                     err_data = {}
                 err_desc = (err_data.get("error_description") if isinstance(err_data, dict) else None) or response.text
                 err_name = (err_data.get("error") if isinstance(err_data, dict) else None) or "token_refresh_failed"
+                is_trans = response.status_code in (500, 502, 503, 504)
                 try:
                     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
                     recent_log = await db.execute(
@@ -550,7 +575,9 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
                                 "provider": provider,
                                 "status_code": response.status_code,
                                 "error": err_name,
-                                "error_description": str(err_desc)[:250]
+                                "error_description": str(err_desc)[:250],
+                                "error_class": "transient" if is_trans else "permanent",
+                                "is_transient": is_trans,
                             }
                         )
                 except Exception as audit_err:
@@ -558,6 +585,7 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
                     await db.rollback()
         except Exception as e:
             logger.error(f"Token refresh error for {user.email}: {e}")
+            is_trans = isinstance(e, (httpx.TimeoutException, httpx.NetworkError, ConnectionError, OSError, asyncio.TimeoutError))
             try:
                 one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
                 recent_log = await db.execute(
@@ -580,7 +608,9 @@ async def refresh_token_v2(db: AsyncSession, user: User) -> Optional[str]:
                             "email": user.email,
                             "provider": provider,
                             "error": type(e).__name__,
-                            "error_description": str(e)[:250]
+                            "error_description": str(e)[:250],
+                            "error_class": "transient" if is_trans else "permanent",
+                            "is_transient": is_trans,
                         }
                     )
             except Exception as audit_err:

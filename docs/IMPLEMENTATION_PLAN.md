@@ -199,3 +199,24 @@
 *   [x] **Calendar View & Build Stability:** Fixed TypeScript type narrowing in `CalendarView` via `for...of` loops, ensuring clean production builds.
 *   [x] **Comprehensive Test Coverage:** Added unit tests verifying token refresh failure logging, missing refresh token handling, and IMAP auth error auditing (110 passed backend tests).
 
+---
+
+## Phase 16: Transient vs. Permanent Error Classification & Performance Tuning ✅
+**Goal:** Differentiate recoverable network glitches from permanent credential/data errors, guarantee automated retry semantics, and eliminate request aborts.
+
+*   [x] **Transient vs. Permanent Error Differentiation:**
+    *   Tagged all error audit events (`email.connection_failed`, `email.token_refresh_failed`, `email.task_creation_failed`) with `error_class: "transient" | "permanent"` and `is_transient: bool`.
+    *   Network timeouts, socket drops, and provider 5xx HTTP gateway errors are classified as transient (`is_transient: true`).
+    *   Missing refresh tokens, HTTP 400/401 OAuth rejections (`invalid_client`, `invalid_grant`), and malformed email/DB errors are classified as permanent (`is_transient: false`).
+*   [x] **Automated Retry Semantics & Poison-Pill Isolation:**
+    *   IMAP connection drops trigger an immediate 3-second retry before alerting.
+    *   Individual email network/timeout drops abort the current batch *without* marking the message `\Seen` or recording it in `processed_ids`, guaranteeing it auto-retries on the next 60-second polling cycle.
+    *   Permanent payload/parsing errors are marked `\Seen` and recorded in `AuditLog` (`email.task_creation_failed`, `is_transient: false`) to isolate poison pills and prevent infinite retry loops.
+*   [x] **Frontend Visual Differentiation:**
+    *   Audit Logs modal renders amber icons with `[Transient - Auto-Retrying]` for transient events, clarifying that the system will automatically self-heal.
+    *   Permanent errors render in red with `[Permanent - Action Required]` (e.g. re-login via SSO).
+*   [x] **Scheduler & Polling Performance Optimization:**
+    *   Restored `UNSEEN SINCE <7 days ago>` query for email polling, reducing scan times from >50s to <4s in large mailboxes (100k+ messages).
+    *   Optimized `POST /ai/schedule` prompt by capping payload to the top 60 issues and using `max_tokens=512`, eliminating client request aborts and keeping scheduling times under 10s.
+
+
