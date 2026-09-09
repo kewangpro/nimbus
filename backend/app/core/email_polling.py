@@ -52,13 +52,14 @@ async def poll_emails(db: AsyncSession):
     for user in users:
         await process_email_source(db, user)
 
-async def process_email_source(db: AsyncSession, user: User):
+async def process_email_source(db: AsyncSession, user: User, retry: bool = True):
     """
     Connect to IMAP and fetch unseen emails for a specific user.
     """
     email_address = user.email
     provider = user.oauth_provider
     user_id = user.id
+    host = "imap.gmail.com" if provider == "gmail" else "outlook.office365.com"
     
     try:
         # Refresh token if needed
@@ -66,9 +67,8 @@ async def process_email_source(db: AsyncSession, user: User):
         if not token:
             return
 
-        # Connect to provider with increased timeout (30 seconds)
-        host = "imap.gmail.com" if provider == "gmail" else "outlook.office365.com"
-        imap = aioimaplib.IMAP4_SSL(host=host, timeout=30.0)
+        # Connect to provider with increased timeout (60 seconds)
+        imap = aioimaplib.IMAP4_SSL(host=host, timeout=60.0)
         await imap.wait_hello_from_server()
         
         # XOAUTH2 Authentication
@@ -134,7 +134,7 @@ async def process_email_source(db: AsyncSession, user: User):
             if m_id:
                 processed_ids.add(m_id)
 
-        # Search for emails from last 7 days (seen or unseen) to catch up after multi-day token failure/outages
+        # Search for UNSEEN emails from last 7 days.
         # Boundary duplicates are prevented by processed_ids (which tracks 14 days).
         # Use protocol.execute directly to avoid aioimaplib injecting UTF-8 charset
         # which causes Outlook to respond with BADCHARSET error.
@@ -142,7 +142,7 @@ async def process_email_source(db: AsyncSession, user: User):
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         date_str = f"{search_window.day:02d}-{months[search_window.month-1]}-{search_window.year}"
         
-        search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), f"SINCE {date_str}"))
+        search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), f"UNSEEN SINCE {date_str}"))
         if search_resp.result != "OK":
             # Fallback: try just UNSEEN
             search_resp = await imap.protocol.execute(Command("SEARCH", imap.protocol.new_tag(), "UNSEEN"))
@@ -156,6 +156,10 @@ async def process_email_source(db: AsyncSession, user: User):
                     val = part.decode(errors='ignore')
                     if val.isdigit():
                         msg_ids.append(val)
+
+        # Cap batch to at most 20 emails per poll cycle to prevent IMAP timeouts
+        if len(msg_ids) > 20:
+            msg_ids = msg_ids[-20:]
 
         if msg_ids:
             from email import message_from_bytes
@@ -361,6 +365,45 @@ async def process_email_source(db: AsyncSession, user: User):
         except Exception as logout_err:
             logger.warning(f"IMAP logout timed out or failed: {logout_err}")
 
+    except (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError) as transient_err:
+        if retry:
+            logger.warning(f"Transient IMAP connection error for {email_address}: {transient_err or type(transient_err).__name__}. Retrying in 3 seconds...")
+            await asyncio.sleep(3)
+            return await process_email_source(db, user, retry=False)
+
+        logger.exception(f"Error processing emails for {email_address} after retry")
+        try:
+            one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+            recent_log = await db.execute(
+                select(AuditLog).where(
+                    and_(
+                        AuditLog.user_id == user_id,
+                        AuditLog.action == "email.connection_failed",
+                        AuditLog.created_at >= one_hour_ago
+                    )
+                ).limit(1)
+            )
+            if not recent_log.scalars().first():
+                err_type = type(transient_err).__name__
+                err_desc = str(transient_err)
+                if not err_desc and err_type in ("TimeoutError", "asyncio.TimeoutError"):
+                    err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
+                await crud_audit.log_action(
+                    db,
+                    "email.connection_failed",
+                    user_id=user_id,
+                    entity_type="user",
+                    entity_id=user_id,
+                    details={
+                        "email": email_address,
+                        "provider": provider,
+                        "error": err_type,
+                        "error_description": err_desc[:250]
+                    }
+                )
+        except Exception as audit_err:
+            logger.error(f"Failed to write connection_failed audit log: {audit_err}")
+            await db.rollback()
     except Exception as e:
         logger.exception(f"Error processing emails for {email_address}")
         try:
@@ -375,6 +418,10 @@ async def process_email_source(db: AsyncSession, user: User):
                 ).limit(1)
             )
             if not recent_log.scalars().first():
+                err_type = type(e).__name__
+                err_desc = str(e)
+                if not err_desc and err_type in ("TimeoutError", "asyncio.TimeoutError"):
+                    err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
                 await crud_audit.log_action(
                     db,
                     "email.connection_failed",
@@ -384,8 +431,8 @@ async def process_email_source(db: AsyncSession, user: User):
                     details={
                         "email": email_address,
                         "provider": provider,
-                        "error": type(e).__name__,
-                        "error_description": str(e)[:250]
+                        "error": err_type,
+                        "error_description": err_desc[:250]
                     }
                 )
         except Exception as audit_err:
