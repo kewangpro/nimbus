@@ -56,6 +56,27 @@ const ACTION_CONFIG: Record<string, { label: string, icon: any, color: string }>
     "email.ignored": { label: "Email Ignored (Non-Task)", icon: Mail, color: "text-muted-foreground" },
 }
 
+function isTransientError(log: AuditLog): boolean {
+    if (typeof log.details?.is_transient === "boolean") {
+        return log.details.is_transient
+    }
+    // Connection failures to IMAP are network/timeout drops and always transient
+    if (log.action === "email.connection_failed") {
+        return true
+    }
+    const errText = `${log.details?.error || ""} ${log.details?.error_description || ""} ${log.details?.reason || ""}`.toLowerCase()
+    if (
+        errText.includes("timeout") ||
+        errText.includes("connection") ||
+        errText.includes("network") ||
+        errText.includes("socket") ||
+        errText.includes("temporarily")
+    ) {
+        return true
+    }
+    return false
+}
+
 function getActionInfo(log: AuditLog) {
     const config = ACTION_CONFIG[log.action] || { label: log.action, icon: HelpCircle, color: "text-muted-foreground" }
     
@@ -69,7 +90,7 @@ function getActionInfo(log: AuditLog) {
     }
 
     // Differentiate transient vs permanent email errors
-    if (log.details?.is_transient) {
+    if (isTransientError(log)) {
         return {
             label: `${config.label} (Transient)`,
             icon: AlertCircle,
@@ -110,12 +131,14 @@ function getLogDetailSummary(log: AuditLog) {
         parts.push(`Job ID: ${log.details.job_id?.split('-')[0]}...`)
     }
     if (log.action === "email.task_creation_failed") {
-        const errorTag = log.details.is_transient ? "[Transient - Auto-Retrying]" : "[Permanent Failure]"
+        const isTransient = isTransientError(log)
+        const errorTag = isTransient ? "[Transient - Auto-Retrying]" : "[Permanent Failure]"
         if (log.details.error) parts.push(`${errorTag} Error: ${log.details.error}`)
         else parts.push(errorTag)
     }
     if (log.action === "email.token_refresh_failed" || log.action === "email.auth_failed" || log.action === "email.connection_failed") {
-        const errorTag = log.details.is_transient ? "[Transient - Auto-Retrying]" : "[Permanent - Action Required]"
+        const isTransient = isTransientError(log)
+        const errorTag = isTransient ? "[Transient - Auto-Retrying]" : "[Permanent - Action Required]"
         const err = log.details.error_description || log.details.error || log.details.reason
         if (err) parts.push(`${errorTag} Error: ${err}`)
         else parts.push(errorTag)

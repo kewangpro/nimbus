@@ -382,7 +382,7 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
         except Exception as logout_err:
             logger.warning(f"IMAP logout timed out or failed: {logout_err}")
 
-    except (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError) as transient_err:
+    except (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError, AioImapException, CommandTimeout) as transient_err:
         if retry:
             logger.warning(f"Transient IMAP connection error for {email_address}: {transient_err or type(transient_err).__name__}. Retrying in 3 seconds...")
             await asyncio.sleep(3)
@@ -403,7 +403,7 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
             if not recent_log.scalars().first():
                 err_type = type(transient_err).__name__
                 err_desc = str(transient_err)
-                if not err_desc and err_type in ("TimeoutError", "asyncio.TimeoutError"):
+                if not err_desc and ("timeout" in err_type.lower()):
                     err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
                 await crud_audit.log_action(
                     db,
@@ -439,9 +439,14 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
             if not recent_log.scalars().first():
                 err_type = type(e).__name__
                 err_desc = str(e)
-                if not err_desc and err_type in ("TimeoutError", "asyncio.TimeoutError"):
+                if not err_desc and ("timeout" in err_type.lower()):
                     err_desc = f"Connection to {host} timed out after 60s. The mail server may be slow or temporarily throttling requests."
-                is_trans = isinstance(e, (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError))
+                is_trans = (
+                    isinstance(e, (asyncio.TimeoutError, TimeoutError, ConnectionError, OSError, AioImapException, CommandTimeout))
+                    or "timeout" in err_type.lower()
+                    or "connection" in err_type.lower()
+                    or "timeout" in err_desc.lower()
+                )
                 await crud_audit.log_action(
                     db,
                     "email.connection_failed",
