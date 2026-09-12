@@ -162,12 +162,13 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
   })
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
+    <div className="space-y-4 min-w-0 max-w-full">
+      <div className="flex gap-2 min-w-0">
         <Input
           placeholder="AI filter (e.g. overdue high priority for Alice)"
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
+          className="min-w-0"
         />
         <AIButton
           type="button"
@@ -182,29 +183,29 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
           </Button>
         )}
       </div>
-      <div className="border rounded-md">
-        <Table>
+      <div className="border rounded-md min-w-0 max-w-full overflow-hidden">
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort("id")}>
+              <TableHead className="w-[88px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort("id")}>
                 <div className="flex items-center gap-1">ID {getSortIcon("id")}</div>
               </TableHead>
               <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("title")}>
                 <div className="flex items-center gap-1">Title {getSortIcon("title")}</div>
               </TableHead>
-              <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("status")}>
+              <TableHead className="w-[110px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort("status")}>
                 <div className="flex items-center gap-1">Status {getSortIcon("status")}</div>
               </TableHead>
-              <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("priority")}>
+              <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort("priority")}>
                 <div className="flex items-center gap-1">Priority {getSortIcon("priority")}</div>
               </TableHead>
-              <TableHead className="cursor-pointer hover:bg-muted/50">
+              <TableHead className="w-[140px] cursor-pointer hover:bg-muted/50">
                 <div className="flex items-center gap-1">Assignee</div>
               </TableHead>
-              <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort("due_date")}>
+              <TableHead className="w-[140px] cursor-pointer hover:bg-muted/50" onClick={() => handleSort("due_date")}>
                 <div className="flex items-center gap-1">Due Date {getSortIcon("due_date")}</div>
               </TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => handleSort("created_at")}>
+              <TableHead className="w-[110px] text-right cursor-pointer hover:bg-muted/50" onClick={() => handleSort("created_at")}>
                 <div className="flex items-center justify-end gap-1">Created {getSortIcon("created_at")}</div>
               </TableHead>
             </TableRow>
@@ -232,9 +233,9 @@ export function IssueList({ refreshTrigger = 0, projectId }: IssueListProps) {
                     onClick={() => setSelectedIssue(issue)}
                   >
                     <TableCell className="font-mono text-xs">{issue.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {issue.title}
+                    <TableCell className="font-medium max-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate" title={issue.title}>{issue.title}</span>
                         {overdue && <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />}
                         {isUnassigned && <UserMinus className="w-4 h-4 text-blue-500 shrink-0" />}
                         {needsScheduling && <HelpCircle className="w-4 h-4 text-amber-500 shrink-0" />}

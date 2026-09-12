@@ -39,13 +39,13 @@ export function BoardCard({ issue, index, onClick }: BoardCardProps) {
           className={`mb-2 ${snapshot.isDragging ? "opacity-50" : ""}`}
           onClick={() => onClick(issue)}
         >
-          <Card className={`cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${overdue ? "border-red-300 bg-red-50/20" :
+          <Card className={`cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow min-w-0 overflow-hidden ${overdue ? "border-red-300 bg-red-50/20" :
               isUnassigned ? "border-blue-200 bg-blue-50/10" :
                 needsScheduling ? "border-amber-200 bg-amber-50/10" : ""
             }`}>
-            <CardHeader className="p-3 pb-0 space-y-0">
-              <div className="flex justify-between items-start gap-2">
-                <CardTitle className="text-sm font-medium leading-none break-words">
+            <CardHeader className="p-3 pb-0 space-y-0 min-w-0">
+              <div className="flex justify-between items-start gap-2 min-w-0">
+                <CardTitle className="text-sm font-medium leading-snug min-w-0 break-words [overflow-wrap:anywhere]" title={issue.title}>
                   {issue.title}
                 </CardTitle>
                 <div className="flex gap-1 shrink-0">

@@ -178,7 +178,7 @@ export function Dashboard({ user, logout }: DashboardProps) {
                                 setHasFetched={setHasFetchedInbox}
                             />
                         ) : project ? (
-                            <Tabs defaultValue="board" className="h-full flex flex-col">
+                            <Tabs defaultValue="board" className="h-full flex flex-col min-w-0">
                                 <div className="flex justify-between items-center mb-4 shrink-0">
                                     <div className="flex items-center gap-4">
                                         <h2 className="text-2xl font-bold tracking-tight">{project.name}</h2>
@@ -191,10 +191,10 @@ export function Dashboard({ user, logout }: DashboardProps) {
                                     </div>
                                 </div>
 
-                                <TabsContent value="board" className="flex-1 overflow-hidden mt-0">
+                                <TabsContent value="board" className="flex-1 overflow-hidden mt-0 min-w-0">
                                     <Board refreshTrigger={refreshKey} projectId={project.id} />
                                 </TabsContent>
-                                <TabsContent value="list" className="flex-1 overflow-auto mt-0">
+                                <TabsContent value="list" className="flex-1 overflow-auto mt-0 min-w-0">
                                     <IssueList refreshTrigger={refreshKey} projectId={project.id} />
                                 </TabsContent>
 
