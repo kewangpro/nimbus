@@ -29,7 +29,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ### 2.2 Issue Tracking
 *   **Kanban Board:** Drag-and-drop with real-time WebSocket updates.
 *   **List View:** Sortable, filterable, high-density table.
-*   **My Calendar:** User-centric 5-day sprint timeline showing all assigned tasks across all projects.
+*   **My Calendar:** User-centric 2-week sprint timeline (10 weekdays from today with up to 7-day overdue lookback) showing all assigned tasks across all projects, with an outlier dropdown for tasks scheduled outside the active plan.
 *   **Visual Indicators:** Overdue (red), unassigned (blue), unscheduled (amber).
 
 ### 2.3 SSO & Email Integration
@@ -42,7 +42,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 
 ### 2.4 AI-Native Core (Local MLX + Llama 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
-*   **AI Scheduler:** Redistributes open (non-done, non-canceled) tasks — unscheduled, scheduled for today/future, or mis-scheduled far in the future — across the next 5 business days (Mon-Fri only). **Overdue tasks (due before today) are skipped** to prevent moving them automatically. Processes in stateful batches of **20 tasks**, scalable to 100+. The calendar updates live every 4 seconds during the run.
+*   **AI Scheduler:** Redistributes open (non-done, non-canceled) tasks — unscheduled, scheduled for today/future, or mis-scheduled far in the future — across the next 10 business days (Mon-Fri only). **Overdue tasks (due before today) are skipped** to prevent moving them automatically. Processes in stateful batches of **20 tasks**, scalable to 150 tasks. The calendar view focuses on the active 2-week sprint window (with an indicator for any tasks scheduled beyond the sprint) and updates live every 4 seconds during the run.
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
 *   **Auto-Triage:** Suggests issue priority using Llama 3.2 via MLX.
 *   **Similar Issues:** Detects likely duplicates during issue creation.

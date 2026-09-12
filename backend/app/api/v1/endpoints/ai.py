@@ -45,6 +45,26 @@ class ScheduleResponse(BaseModel):
     scheduled_count: int
     message: str
 
+class ScheduleProgressResponse(BaseModel):
+    status: str
+    processed: int
+    total: int
+    percent: int
+
+_schedule_progress: dict[str, dict] = {}
+
+
+def _set_schedule_progress(user_id: Any, *, status: str, processed: int, total: int) -> None:
+    percent = int((processed / total) * 100) if total else (100 if status == "done" else 0)
+    if percent > 100:
+        percent = 100
+    _schedule_progress[str(user_id)] = {
+        "status": status,
+        "processed": processed,
+        "total": total,
+        "percent": percent,
+    }
+
 class SimilarRequest(BaseModel):
     title: str
     description: Optional[str] = None
@@ -87,6 +107,16 @@ class DependencyRequest(BaseModel):
     project_id: Optional[UUID] = None
     limit: int = 30
 
+@router.get("/schedule/progress", response_model=ScheduleProgressResponse)
+async def schedule_progress(
+    current_user: Any = Depends(deps.get_current_active_user),
+) -> Any:
+    """Return live AI Schedule progress for the current user."""
+    return _schedule_progress.get(
+        str(current_user.id),
+        {"status": "idle", "processed": 0, "total": 0, "percent": 0},
+    )
+
 @router.post("/schedule", response_model=ScheduleResponse)
 async def auto_schedule(
     db: AsyncSession = Depends(deps.get_db),
@@ -96,10 +126,11 @@ async def auto_schedule(
     Auto-schedule open issues using AI.
     """
     logger.info(f"User {current_user.id} requested auto-scheduling")
-    # 1. Fetch open issues (scoped by role)
-    # For regular users and tests, always filter by current user
-    owner_id = current_user.id
-    assignee_id = None
+    _set_schedule_progress(current_user.id, status="running", processed=0, total=0)
+    # Match My Sprint Plan: calendar loads assignee_id=current user.
+    # Clients are additionally scoped to issues they own.
+    assignee_id = current_user.id
+    owner_id = current_user.id if getattr(current_user, "role", None) == "client" else None
 
     issues: list[Issue] = []
     page_size = 200
@@ -162,9 +193,21 @@ async def auto_schedule(
     
     if not schedulable_issues:
         logger.info("No issues require rescheduling.")
+        _set_schedule_progress(current_user.id, status="done", processed=0, total=0)
         return {"scheduled_count": 0, "message": "No issues require rescheduling."}
 
     logger.info(f"Redistributing {len(schedulable_issues)} issues for total sprint balance")
+
+    # Generate next 10 weekdays in user's timezone
+    next_10_weekdays = []
+    # today variable is already defined as now_in_tz.date()
+    current_date = today
+    while len(next_10_weekdays) < 10:
+        if current_date.weekday() < 5: # 0-4 are Mon-Fri
+            next_10_weekdays.append(current_date.strftime("%Y-%m-%d"))
+        current_date += timedelta(days=1)
+
+    sprint_end_date = datetime.strptime(next_10_weekdays[-1], "%Y-%m-%d").date()
 
     # Priority mapping for numerical sorting
     priority_map = {
@@ -175,27 +218,38 @@ async def auto_schedule(
     }
 
     # Sort criteria for processing:
-    # 1. Priority (URGENT -> LOW) - Ensure important tasks get first pick of earlier days
-    # 2. Created date (Older first)
-    schedulable_issues.sort(key=lambda x: (
-        priority_map.get(str(x.priority).lower(), 9),
-        x.created_at or datetime.min.replace(tzinfo=timezone.utc)
-    ))
+    # 1. Placement need: Pull unscheduled and far-future (> sprint_end) tasks in before the cap
+    # 2. Priority (URGENT -> LOW) - important tasks get first pick of earlier days
+    # 3. Created date (Older first)
+    def get_sort_key(task: Issue):
+        task_due = task.due_date
+        if task_due is not None:
+            if task_due.tzinfo is None:
+                task_due = task_due.replace(tzinfo=timezone.utc)
+            task_due_date = task_due.astimezone(tz).date()
+        else:
+            task_due_date = None
+        needs_placement = 0 if (task_due_date is None or task_due_date > sprint_end_date) else 1
+        return (
+            needs_placement,
+            priority_map.get(str(task.priority).lower(), 9),
+            task.created_at or datetime.min.replace(tzinfo=timezone.utc)
+        )
 
-    # Cap to top 60 most urgent/relevant issues to ensure fast generation (<15s) and realistic workload
-    # (maximum 6 tasks per day across the 10-day sprint)
-    if len(schedulable_issues) > 60:
-        logger.info(f"Capping auto-scheduling from {len(schedulable_issues)} to top 60 priority tasks")
-        schedulable_issues = schedulable_issues[:60]
-    
-    # Generate next 10 weekdays in user's timezone
-    next_10_weekdays = []
-    # today variable is already defined as now_in_tz.date()
-    current_date = today
-    while len(next_10_weekdays) < 10:
-        if current_date.weekday() < 5: # 0-4 are Mon-Fri
-            next_10_weekdays.append(current_date.strftime("%Y-%m-%d"))
-        current_date += timedelta(days=1)
+    schedulable_issues.sort(key=get_sort_key)
+
+    # Scale to 100+ tasks (up to 150 tasks) across the 10-day sprint
+    MAX_SCHEDULABLE_ISSUES = 150
+    if len(schedulable_issues) > MAX_SCHEDULABLE_ISSUES:
+        logger.info(f"Capping auto-scheduling from {len(schedulable_issues)} to top {MAX_SCHEDULABLE_ISSUES} priority tasks")
+        schedulable_issues = schedulable_issues[:MAX_SCHEDULABLE_ISSUES]
+
+    _set_schedule_progress(
+        current_user.id,
+        status="running",
+        processed=0,
+        total=len(schedulable_issues),
+    )
 
     # 2. Process in batches with Enforced Balancing
     batch_size = 20
@@ -275,6 +329,7 @@ async def auto_schedule(
             day_num_raw = item.get("day_number")
             
             if idx_val not in batch_id_map: continue
+            if idx_val in processed_indices: continue
             processed_indices.add(idx_val)
 
             # Deterministic Fallback: If AI suggests an overloaded day, find the truly least busy day
@@ -352,8 +407,20 @@ async def auto_schedule(
                 except Exception: continue
         
         await db.commit()
+        _set_schedule_progress(
+            current_user.id,
+            status="running",
+            processed=min(total_updated, len(schedulable_issues)),
+            total=len(schedulable_issues),
+        )
 
     logger.info(f"Successfully balanced {total_updated} issues across the sprint.")
+    _set_schedule_progress(
+        current_user.id,
+        status="done",
+        processed=len(schedulable_issues),
+        total=len(schedulable_issues),
+    )
     return {"scheduled_count": total_updated, "message": f"Successfully balanced {total_updated} tasks across 10 days."}
 
 @router.post("/plan", response_model=List[PlannedIssue])

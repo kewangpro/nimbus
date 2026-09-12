@@ -70,12 +70,12 @@ CREATE TABLE issue_links (
 *   **Constraint:** Overdue tasks (due before today) are **excluded** from the rescheduling pool.
 *   **Output:** Optimized `due_date` for every issue in the pool.
 *   **Logic:**
-    *   **Capacity:** Scalable to **100+ tasks** using **Stateful Batching** (20 tasks per batch).
-    *   **Total Sprint Balance:** Redistributes the entire open backlog into the next 5 weekdays, ensuring no day is overloaded.
-    *   **Stateful Load Awareness:** Each batch prompt includes a `CURRENT WORKLOAD` summary, allowing the AI to see how many tasks are already assigned to Days 1-5.
+    *   **Capacity:** Scalable to **150 tasks** using **Stateful Batching** (20 tasks per batch).
+    *   **Total Sprint Balance:** Redistributes open tasks into the next 10 weekdays (2-week sprint), ensuring no day is overloaded. Prioritizes mis-scheduled far-future tasks (> 10 business days) and unscheduled tasks to pull them into the sprint.
+    *   **Stateful Load Awareness:** Each batch prompt includes a `CURRENT WORKLOAD` summary, allowing the AI to see how many tasks are already assigned to Days 1-10.
     *   **Deterministic Safety Layer:** The backend enforces a strict `Least-Busy-Day` override. If the AI suggests an overloaded day, the system automatically pulls the task to the truly lightest day.
-    *   **100% Coverage Loop:** A final verification pass ensures every single task receives an update, using round-robin assignment for any items the AI skips.
-    *   **Live UI Updates:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight, so the calendar updates incrementally as each batch commits rather than waiting for the full response.
+    *   **100% Coverage Loop:** A final verification pass ensures every single task receives an update, using round-robin assignment for any items the AI skips, and deduplicates repeated task indices in AI responses.
+    *   **Live UI Updates & Sprint Bounding:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight, so the calendar updates incrementally as each batch commits. The sprint view is bounded to a 2-week window with a quick-access indicator for any tasks scheduled beyond the sprint.
 ...
 *   **Validation:** Every extracted task is validated for required fields (`title`) and sanitized before database insertion.
 

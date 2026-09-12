@@ -13,10 +13,10 @@ Nimbus is a modern, high-performance project management tool designed to replace
         *   **Input:** Open (non-done, non-canceled) issues that are **unscheduled** (no due date), **scheduled for today/future**, or **mis-scheduled far in the future**.
         *   **Constraint:** Overdue tasks (due before today) are **skipped** to prevent moving them automatically.
         *   **Output:** Updated `due_date` for every affected issue.
-        *   **Capacity:** Processes **20 tasks per batch** with stateful load-awareness across batches, scalable to 100+ tasks.
-        *   **Live Calendar Updates:** The calendar polls every 4 seconds during scheduling, so you see tasks populate in real time as each batch commits — no waiting for the full run to finish.
-        *   **Precision Intelligence:** Employs **Index Mapping** and **Day Number** strategies to ensure 100% scheduling accuracy even with smaller local models (1B/3B).
-        *   **Logic:** Prioritizes urgent tasks first. Redistributes the entire open backlog into the next 5 weekdays, strictly avoiding weekends and future-date hallucinations.
+        *   **Capacity:** Processes **20 tasks per batch** with stateful load-awareness across batches, scalable to **150 tasks**.
+        *   **Live Calendar Updates & Real-Time Progress:** Features a live animated progress bar polling `GET /api/v1/ai/schedule/progress` every 750ms with processed/total task counters, alongside 4-second calendar polling so tasks populate in real time as each batch commits — no waiting for the full run to finish.
+        *   **Precision Intelligence:** Employs **Index Mapping** and **Day Number** strategies to ensure 100% scheduling accuracy even with smaller local models (1B/3B), with automatic response deduplication.
+        *   **Logic:** Prioritizes placement need (unscheduled and far-future outlier tasks) and urgent priorities first. Redistributes open backlog tasks evenly across the next 10 weekdays (2-week sprint), strictly avoiding weekends and future-date hallucinations.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using Llama 3.2 via MLX.
@@ -27,7 +27,7 @@ Nimbus is a modern, high-performance project management tool designed to replace
     *   **Unified AI Buttons:** Consistent AI button styling across the app.
     *   **Automatic Embedding:** Every issue is automatically vectorized on creation/update using `nomic-ai/nomic-embed-text-v1` via sentence-transformers.
 *   **Interactive Views:**
-    *   **Dynamic Sprint Plan (My Calendar):** A user-centric timeline showing all tasks assigned to you across **all projects**. Features horizontal scrolling, auto-adjusting range, and toggles for "Show Weekends" and "Show Completed".
+    *   **Dynamic Sprint Plan (My Calendar):** A user-centric timeline showing all tasks assigned to you across **all projects**. Features a bounded 2-week sprint window (10 weekdays from today + up to 7-day overdue lookback), an "outside this plan" dropdown menu to inspect outlier tasks, horizontal scrolling, and toggles for "Show Weekends" and "Show Completed".
         ![Calendar View](docs/screenshots/calendar.png)
     *   **Kanban Board:** Project-specific drag-and-drop interface with optimistic UI updates.
         ![Kanban Board](docs/screenshots/board.png)

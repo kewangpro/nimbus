@@ -31,8 +31,9 @@
 ### 3.2 View Contexts
 
 **My Calendar (Global)**
-*   Responsive horizontal-scroll timeline for the upcoming week.
+*   Responsive horizontal-scroll sprint timeline for the active 2-week sprint window (10 weekdays from today with up to 7-day overdue lookback).
 *   Shows all tasks assigned to the current user across **all projects**.
+*   Outlier indicator: Dropdown menu displaying tasks scheduled outside this plan window ("Older than this plan" and "Beyond this sprint") with one-click issue detail inspection.
 *   Visual indicators: project context on each card, overdue highlights.
 
 **Project Workspace**
@@ -67,7 +68,7 @@
 
 #### 📅 AI Schedule
 *   **Location:** Calendar view "AI Schedule" button.
-*   **Interaction:** One click to redistribute open/unscheduled tasks across the next 5 business days. **Overdue tasks are skipped** to respect their original deadlines.
+*   **Interaction:** One click to redistribute open/unscheduled tasks across the next 10 business days (scalable up to 150 tasks). Displays real-time progress bar with live task counters (polling `/ai/schedule/progress`) and live 4-second calendar polling. **Overdue tasks are skipped** to respect their original deadlines.
 
 #### 🔎 Smart Search
 *   **Location:** Global header "Smart Search..." input.

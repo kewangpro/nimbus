@@ -19,10 +19,10 @@ async def test_ai_schedule_endpoint(
 
     now = datetime.now(timezone.utc)
     # 4 issues that should ALL be redistributed
-    issue_overdue = await crud_issue.create(db, obj_in=IssueCreate(title="Overdue", project_id=project.id, due_date=now - timedelta(days=5)), owner_id=user.id)
-    issue_future = await crud_issue.create(db, obj_in=IssueCreate(title="Far Future", project_id=project.id, due_date=now + timedelta(days=240)), owner_id=user.id)
-    issue_unscheduled = await crud_issue.create(db, obj_in=IssueCreate(title="Unscheduled", project_id=project.id, due_date=None), owner_id=user.id)
-    issue_in_window = await crud_issue.create(db, obj_in=IssueCreate(title="In Window", project_id=project.id, due_date=now + timedelta(days=2)), owner_id=user.id)
+    issue_overdue = await crud_issue.create(db, obj_in=IssueCreate(title="Overdue", project_id=project.id, due_date=now - timedelta(days=5), assignee_id=user.id), owner_id=user.id)
+    issue_future = await crud_issue.create(db, obj_in=IssueCreate(title="Far Future", project_id=project.id, due_date=now + timedelta(days=240), assignee_id=user.id), owner_id=user.id)
+    issue_unscheduled = await crud_issue.create(db, obj_in=IssueCreate(title="Unscheduled", project_id=project.id, due_date=None, assignee_id=user.id), owner_id=user.id)
+    issue_in_window = await crud_issue.create(db, obj_in=IssueCreate(title="In Window", project_id=project.id, due_date=now + timedelta(days=2), assignee_id=user.id), owner_id=user.id)
 
     mock_response = json.dumps([
         {"index": 0, "day_number": 1},
@@ -60,8 +60,8 @@ async def test_ai_schedule_priority_sorting(
     project = await crud_project.create(db, obj_in=p_in, owner_id=user.id)
 
     # High priority should be index 0
-    issue_low = await crud_issue.create(db, obj_in=IssueCreate(title="Low", project_id=project.id, priority="low", due_date=None), owner_id=user.id)
-    issue_high = await crud_issue.create(db, obj_in=IssueCreate(title="High", project_id=project.id, priority="high", due_date=None), owner_id=user.id)
+    issue_low = await crud_issue.create(db, obj_in=IssueCreate(title="Low", project_id=project.id, priority="low", due_date=None, assignee_id=user.id), owner_id=user.id)
+    issue_high = await crud_issue.create(db, obj_in=IssueCreate(title="High", project_id=project.id, priority="high", due_date=None, assignee_id=user.id), owner_id=user.id)
 
     mock_response = json.dumps([{"index": 0, "day_number": 1}, {"index": 1, "day_number": 2}])
     with patch("app.core.ai.generate_completion", return_value=mock_response):
@@ -107,3 +107,34 @@ async def test_get_issue_summary_endpoint(
     assert data is not None
     assert data["summary"] == "AI-generated summary of email."
     assert data["next_steps"] == ["Step 1", "Step 2"]
+
+
+@pytest.mark.asyncio
+async def test_ai_schedule_progress_endpoint(
+    client: AsyncClient, normal_user_token_headers: dict, db: AsyncSession
+) -> None:
+    from app.crud.crud_user import get_by_email
+    user = await get_by_email(db, email="user@example.com")
+    project = await crud_project.create(db, obj_in=ProjectCreate(name="Progress Test"), owner_id=user.id)
+    await crud_issue.create(
+        db,
+        obj_in=IssueCreate(title="Needs a date", project_id=project.id, due_date=None, assignee_id=user.id),
+        owner_id=user.id,
+    )
+
+    idle = await client.get("/api/v1/ai/schedule/progress", headers=normal_user_token_headers)
+    assert idle.status_code == 200
+    assert "percent" in idle.json()
+    assert "status" in idle.json()
+
+    mock_response = json.dumps([{"index": 0, "day_number": 1}])
+    with patch("app.core.ai.generate_completion", return_value=mock_response):
+        scheduled = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+    assert scheduled.status_code == 200
+
+    done = await client.get("/api/v1/ai/schedule/progress", headers=normal_user_token_headers)
+    assert done.status_code == 200
+    data = done.json()
+    assert data["status"] == "done"
+    assert data["percent"] == 100
+    assert data["total"] >= 1

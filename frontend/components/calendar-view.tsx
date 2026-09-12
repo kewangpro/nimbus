@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { format, addDays, isSameDay, isToday, startOfDay, parseISO, isBefore, isAfter } from "date-fns"
+import { format, addDays, isSameDay, startOfDay, isBefore, isAfter } from "date-fns"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
 import axios from "axios"
 import { api } from "@/lib/api"
 import { Issue, IssueStatus, IssuePriority } from "@/types"
 import { Button } from "@/components/ui/button"
 import { AIButton } from "@/components/ai-button"
-import { Wand2, Loader2, RefreshCw } from "lucide-react"
+import { Loader2, RefreshCw, CalendarClock } from "lucide-react"
 import { toast } from "sonner"
 import { IssueDetailModal } from "@/components/issue-detail-modal"
 import { Switch } from "@/components/ui/switch"
@@ -16,6 +16,15 @@ import { Label } from "@/components/ui/label"
 import { isOverdue } from "@/lib/utils"
 import { useTimezone } from "@/components/timezone-provider"
 import { fromZonedTime } from "date-fns-tz"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { getSprintPlanRange } from "@/lib/sprint-plan"
 
 const isAbortError = (err: any) => {
     return (
@@ -35,6 +44,8 @@ interface CalendarViewProps {
 export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) {
     const [issues, setIssues] = useState<Issue[]>([])
     const [scheduling, setScheduling] = useState(false)
+    const [schedulePercent, setSchedulePercent] = useState(0)
+    const [scheduleCounts, setScheduleCounts] = useState({ processed: 0, total: 0 })
     const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
     const [showCompleted, setShowCompleted] = useState(false)
     const [showWeekends, setShowWeekends] = useState(true)
@@ -98,12 +109,15 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
 
     const handleAutoSchedule = async () => {
         setScheduling(true)
+        setSchedulePercent(0)
+        setScheduleCounts({ processed: 0, total: 0 })
         if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current)
         }
         pollIntervalRef.current = setInterval(fetchIssues, 4000)
         try {
             const res = await api.post("/ai/schedule", {}, { timeout: 180000 })
+            setSchedulePercent(100)
             toast.success(res.data.message)
         } catch (err: any) {
             if (isAbortError(err)) return
@@ -116,8 +130,34 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
             }
             fetchIssues()
             setScheduling(false)
+            setSchedulePercent(0)
+            setScheduleCounts({ processed: 0, total: 0 })
         }
     }
+
+    useEffect(() => {
+        if (!scheduling) return
+        let cancelled = false
+        const pollProgress = async () => {
+            try {
+                const res = await api.get("/ai/schedule/progress")
+                if (cancelled) return
+                setSchedulePercent(typeof res.data.percent === "number" ? res.data.percent : 0)
+                setScheduleCounts({
+                    processed: res.data.processed ?? 0,
+                    total: res.data.total ?? 0,
+                })
+            } catch (err: any) {
+                if (isAbortError(err)) return
+            }
+        }
+        pollProgress()
+        const id = setInterval(pollProgress, 750)
+        return () => {
+            cancelled = true
+            clearInterval(id)
+        }
+    }, [scheduling])
 
     // Refetch when refreshTrigger changes
     useEffect(() => {
@@ -151,50 +191,44 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
         }
     }
 
-    const days = useMemo(() => {
-        let minDate: Date | null = null
-        let maxDate: Date | null = null
+    const { days, olderThanPlan, tasksBeyondSprint } = useMemo(() => {
+        let oldestDue: Date | null = null
 
-        for (const issue of issues) {
-            if (!issue.due_date) continue
-            if (!showCompleted && (issue.status === IssueStatus.DONE || issue.status === IssueStatus.CANCELED)) continue
+        const visibleDatedIssues = issues.filter((issue): issue is Issue & { due_date: string } => {
+            if (!issue.due_date) return false
+            if (!showCompleted && (issue.status === IssueStatus.DONE || issue.status === IssueStatus.CANCELED)) return false
+            return true
+        })
 
-            // Ensure we use the user's timezone when determining which "day" an issue belongs to
+        for (const issue of visibleDatedIssues) {
             const date = startOfDay(toZoned(issue.due_date))
-
-            if (!minDate || isBefore(date, minDate)) minDate = date
-            if (!maxDate || isAfter(date, maxDate)) maxDate = date
+            if (!oldestDue || isBefore(date, oldestDue)) oldestDue = date
         }
 
-        let start = todayInTz
-        let end = addDays(todayInTz, 4)
+        const { start, end } = getSprintPlanRange(todayInTz, oldestDue)
 
-        if (minDate && maxDate) {
-            // Check if today is close to the scheduled dates (within 45 days)
-            const diffFromToday = Math.abs(minDate.getTime() - todayInTz.getTime()) / (1000 * 60 * 60 * 24)
-            if (diffFromToday < 45) {
-                // Today is close, merge today and issues range normally
-                start = isBefore(todayInTz, minDate) ? todayInTz : minDate
-                end = isAfter(addDays(todayInTz, 4), maxDate) ? addDays(todayInTz, 4) : maxDate
-            } else {
-                // Today is extremely far (e.g., mock clock mismatch), ignore today to prevent rendering a giant calendar
-                start = minDate
-                end = maxDate
-            }
-        }
-
-        // Generate range
         const dayList = []
         let current = start
         while (current <= end) {
-            // Filter weekends if toggle is off
             const isWeekend = current.getDay() === 0 || current.getDay() === 6
             if (showWeekends || !isWeekend) {
                 dayList.push(current)
             }
             current = addDays(current, 1)
         }
-        return dayList
+
+        const olderThanPlan: Issue[] = []
+        const beyondList: Issue[] = []
+        for (const issue of visibleDatedIssues) {
+            const issueDate = startOfDay(toZoned(issue.due_date))
+            if (isBefore(issueDate, start)) olderThanPlan.push(issue)
+            else if (isAfter(issueDate, end)) beyondList.push(issue)
+        }
+
+        olderThanPlan.sort((a, b) => toZoned(a.due_date!).getTime() - toZoned(b.due_date!).getTime())
+        beyondList.sort((a, b) => toZoned(a.due_date!).getTime() - toZoned(b.due_date!).getTime())
+
+        return { days: dayList, olderThanPlan, tasksBeyondSprint: beyondList }
     }, [issues, showCompleted, showWeekends, todayInTz, toZoned])
 
     // Helper to split issues into days for render
@@ -226,6 +260,59 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
             <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
                     <h2 className="text-xl font-bold">My Sprint Plan ({days.length} Days)</h2>
+                    {(olderThanPlan.length > 0 || tasksBeyondSprint.length > 0) && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-xs h-7 px-2.5 gap-1.5 border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:text-amber-950 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
+                                    <CalendarClock className="h-3.5 w-3.5" />
+                                    {olderThanPlan.length + tasksBeyondSprint.length} outside this plan
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-80 max-h-72 overflow-y-auto">
+                                {olderThanPlan.length > 0 && (
+                                    <>
+                                        <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold">
+                                            Older than this plan
+                                        </DropdownMenuLabel>
+                                        {olderThanPlan.map(issue => (
+                                            <DropdownMenuItem
+                                                key={issue.id}
+                                                className="flex flex-col items-start gap-0.5 p-2 cursor-pointer"
+                                                onClick={() => setSelectedIssue(issue)}
+                                            >
+                                                <div className="font-medium text-xs line-clamp-1">{issue.title}</div>
+                                                <div className="text-[10px] text-muted-foreground">
+                                                    Due {format(toZoned(issue.due_date!), 'MMM d, yyyy')} • {issue.priority}
+                                                </div>
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </>
+                                )}
+                                {olderThanPlan.length > 0 && tasksBeyondSprint.length > 0 && (
+                                    <DropdownMenuSeparator />
+                                )}
+                                {tasksBeyondSprint.length > 0 && (
+                                    <>
+                                        <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold">
+                                            Beyond this sprint
+                                        </DropdownMenuLabel>
+                                        {tasksBeyondSprint.map(issue => (
+                                            <DropdownMenuItem
+                                                key={issue.id}
+                                                className="flex flex-col items-start gap-0.5 p-2 cursor-pointer"
+                                                onClick={() => setSelectedIssue(issue)}
+                                            >
+                                                <div className="font-medium text-xs line-clamp-1">{issue.title}</div>
+                                                <div className="text-[10px] text-muted-foreground">
+                                                    Due {format(toZoned(issue.due_date!), 'MMM d, yyyy')} • {issue.priority}
+                                                </div>
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                     <div className="flex items-center gap-4">
                         <div className="flex items-center space-x-2 bg-muted/50 px-3 py-1 rounded-full border">
                             <Switch
@@ -246,6 +333,28 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
+                    {scheduling && (
+                        <div
+                            className="flex items-center gap-2 pr-1"
+                            role="progressbar"
+                            aria-label="AI Schedule progress"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={schedulePercent}
+                        >
+                            <div className="relative h-1.5 w-32 overflow-hidden rounded-full bg-violet-100 ring-1 ring-violet-200/80 dark:bg-violet-950/60 dark:ring-violet-800">
+                                <div
+                                    className="h-full rounded-full bg-violet-600 transition-[width] duration-500 ease-out dark:bg-violet-400"
+                                    style={{ width: `${Math.max(schedulePercent, 4)}%` }}
+                                />
+                            </div>
+                            <span className="text-[10px] font-medium tabular-nums text-violet-800 dark:text-violet-300 min-w-[2.75rem]">
+                                {scheduleCounts.total > 0
+                                    ? `${scheduleCounts.processed}/${scheduleCounts.total}`
+                                    : "…"}
+                            </span>
+                        </div>
+                    )}
                     <AIButton
                         size="sm"
                         className="gap-2"
@@ -253,7 +362,7 @@ export function CalendarView({ refreshTrigger = 0, userId }: CalendarViewProps) 
                         disabled={scheduling}
                     >
                         {scheduling && <Loader2 className="h-3 w-3 animate-spin" />}
-                        🗓️ AI Schedule
+                        {scheduling ? "Scheduling…" : "AI Schedule"}
                     </AIButton>
                     <Button variant="outline" size="icon" onClick={fetchIssues}>
                         <RefreshCw className="h-4 w-4" />
