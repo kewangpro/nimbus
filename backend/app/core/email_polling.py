@@ -86,6 +86,106 @@ async def poll_emails(db: AsyncSession):
     for user in users:
         await process_email_source(db, user)
 
+
+def _imap_auth_error_reason(response) -> str:
+    parts = []
+    for line in getattr(response, "lines", None) or []:
+        if isinstance(line, (bytes, bytearray)):
+            parts.append(line.decode("utf-8", errors="replace"))
+        else:
+            parts.append(str(line))
+    detail = " ".join(p.strip() for p in parts if p and str(p).strip())
+    result = getattr(response, "result", "NO")
+    if detail:
+        return f"IMAP XOAUTH2 authentication failed: {result} ({detail[:240]})"
+    return f"IMAP XOAUTH2 authentication failed: {result}"
+
+
+async def _imap_connect(host: str):
+    imap = aioimaplib.IMAP4_SSL(host=host, timeout=60.0)
+    await imap.wait_hello_from_server()
+    return imap
+
+
+async def _xoauth2_authenticate(imap, email_address: str, token: str):
+    auth_string = generate_xoauth2_string(email_address, token)
+    return await imap.protocol.execute(
+        Command("AUTHENTICATE", imap.protocol.new_tag(), "XOAUTH2", auth_string)
+    )
+
+
+async def _log_auth_failed(db: AsyncSession, user_id, email_address: str, provider: str, reason: str) -> None:
+    try:
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+        recent_log = await db.execute(
+            select(AuditLog).where(
+                and_(
+                    AuditLog.user_id == user_id,
+                    AuditLog.action == "email.auth_failed",
+                    AuditLog.created_at >= one_hour_ago,
+                )
+            ).limit(1)
+        )
+        if not recent_log.scalars().first():
+            await crud_audit.log_action(
+                db,
+                "email.auth_failed",
+                user_id=user_id,
+                entity_type="user",
+                entity_id=user_id,
+                details={
+                    "email": email_address,
+                    "provider": provider,
+                    "reason": reason,
+                    "error_class": "permanent",
+                    "is_transient": False,
+                },
+            )
+    except Exception as audit_err:
+        logger.error(f"Failed to write email.auth_failed audit log for {email_address}: {audit_err}")
+        await db.rollback()
+
+
+async def _maybe_log_imap_recovered(db: AsyncSession, user_id, email_address: str, provider: str) -> None:
+    try:
+        one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+        recent_logs = await db.execute(
+            select(AuditLog).where(
+                and_(
+                    AuditLog.user_id == user_id,
+                    AuditLog.action.in_([
+                        "email.connection_failed",
+                        "email.auth_failed",
+                        "email.connection_recovered",
+                    ]),
+                    AuditLog.created_at >= one_day_ago,
+                )
+            ).order_by(AuditLog.created_at.desc()).limit(1)
+        )
+        last_log = recent_logs.scalars().first()
+        if last_log and last_log.action in ("email.connection_failed", "email.auth_failed"):
+            message = (
+                f"IMAP authentication to {provider.capitalize()} restored successfully."
+                if last_log.action == "email.auth_failed"
+                else f"Connection to {provider.capitalize()} restored successfully."
+            )
+            await crud_audit.log_action(
+                db,
+                "email.connection_recovered",
+                user_id=user_id,
+                entity_type="user",
+                entity_id=user_id,
+                details={
+                    "email": email_address,
+                    "provider": provider,
+                    "status": "connected",
+                    "message": message,
+                },
+            )
+    except Exception as rec_err:
+        logger.debug(f"Could not check/write connection_recovered: {rec_err}")
+
+
 async def process_email_source(db: AsyncSession, user: User, retry: bool = True):
     """
     Connect to IMAP and fetch unseen emails for a specific user.
@@ -101,83 +201,35 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
         if not token:
             return
 
-        # Connect to provider with increased timeout (60 seconds)
-        imap = aioimaplib.IMAP4_SSL(host=host, timeout=60.0)
-        await imap.wait_hello_from_server()
-        
-        # XOAUTH2 Authentication
-        auth_string = generate_xoauth2_string(email_address, token)
-        response = await imap.protocol.execute(Command("AUTHENTICATE", imap.protocol.new_tag(), "XOAUTH2", auth_string))
+        imap = await _imap_connect(host)
+        response = await _xoauth2_authenticate(imap, email_address, token)
         logger.debug(f"AUTHENTICATE result for {email_address}: {response.result}, lines: {response.lines}")
-        if response.result == "OK":
-            imap.protocol.state = "AUTH"
-            # Check if there was a recent connection_failed error that is now recovered
-            try:
-                one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
-                recent_logs = await db.execute(
-                    select(AuditLog).where(
-                        and_(
-                            AuditLog.user_id == user_id,
-                            AuditLog.action.in_(["email.connection_failed", "email.connection_recovered"]),
-                            AuditLog.created_at >= one_day_ago
-                        )
-                    ).order_by(AuditLog.created_at.desc()).limit(1)
-                )
-                last_conn_log = recent_logs.scalars().first()
-                if last_conn_log and last_conn_log.action == "email.connection_failed":
-                    await crud_audit.log_action(
-                        db,
-                        "email.connection_recovered",
-                        user_id=user_id,
-                        entity_type="user",
-                        entity_id=user_id,
-                        details={
-                            "email": email_address,
-                            "provider": provider,
-                            "status": "connected",
-                            "message": f"Connection to {provider.capitalize()} restored successfully."
-                        }
-                    )
-            except Exception as rec_err:
-                logger.debug(f"Could not check/write connection_recovered: {rec_err}")
-        else:
-            # Log the full server error detail (Outlook often returns a base64 JSON error)
+
+        if response.result != "OK":
             logger.error(f"XOAUTH2 AUTHENTICATE failed for {email_address}: result={response.result} lines={response.lines}")
-            # Don't call logout() — connection is still in NONAUTH, that would throw
-            # Try forcing a token refresh in case the token was silently revoked
-            logger.info(f"Forcing token refresh for {email_address} due to auth failure...")
-            user.oauth_token_expires_at = None  # invalidate so refresh_token_v2 will attempt refresh
+            # Stale-but-unexpired access tokens are common with Outlook. Force a refresh and retry once.
+            user.oauth_token_expires_at = None
             await db.commit()
-            try:
-                one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
-                recent_log = await db.execute(
-                    select(AuditLog).where(
-                        and_(
-                            AuditLog.user_id == user_id,
-                            AuditLog.action == "email.auth_failed",
-                            AuditLog.created_at >= one_hour_ago
-                        )
-                    ).limit(1)
+            refreshed = await refresh_token_v2(db, user)
+            if refreshed:
+                logger.info(f"Retrying IMAP XOAUTH2 for {email_address} after token refresh...")
+                imap = await _imap_connect(host)
+                response = await _xoauth2_authenticate(imap, email_address, refreshed)
+                logger.debug(f"AUTHENTICATE retry result for {email_address}: {response.result}, lines={response.lines}")
+
+            if response.result != "OK":
+                logger.error(f"XOAUTH2 AUTHENTICATE still failing for {email_address} after refresh retry: result={response.result} lines={response.lines}")
+                await _log_auth_failed(
+                    db,
+                    user_id,
+                    email_address,
+                    provider,
+                    _imap_auth_error_reason(response),
                 )
-                if not recent_log.scalars().first():
-                    await crud_audit.log_action(
-                        db,
-                        "email.auth_failed",
-                        user_id=user_id,
-                        entity_type="user",
-                        entity_id=user_id,
-                        details={
-                            "email": email_address,
-                            "provider": provider,
-                            "reason": f"IMAP XOAUTH2 authentication failed: {response.result}",
-                            "error_class": "permanent",
-                            "is_transient": False,
-                        }
-                    )
-            except Exception as audit_err:
-                logger.error(f"Failed to write email.auth_failed audit log for {email_address}: {audit_err}")
-                await db.rollback()
-            return
+                return
+
+        imap.protocol.state = "AUTH"
+        await _maybe_log_imap_recovered(db, user_id, email_address, provider)
 
         await imap.select("INBOX")
 

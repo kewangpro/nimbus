@@ -46,9 +46,9 @@ Actions related to the email-to-task automation.
 | `email.task_created_manual` | When a user manually creates a task from their inbox. | Success |
 | `email.task_creation_failed` | When an error occurs while creating a task from an email. | **Permanent Failure** (`is_transient: false`): Mark email `\Seen` and record in audit log to isolate poison-pill emails and avoid infinite retry loops. |
 | `email.token_refresh_failed` | When OAuth access token refresh fails. Throttled to max 1 per hour per user. | **Transient** (`is_transient: true`) for HTTP 5xx or network drops; **Permanent** (`is_transient: false`) for HTTP 400/401 (e.g. expired client secret or missing token, requiring re-login). |
-| `email.auth_failed` | When IMAP XOAUTH2 authentication is rejected by the mail provider. Throttled to max 1 per hour per user. | **Permanent** (`is_transient: false`): Mail access rejected; user must re-authenticate. |
+| `email.auth_failed` | When IMAP XOAUTH2 authentication is still rejected after forcing an OAuth token refresh and retrying IMAP in the same poll. Throttled to max 1 per hour per user. | **Permanent** (`is_transient: false`): Access token was stale or revoked; a same-cycle refresh+IMAP retry already failed, so the user must re-authenticate. A first IMAP `NO` is treated as a stale-token retry and is not logged. |
 | `email.connection_failed` | When connection to the IMAP server fails or times out. Throttled to max 1 per hour per user. | **Transient** (`is_transient: true`): Poller auto-retries in 3s, and background worker retries every 60s. Unread emails remain `UNSEEN` and are preserved for subsequent processing. |
-| `email.connection_recovered` | When IMAP connection and authentication succeed following a previous connection failure. | **Recovery Success**: Confirms background retries succeeded and connection is restored. |
+| `email.connection_recovered` | When IMAP connection and authentication succeed following a previous connection failure or auth failure. | **Recovery Success**: Confirms background retries succeeded and connection/auth is restored. |
 | `email.ignored` | When a polled email does not contain actionable tasks (e.g., promotional ad or newsletter). | Informational (Non-Task) |
 
 ### 📂 Files

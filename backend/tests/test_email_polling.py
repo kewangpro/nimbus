@@ -381,5 +381,110 @@ async def test_poll_emails_logs_auth_failed_on_imap_auth_error(db: AsyncSession)
     logs = res.scalars().all()
     assert len(logs) == 1
     assert "IMAP XOAUTH2 authentication failed" in logs[0].details.get("reason", "")
+    assert logs[0].details.get("is_transient") is False
+    assert "AUTHENTICATE failed" in logs[0].details.get("reason", "")
+
+
+@pytest.mark.asyncio
+async def test_poll_emails_retries_imap_auth_after_token_refresh(db: AsyncSession):
+    from app.models.audit_log import AuditLog
+    from sqlalchemy.future import select
+    from app.core import email_polling
+
+    user = User(
+        email="stale-token@example.com",
+        oauth_provider="outlook",
+        oauth_access_token="stale-token",
+        oauth_refresh_token="refresh-token",
+        oauth_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        email_automation_enabled=True
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    user_id = user.id
+
+    failed_imap = MagicMock()
+    failed_imap.wait_hello_from_server = AsyncMock()
+    failed_imap.protocol = MagicMock()
+    failed_imap.protocol.new_tag = MagicMock(return_value="A1")
+    failed_imap.protocol.execute = AsyncMock(return_value=MagicMock(result="NO", lines=[b"AUTHENTICATE failed"]))
+
+    ok_imap = MagicMock()
+    ok_imap.wait_hello_from_server = AsyncMock()
+    ok_imap.protocol = MagicMock()
+    ok_imap.protocol.new_tag = MagicMock(return_value="A2")
+    ok_imap.protocol.execute = AsyncMock(side_effect=[
+        MagicMock(result="OK"),
+        MagicMock(result="OK", lines=[b"* SEARCH", b"SEARCH completed."]),
+    ])
+    ok_imap.select = AsyncMock()
+    ok_imap.logout = AsyncMock()
+
+    with patch("aioimaplib.IMAP4_SSL", side_effect=[failed_imap, ok_imap]), \
+         patch.object(email_polling, "refresh_token_v2", AsyncMock(side_effect=["stale-token", "fresh-token"])):
+        await poll_emails(db)
+
+    res = await db.execute(
+        select(AuditLog).where(
+            AuditLog.user_id == user_id,
+            AuditLog.action == "email.auth_failed"
+        )
+    )
+    assert res.scalars().all() == []
+    assert failed_imap.protocol.execute.await_count == 1
+    assert ok_imap.select.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_poll_emails_logs_auth_recovered_after_prior_failure(db: AsyncSession):
+    from app.models.audit_log import AuditLog
+    from sqlalchemy.future import select
+    from app.crud import crud_audit
+
+    user = User(
+        email="recovered-auth@example.com",
+        oauth_provider="outlook",
+        oauth_access_token="valid-token",
+        oauth_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        email_automation_enabled=True
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    user_id = user.id
+
+    await crud_audit.log_action(
+        db,
+        "email.auth_failed",
+        user_id=user_id,
+        entity_type="user",
+        entity_id=user_id,
+        details={"error_class": "permanent", "is_transient": False},
+    )
+
+    mock_imap = MagicMock()
+    mock_imap.wait_hello_from_server = AsyncMock()
+    mock_imap.protocol = MagicMock()
+    mock_imap.protocol.new_tag = MagicMock(return_value="A1")
+    mock_imap.protocol.execute = AsyncMock(side_effect=[
+        MagicMock(result="OK"),
+        MagicMock(result="OK", lines=[b"* SEARCH", b"SEARCH completed."]),
+    ])
+    mock_imap.select = AsyncMock()
+    mock_imap.logout = AsyncMock()
+
+    with patch("aioimaplib.IMAP4_SSL", return_value=mock_imap):
+        await poll_emails(db)
+
+    res = await db.execute(
+        select(AuditLog).where(
+            AuditLog.user_id == user_id,
+            AuditLog.action == "email.connection_recovered"
+        )
+    )
+    logs = res.scalars().all()
+    assert len(logs) == 1
+    assert "authentication" in logs[0].details.get("message", "").lower()
 
 
