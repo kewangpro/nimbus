@@ -123,14 +123,28 @@ PORT=3100 npm run dev
 App: `http://localhost:3100`
 If port 3100 is in use, pick another port (e.g. `PORT=3101`).
 
-### 4. Interactive Port Diagnostics
+### 4. Running Tests
+
+#### Backend Test Suite (pytest)
+```bash
+cd backend
+./venv/bin/pytest
+```
+
+#### Frontend Test Suite
+```bash
+cd frontend
+npm test
+```
+
+### 5. Interactive Port Diagnostics
 To quickly verify that all Nimbus services are running on their correct ports and identify any port conflicts with other processes on your machine, simply run:
 ```bash
 make ports
 ```
 This prints a clean, real-time diagnostic dashboard directly in your terminal, showing which ports are `ACTIVE` (with their Process IDs and process names) or `FREE` (ready to use).
 
-### 5. Stopping the Application
+### 6. Stopping the Application
 To stop all running frontend, backend services, and Docker infrastructure containers (db, redis, minio) in one command, run:
 ```bash
 make stop

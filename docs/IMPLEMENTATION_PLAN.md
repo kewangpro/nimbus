@@ -224,5 +224,16 @@
     *   Restored `UNSEEN SINCE <7 days ago>` query for email polling, reducing scan times from >50s to <4s in large mailboxes (100k+ messages).
     *   Optimized `POST /ai/schedule` prompt by capping payload to the top 60 issues and using `max_tokens=512`, eliminating client request aborts and keeping scheduling times under 10s.
 
+---
 
+## Phase 17: Bounded Sprint Planning, AI Scheduler Scaling (150 Tasks) & Progress Telemetry ✅
+**Goal:** Bound the sprint calendar to a readable 2-week window, scale AI scheduling up to 150 tasks, pull far-future outliers into the sprint, and provide real-time progress feedback.
 
+*   [x] **Sprint Window Bounding:** Implemented `getSprintPlanRange` in `frontend/lib/sprint-plan.ts` to bound the sprint view to 10 weekdays from today (`SPRINT_WEEKDAYS = 10`) with a 7-day overdue lookback cap (`OVERDUE_LOOKBACK_DAYS = 7`), preventing calendar timeline sprawl (e.g. 55-day wide columns).
+*   [x] **Outlier Tasks Dropdown Menu:** Added `<Button><CalendarClock /> X outside this plan</Button>` dropdown menu to display tasks older than the plan or scheduled beyond the 10-day sprint window, with one-click issue inspection.
+*   [x] **AI Scheduler Scaling (150 Tasks):** Raised `MAX_SCHEDULABLE_ISSUES = 150` with stateful 20-task batching and load balancing across the sprint.
+*   [x] **Assignee Scoping Alignment:** Aligned `schedule_sprint` query to `assignee_id = current_user.id` (and client `owner_id`), matching the calendar view's query scope.
+*   [x] **Far-Future Outlier Prioritization:** Prioritized unscheduled and far-future tasks (`due_date > sprint_end_date`) to guarantee placement into the active 10-day sprint window.
+*   [x] **Batch Response Deduplication:** Safeguarded batch processing against duplicate indices from local LLM outputs.
+*   [x] **Real-Time Progress Endpoint & UI:** Added `GET /api/v1/ai/schedule/progress` and animated purple progress bar in frontend polling every 750ms with processed/total task counters.
+*   [x] **Comprehensive Test Suites:** Added frontend unit tests (`frontend/lib/sprint-plan.test.ts` via native Node.js test runner) and backend pytest suites covering far-future rebalancing, deduplication, assignee scoping, and progress polling (118 passed backend tests, 7 passed frontend tests).

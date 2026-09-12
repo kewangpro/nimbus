@@ -76,9 +76,9 @@ CREATE TABLE issue_links (
     *   **Deterministic Safety Layer:** The backend enforces a strict `Least-Busy-Day` override. If the AI suggests an overloaded day, the system automatically pulls the task to the truly lightest day.
     *   **100% Coverage Loop:** A final verification pass ensures every single task receives an update, using round-robin assignment for any items the AI skips, and deduplicates repeated task indices in AI responses.
     *   **Live UI Updates & Sprint Bounding:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight, so the calendar updates incrementally as each batch commits. The sprint view is bounded to a 2-week window with a quick-access indicator for any tasks scheduled beyond the sprint.
-...
-*   **Validation:** Every extracted task is validated for required fields (`title`) and sanitized before database insertion.
+    *   **Real-Time Progress Endpoint:** Exposes `GET /api/v1/ai/schedule/progress` returning `{ "status": "idle" | "running" | "done", "processed": int, "total": int, "percent": int }` polled every 750ms by the frontend.
 
+### 4.4 Semantic Search
 *   **Input:** User query string.
 *   **Output:** Issues ranked by `pgvector` cosine distance (`<=>`) to the query embedding.
 
@@ -165,7 +165,7 @@ CREATE TABLE issue_links (
 *   **Async:** All AI calls run in a single-worker `ThreadPoolExecutor` wrapped with `asyncio.run_in_executor` — non-blocking to the FastAPI event loop. MLX requires sequential GPU access, hence `max_workers=1`.
 *   **Lazy loading:** Models are loaded on first inference call and kept in memory for the process lifetime.
 *   **Debounce:** UI updates are immediate (optimistic); vector updates happen on save.
-*   **Scheduler Batch Capping:** Task auto-scheduling caps the prompt payload to the top 60 highest priority/earliest due issues and sets `max_tokens=512`, preventing request aborts and keeping LLM response times well under 10 seconds.
+*   **Scheduler Scaling & Stateful Batching:** Task auto-scheduling scales up to 150 tasks using stateful 20-task batches with load awareness across batches, keeping LLM response times well under control.
 *   **Context Window:** Completion calls use a `max_tokens` limit of **4096** (increased from 2048) to support large structured outputs (e.g., 100+ task schedules).
 *   **Fallback:** If inference fails (e.g. model not yet downloaded), AI endpoints return HTTP 500. No keyword fallback — treat AI features as optional.
 *   **Consolidated Background Jobs:** Embedding backfills and email polling run via an integrated async worker task inside the main FastAPI process to minimize memory footprint.
@@ -192,4 +192,3 @@ Nimbus implements a **Model Context Protocol (MCP)** server via the `FastMCP` fr
 ### Security:
 *   Currently uses environment-based user lookup (`NIMBUS_USER_EMAIL`) for MCP context.
 *   Strictly filters data by `owner_id` to ensure isolation.
-156: 
