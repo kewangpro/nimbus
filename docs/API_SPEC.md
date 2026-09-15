@@ -19,11 +19,11 @@
     *   **Response:** `List[dict]` — up to 20 emails, newest first. Each item: `{ id, subject, from, date, snippet }`.
 *   `POST /email-oauth/create-task-from-email`
     *   **Body:** `{ "subject": "...", "snippet": "...", "id": "..." }`
-    *   **Description:** AI-powered task creation from an email. Stores the raw email body in `description`, saves the AI summary in `IssueSummary`, and creates the issue in the user's **"General"** project, **auto-assigned to the current user**.
+    *   **Description:** AI-powered task creation from an email. Stores the raw email body in `description`, saves the AI summary in `IssueSummary`, and creates the issue in the user's **"General"** project, **auto-assigned to the current user**. Due dates are set within the current 2-week sprint.
     *   **Response:** `{ "status": "success", "issue_id": "uuid" }`
 *   `POST /email-oauth/create-tasks-bulk`
     *   **Body:** `List[{ "subject": "...", "snippet": "...", "id": "..." }]`
-    *   **Description:** Bulk AI-powered task creation from multiple emails. Stores each email body in `description` and saves AI summaries in `IssueSummary`.
+    *   **Description:** Bulk AI-powered task creation from multiple emails. Stores each email body in `description` and saves AI summaries in `IssueSummary`. Due dates are set within the current 2-week sprint.
     *   **Response:** `{ "status": "success", "issue_ids": ["uuid", "uuid", ...] }`
 
 ## 3. Issues (Core)

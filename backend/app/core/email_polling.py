@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.email_processor import email_processor
 from app.core.email_utils import extract_email_body_from_message
+from app.core.sprint import resolve_email_task_due_date
 from app.schemas.issue import IssueCreate
 from app.models.issue import Issue
 from app.models.project import Project
@@ -376,26 +377,12 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                     if priority_val not in ["low", "medium", "high", "urgent"]:
                         priority_val = "medium"
 
-                    due_date_val = task_data.get("due_date")
-                    parsed_due_date = None
-                    if due_date_val:
-                        if isinstance(due_date_val, list):
-                            due_date_val = str(due_date_val[0]) if due_date_val else None
-                        if isinstance(due_date_val, str):
-                            due_date_val = due_date_val.strip()
-                            for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
-                                try:
-                                    parsed_due_date = datetime.strptime(due_date_val, fmt)
-                                    user_tz_str = getattr(user, "timezone", "UTC")
-                                    try:
-                                        from zoneinfo import ZoneInfo
-                                        tz = ZoneInfo(user_tz_str)
-                                    except Exception:
-                                        tz = timezone.utc
-                                    parsed_due_date = parsed_due_date.replace(tzinfo=tz)
-                                    break
-                                except ValueError:
-                                    continue
+                    parsed_due_date = await resolve_email_task_due_date(
+                        db,
+                        user,
+                        extracted_due=task_data.get("due_date"),
+                        priority=priority_val,
+                    )
 
                     # Find user's "General" project
                     res = await db.execute(select(Project).where(and_(Project.owner_id == user_id, Project.name == "General")))

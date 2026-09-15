@@ -158,7 +158,10 @@ async def test_poll_emails_sanitizes_lists(db: AsyncSession):
     assert issue.description == "Body content"
     assert issue.priority == "high"
     assert issue.due_date is not None
-    assert issue.due_date.strftime("%Y-%m-%d") == "2026-06-01"
+    from app.core.sprint import SPRINT_WEEKDAYS, next_weekdays, zoneinfo_for_user
+    user_today = datetime.now(zoneinfo_for_user(user)).date()
+    sprint_end = next_weekdays(user_today, SPRINT_WEEKDAYS)[-1]
+    assert user_today <= issue.due_date.date() <= sprint_end
     mock_imap.store.assert_called_once_with("1", "+FLAGS", "(\\Seen)")
 
     from app.crud import crud_issue_summary

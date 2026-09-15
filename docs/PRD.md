@@ -35,7 +35,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ### 2.3 SSO & Email Integration
 *   **Single Sign-On:** Login via Google or Outlook (OAuth2 PKCE).
 *   **Email Inbox:** View the last 3 days of inbox emails from within Nimbus ("View Inbox" button in the header).
-*   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project.
+*   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project, dated within the current 2-week sprint.
 *   **Intelligent Extraction:** AI identifies and extracts a structured task from a single email, creating a new issue for it.
 *   **Resilient Fallback:** If AI extraction fails or returns malformed data, Nimbus automatically creates a "Raw" task from the email subject and body to ensure zero data loss.
 *   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for emails since the last 7 days every minute, checking for unique Message-IDs in database audit logs from the last 14 days to process new emails regardless of their read status and seamlessly catch up after multi-day outages. Credential failures (`email.token_refresh_failed`), authentication errors, and connection drops are recorded in the audit log table (throttled to 1/hour per user) for immediate operational visibility.

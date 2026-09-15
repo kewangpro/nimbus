@@ -236,4 +236,5 @@
 *   [x] **Far-Future Outlier Prioritization:** Prioritized unscheduled and far-future tasks (`due_date > sprint_end_date`) to guarantee placement into the active 10-day sprint window.
 *   [x] **Batch Response Deduplication:** Safeguarded batch processing against duplicate indices from local LLM outputs.
 *   [x] **Real-Time Progress Endpoint & UI:** Added `GET /api/v1/ai/schedule/progress` and animated purple progress bar in frontend polling every 750ms with processed/total task counters.
-*   [x] **Comprehensive Test Suites:** Added frontend unit tests (`frontend/lib/sprint-plan.test.ts` via native Node.js test runner) and backend pytest suites covering far-future rebalancing, deduplication, assignee scoping, and progress polling (118 passed backend tests, 7 passed frontend tests).
+*   [x] **Comprehensive Test Suites:** Added frontend unit tests (`frontend/lib/sprint-plan.test.ts` via native Node.js test runner) and backend pytest suites covering far-future rebalancing, deduplication, assignee scoping, and progress polling.
+*   [x] **Email due dates (bug fix):** New email tasks are dated within the current 2-week sprint instead of landing outside the plan.

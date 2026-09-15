@@ -25,6 +25,7 @@ def _decode_header(raw: Optional[str]) -> str:
         return raw
 
 from app.core.email_utils import clean_email_html, extract_email_body_from_message
+from app.core.sprint import resolve_email_task_due_date
 
 def _strip_html(text: str) -> str:
     """Remove HTML tags and collapse whitespace for clean snippet display."""
@@ -210,9 +211,12 @@ async def create_task_from_email(
 
 
     # AI sometimes returns "null" as a string, which breaks Pydantic validation
-    due_date_val = task_data.get("due_date")
-    if due_date_val == "null":
-        due_date_val = None
+    due_date_val = await resolve_email_task_due_date(
+        db,
+        current_user,
+        extracted_due=task_data.get("due_date"),
+        priority=task_data.get("priority"),
+    )
 
     raw_summary = task_data.get("summary")
     if not raw_summary and task_data.get("description"):
@@ -321,10 +325,12 @@ async def create_tasks_bulk(
             tasks_to_create = [{"title": subject, "summary": "Auto-created from email"}]
 
         for task_data in tasks_to_create:
-            # AI sometimes returns "null" as a string, which breaks Pydantic validation
-            due_date_val = task_data.get("due_date")
-            if due_date_val == "null":
-                due_date_val = None
+            due_date_val = await resolve_email_task_due_date(
+                db,
+                current_user,
+                extracted_due=task_data.get("due_date"),
+                priority=task_data.get("priority"),
+            )
 
             raw_summary = task_data.get("summary")
             if not raw_summary and task_data.get("description"):
