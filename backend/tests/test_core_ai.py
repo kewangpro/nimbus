@@ -47,6 +47,31 @@ async def test_generate_completion_all_fail():
         assert res is None
 
 
+@pytest.mark.asyncio
+async def test_generate_completion_uses_mlx_server_when_configured():
+    payload = {"choices": [{"message": {"content": "From server"}}]}
+    mock_response = type("R", (), {"json": lambda self: payload, "raise_for_status": lambda self: None})()
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return None
+        async def post(self, url, json=None, headers=None):
+            assert url.endswith("/chat/completions")
+            assert json["model"] == ai.CHAT_MODEL
+            return mock_response
+
+    with patch("app.core.ai._mlx_server_url", return_value="http://localhost:8080/v1"), \
+         patch("app.core.ai._sync_generate") as mock_sync, \
+         patch("httpx.AsyncClient", FakeAsyncClient):
+        res = await ai.generate_completion("Test prompt", "System prompt", max_tokens=64)
+        assert res == "From server"
+        mock_sync.assert_not_called()
+
+
 def test_parse_json_robust():
     # Valid JSON
     assert ai.parse_json_robust('{"key": "value"}') == {"key": "value"}

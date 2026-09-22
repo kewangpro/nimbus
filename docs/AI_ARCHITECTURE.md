@@ -163,7 +163,7 @@ CREATE TABLE issue_links (
 
 ## 6. Controls & Performance
 *   **Async:** All AI calls run in a single-worker `ThreadPoolExecutor` wrapped with `asyncio.run_in_executor` — non-blocking to the FastAPI event loop. MLX requires sequential GPU access, hence `max_workers=1`.
-*   **Lazy loading:** Models are loaded on first inference call and kept in memory for the process lifetime.
+*   **Lazy loading:** Models are loaded on first inference call and kept in memory for the process lifetime. Set `MLX_BASE_URL` (e.g. `http://localhost:8080/v1`) to use a shared `mlx_lm.server` instead of loading chat weights in the Nimbus process.
 *   **Debounce:** UI updates are immediate (optimistic); vector updates happen on save.
 *   **Scheduler Scaling & Stateful Batching:** Task auto-scheduling scales up to 150 tasks using stateful 20-task batches with load awareness across batches, keeping LLM response times well under control.
 *   **Context Window:** Completion calls use a `max_tokens` limit of **4096** (increased from 2048) to support large structured outputs (e.g., 100+ task schedules).

@@ -1,7 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
-import os
 import logging
 
 from app.core.config import settings
@@ -84,24 +83,68 @@ async def generate_embedding(text: str) -> Optional[List[float]]:
         return None
 
 
+def _mlx_server_url() -> Optional[str]:
+    raw = (settings.MLX_BASE_URL or "").strip().rstrip("/")
+    if not raw:
+        return None
+    return raw if raw.endswith("/v1") else f"{raw}/v1"
+
+
+async def _generate_via_server(
+    prompt: str, system_prompt: str, model_name: str, max_tokens: int
+) -> str:
+    import httpx
+
+    base = _mlx_server_url()
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+    payload: dict = {
+        "model": model_name,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.2,
+    }
+    if "gemma" in model_name.lower():
+        payload["stop"] = ["<end_of_turn>"]
+
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        response = await client.post(
+            f"{base}/chat/completions",
+            json=payload,
+            headers={"Authorization": "Bearer mlx"},
+        )
+        response.raise_for_status()
+        data = response.json()
+    return data["choices"][0]["message"]["content"]
+
+
 async def generate_completion(
     prompt: str, system_prompt: str = "", model_name: Optional[str] = None, max_tokens: int = 4096
 ) -> Optional[str]:
     if model_name is None:
         model_name = CHAT_MODEL
+    use_server = bool(_mlx_server_url())
     try:
         logger.info(f"Starting AI completion generation with model: {model_name}")
-        loop = asyncio.get_event_loop()
-        args = [prompt, system_prompt, model_name]
-        if max_tokens != 4096:
-            args.append(max_tokens)
-        result = await loop.run_in_executor(
-            _executor, _sync_generate, *args
-        )
+        if use_server:
+            result = await _generate_via_server(prompt, system_prompt, model_name, max_tokens)
+        else:
+            loop = asyncio.get_event_loop()
+            args = [prompt, system_prompt, model_name]
+            if max_tokens != 4096:
+                args.append(max_tokens)
+            result = await loop.run_in_executor(
+                _executor, _sync_generate, *args
+            )
         logger.info(f"AI completion generation finished for model: {model_name}")
         return result
     except Exception as e:
         logger.error(f"Error generating completion with {model_name}: {e}")
+        if use_server:
+            # Shared mlx_lm.server already holds the weights; do not load a second copy in-process.
+            return None
         if model_name != FAST_MODEL and FAST_MODEL:
             logger.info(f"Attempting fallback generation with fast model: {FAST_MODEL}")
             try:

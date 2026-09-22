@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     # AI Models
     MLX_CHAT_MODEL: str = "mlx-community/gemma-3-4b-it-4bit"
     MLX_FAST_MODEL: str = "mlx-community/Llama-3.2-1B-Instruct-4bit"
+    # OpenAI-compatible mlx_lm.server (e.g. http://localhost:8080/v1). Empty = load weights in-process.
+    MLX_BASE_URL: Optional[str] = None
     EMBEDDING_MODEL: str = "nomic-ai/nomic-embed-text-v1"
 
     class Config:

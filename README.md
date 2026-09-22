@@ -162,6 +162,7 @@ AI runs entirely on-device via **MLX** on Apple Silicon — no external server r
 |:---|:---|:---|
 | `MLX_CHAT_MODEL` | `mlx-community/gemma-3-4b-it-4bit` | Conversational task balancing, planning, triage, scheduling, summary, email extraction |
 | `MLX_FAST_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Fast fallback model if primary generation fails |
+| `MLX_BASE_URL` | (unset) | Optional OpenAI-compatible `mlx_lm.server` (e.g. `http://localhost:8080/v1`). When set, chat runs on that process instead of loading a second copy of the weights. |
 | `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |
 | `HF_TOKEN` | (optional) | Set this to your Hugging Face token to enable higher rate limits and faster downloads. |
 
