@@ -245,25 +245,25 @@ async def create_task_from_email(
         assignee_id=current_user.id
     )
 
-    issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id)
+    issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id, skip_embedding=True)
 
-    # Store AI summary in IssueSummary if available
-    if summary_val:
-        content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
-        raw_next_steps = task_data.get("next_steps", [])
-        if isinstance(raw_next_steps, list):
-            next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
-        elif raw_next_steps:
-            next_steps_str = str(raw_next_steps).strip()
-        else:
-            next_steps_str = ""
-        await crud_issue_summary.upsert(
-            db,
-            issue_id=issue.id,
-            summary=summary_val,
-            next_steps=next_steps_str,
-            content_hash=content_hash,
-        )
+    if not summary_val:
+        summary_val = f"Auto-created from email: {subject}"
+    content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
+    raw_next_steps = task_data.get("next_steps", [])
+    if isinstance(raw_next_steps, list):
+        next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
+    elif raw_next_steps:
+        next_steps_str = str(raw_next_steps).strip()
+    else:
+        next_steps_str = ""
+    await crud_issue_summary.upsert(
+        db,
+        issue_id=issue.id,
+        summary=summary_val,
+        next_steps=next_steps_str,
+        content_hash=content_hash,
+    )
     
     # Audit log for manual email task creation
     await crud_audit.log_action(
@@ -274,6 +274,11 @@ async def create_task_from_email(
         issue.id, 
         details={"title": issue.title, "email_subject": subject, "source": "manual"}
     )
+
+    try:
+        await crud_issue.ensure_embedding(db, issue)
+    except Exception:
+        pass
     
     return {"status": "success", "issue_id": str(issue.id)}
 
@@ -359,25 +364,25 @@ async def create_tasks_bulk(
                 assignee_id=current_user.id
             )
 
-            issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id)
+            issue = await create_issue(db, obj_in=issue_in, owner_id=current_user.id, skip_embedding=True)
 
-            # Store AI summary in IssueSummary if available
-            if summary_val:
-                content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
-                raw_next_steps = task_data.get("next_steps", [])
-                if isinstance(raw_next_steps, list):
-                    next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
-                elif raw_next_steps:
-                    next_steps_str = str(raw_next_steps).strip()
-                else:
-                    next_steps_str = ""
-                await crud_issue_summary.upsert(
-                    db,
-                    issue_id=issue.id,
-                    summary=summary_val,
-                    next_steps=next_steps_str,
-                    content_hash=content_hash,
-                )
+            if not summary_val:
+                summary_val = f"Auto-created from email: {subject}"
+            content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
+            raw_next_steps = task_data.get("next_steps", [])
+            if isinstance(raw_next_steps, list):
+                next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
+            elif raw_next_steps:
+                next_steps_str = str(raw_next_steps).strip()
+            else:
+                next_steps_str = ""
+            await crud_issue_summary.upsert(
+                db,
+                issue_id=issue.id,
+                summary=summary_val,
+                next_steps=next_steps_str,
+                content_hash=content_hash,
+            )
 
             created_issues.append(str(issue.id))
             
@@ -390,5 +395,10 @@ async def create_tasks_bulk(
                 issue.id, 
                 details={"title": issue.title, "email_subject": subject, "source": "bulk"}
             )
+
+            try:
+                await crud_issue.ensure_embedding(db, issue)
+            except Exception:
+                pass
     
     return {"status": "success", "issue_ids": created_issues}

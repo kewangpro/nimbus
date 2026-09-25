@@ -400,27 +400,32 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                         assignee_id=user_id
                     )
 
-                    issue = await create_issue(db, obj_in=issue_in, owner_id=user_id)
+                    # Skip embedding until after audit + \Seen so a slow embed on a large
+                    # email body cannot time out the poll mid-flight and re-create duplicates.
+                    issue = await create_issue(db, obj_in=issue_in, owner_id=user_id, skip_embedding=True)
 
-                    # Store AI summary in IssueSummary if available
-                    if summary_val:
-                        content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
-                        raw_next_steps = task_data.get("next_steps", [])
-                        if isinstance(raw_next_steps, list):
-                            next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
-                        elif raw_next_steps:
-                            next_steps_str = str(raw_next_steps).strip()
-                        else:
-                            next_steps_str = ""
-                        await crud_issue_summary.upsert(
-                            db,
-                            issue_id=issue.id,
-                            summary=summary_val,
-                            next_steps=next_steps_str,
-                            content_hash=content_hash,
-                        )
-                    
-                    # Audit log for automated email task creation
+                    # Prefer AI summary; otherwise store a short placeholder so the UI
+                    # does not show an empty "Generate Summary" state for email tasks.
+                    if not summary_val:
+                        summary_val = f"Auto-created task from email: {subject}"
+
+                    content_hash = crud_issue.get_content_hash(f"{issue.title} {issue.description or ''}")
+                    raw_next_steps = task_data.get("next_steps", [])
+                    if isinstance(raw_next_steps, list):
+                        next_steps_str = "\n".join(str(s) for s in raw_next_steps if str(s).strip())
+                    elif raw_next_steps:
+                        next_steps_str = str(raw_next_steps).strip()
+                    else:
+                        next_steps_str = ""
+                    await crud_issue_summary.upsert(
+                        db,
+                        issue_id=issue.id,
+                        summary=summary_val,
+                        next_steps=next_steps_str,
+                        content_hash=content_hash,
+                    )
+
+                    # Audit log for automated email task creation (Message-ID dedupe key)
                     await crud_audit.log_action(
                         db, 
                         "email.task_created", 
@@ -440,8 +445,14 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                     except Exception as seen_err:
                         logger.error(f"Failed to mark msg_id {msg_id} as seen: {seen_err}")
 
-                    logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue.title}")
                     processed_ids.add(message_id)
+
+                    try:
+                        await crud_issue.ensure_embedding(db, issue)
+                    except Exception as emb_err:
+                        logger.warning(f"Deferred embedding failed for issue {issue.id}: {emb_err}")
+
+                    logger.info(f"SUCCESS: Created auto-task from email for {email_address}: {issue.title}")
 
                 except Exception as email_err:
                     is_network_err = isinstance(email_err, (AioImapException, CommandTimeout, asyncio.TimeoutError, TimeoutError, ConnectionError, OSError))

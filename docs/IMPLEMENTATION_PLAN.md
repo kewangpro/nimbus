@@ -238,3 +238,4 @@
 *   [x] **Real-Time Progress Endpoint & UI:** Added `GET /api/v1/ai/schedule/progress` and animated purple progress bar in frontend polling every 750ms with processed/total task counters.
 *   [x] **Comprehensive Test Suites:** Added frontend unit tests (`frontend/lib/sprint-plan.test.ts` via native Node.js test runner) and backend pytest suites covering far-future rebalancing, deduplication, assignee scoping, and progress polling.
 *   [x] **Email due dates (bug fix):** New email tasks are dated within the current 2-week sprint instead of landing outside the plan.
+*   [x] **Email create order (bug fix):** Summary, Message-ID audit, and IMAP `\Seen` complete before embedding so a slow embed cannot leave orphan duplicates without an AI summary.

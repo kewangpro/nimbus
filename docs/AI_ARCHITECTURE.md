@@ -154,7 +154,7 @@ CREATE TABLE issue_links (
 4. For each email found:
    - Fetch only lightweight headers (`Message-ID`, `Subject`, `Date`) first to extract the unique `Message-ID`.
    - If the `Message-ID` is in the processed set, skip it immediately.
-   - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project with original email body as `description` and AI summary stored in `IssueSummary` → assign to user → mark as read (`\Seen`) → save `Message-ID` to `AuditLog`.
+   - If new: fetch the full body → extract task with `email_processor` → create issue in user's "General" project (embedding deferred) with original email body as `description` and AI summary stored in `IssueSummary` → write `email.task_created` with `Message-ID` → mark as read (`\Seen`) → then generate the vector embedding. Deferring the embed avoids poll timeouts that previously left duplicate issues without summaries.
    - Filtered non-actionable emails (`email.ignored`) and permanent processing errors (`email.task_creation_failed`) mark the email `\Seen` and write to `AuditLog` to prevent future re-processing and isolate poison pills.
    - Transient network/timeout errors during message processing leave the email `UNSEEN` and abort the remaining batch, allowing the 60-second worker to automatically retry.
 

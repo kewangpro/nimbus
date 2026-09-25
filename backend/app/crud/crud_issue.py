@@ -101,7 +101,24 @@ async def get_multi(
     result = await db.execute(query)
     return result.scalars().all()
 
-async def create(db: AsyncSession, *, obj_in: IssueCreate, owner_id: UUID) -> Issue:
+async def ensure_embedding(db: AsyncSession, issue: Issue) -> None:
+    """Generate/update the vector embedding for an issue (safe to call after create)."""
+    full_text = f"{issue.title} {issue.description or ''}"
+    content_hash = get_content_hash(full_text)
+    embedding = await ai.generate_embedding(full_text)
+    if embedding:
+        await crud_embedding.create_or_update(
+            db, issue_id=issue.id, embedding=embedding, content_hash=content_hash
+        )
+
+
+async def create(
+    db: AsyncSession,
+    *,
+    obj_in: IssueCreate,
+    owner_id: UUID,
+    skip_embedding: bool = False,
+) -> Issue:
     # Handle Default Project
     project_id = obj_in.project_id
     if not project_id:
@@ -130,15 +147,11 @@ async def create(db: AsyncSession, *, obj_in: IssueCreate, owner_id: UUID) -> Is
 
     if obj_in.labels:
         await crud_label.set_issue_labels(db, db_obj.id, obj_in.labels)
-    # Generate Embedding
-    full_text = f"{db_obj.title} {db_obj.description or ''}"
-    content_hash = get_content_hash(full_text)
-    embedding = await ai.generate_embedding(full_text)
-    
-    if embedding:
-        await crud_embedding.create_or_update(
-            db, issue_id=db_obj.id, embedding=embedding, content_hash=content_hash
-        )
+
+    # Email create paths skip embedding here so Message-ID audit + \Seen can finish
+    # before a slow/large embed risks the 120s poll timeout and orphan retries.
+    if not skip_embedding:
+        await ensure_embedding(db, db_obj)
 
     # Return refreshed object with relationships
     return await get(db, db_obj.id)
