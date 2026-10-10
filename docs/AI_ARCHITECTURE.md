@@ -11,7 +11,7 @@ Email intelligence is powered by the same AI pipeline: incoming emails are parse
 
 | Model | Purpose | Library | Config Variable |
 |:---|:---|:---|:---|
-| `mlx-community/gemma-3-4b-it-4bit` | Default primary model: Conversational task balancing, planning, triage, scheduling, summary, email extraction | `mlx-lm` (Apple Silicon GPU) | `MLX_CHAT_MODEL` |
+| `mlx-community/gemma-3-4b-it-4bit` | Default primary model: planning, triage, summary, email extraction, and other chat completions (sprint day placement uses shared `app.core.scheduling`, not chat) | `mlx-lm` (Apple Silicon GPU) | `MLX_CHAT_MODEL` |
 | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Fast fallback model if primary generation fails | `mlx-lm` (Apple Silicon GPU) | `MLX_FAST_MODEL` |
 | `nomic-ai/nomic-embed-text-v1` | Issue embeddings for semantic search | `sentence-transformers` | `EMBEDDING_MODEL` |
 
@@ -66,16 +66,15 @@ CREATE TABLE issue_links (
 *   **Scheduling:** Distributes tasks across the next 5 business days (Mon-Fri), respecting existing load.
 
 ### 4.3 AI Scheduler
-*   **Input:** Open (non-done, non-canceled) issues that are unscheduled, scheduled for today/future, or mis-scheduled far in the future.
+*   **Shared placement (`app.core.scheduling`):** Same engine as new-email task dating — `resolve_task_due_date` / `place_on_sprint`. Content deadlines and lightest-day load balancing apply identically on create and on Schedule.
+*   **Input:** Open (non-done, non-canceled) issues that are unscheduled, scheduled for today/future, or mis-scheduled far in the future. Uses title, description/AI summary, and priority (not a separate chat completion for day buckets).
 *   **Constraint:** Overdue tasks (due before today) are **excluded** from the rescheduling pool.
 *   **Output:** Optimized `due_date` for every issue in the pool.
 *   **Logic:**
-    *   **Capacity:** Scalable to **150 tasks** using **Stateful Batching** (20 tasks per batch).
-    *   **Total Sprint Balance:** Redistributes open tasks into the next 10 weekdays (2-week sprint), ensuring no day is overloaded. Prioritizes mis-scheduled far-future tasks (> 10 business days) and unscheduled tasks to pull them into the sprint.
-    *   **Stateful Load Awareness:** Each batch prompt includes a `CURRENT WORKLOAD` summary, allowing the AI to see how many tasks are already assigned to Days 1-10.
-    *   **Deterministic Safety Layer:** The backend enforces a strict `Least-Busy-Day` override. If the AI suggests an overloaded day, the system automatically pulls the task to the truly lightest day.
-    *   **100% Coverage Loop:** A final verification pass ensures every single task receives an update, using round-robin assignment for any items the AI skips, and deduplicates repeated task indices in AI responses.
-    *   **Live UI Updates & Sprint Bounding:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight, so the calendar updates incrementally as each batch commits. The sprint view is bounded to a 2-week window with a quick-access indicator for any tasks scheduled beyond the sprint.
+    *   **Capacity:** Scalable to **150 tasks**, processed in batches of 20 for progress commits.
+    *   **Content Deadlines:** Explicit actionable deadlines in task/email text (e.g. "submit by 2026-10-15") are pinned to that sprint weekday. Newsletter publication/sent dates without deadline keywords are ignored.
+    *   **Total Sprint Balance:** Remaining tasks go to the lightest weekday (urgent/high prefer the first two days). Far-future and unscheduled tasks are placed first.
+    *   **Live UI Updates & Sprint Bounding:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight. The sprint view is bounded to a 2-week window with an indicator for tasks outside the plan.
     *   **Real-Time Progress Endpoint:** Exposes `GET /api/v1/ai/schedule/progress` returning `{ "status": "idle" | "running" | "done", "processed": int, "total": int, "percent": int }` polled every 750ms by the frontend.
 
 ### 4.4 Semantic Search
@@ -165,8 +164,8 @@ CREATE TABLE issue_links (
 *   **Async:** All AI calls run in a single-worker `ThreadPoolExecutor` wrapped with `asyncio.run_in_executor` — non-blocking to the FastAPI event loop. MLX requires sequential GPU access, hence `max_workers=1`.
 *   **Lazy loading:** Models are loaded on first inference call and kept in memory for the process lifetime. Set `MLX_BASE_URL` (e.g. `http://localhost:8080/v1`) to use a shared `mlx_lm.server` instead of loading chat weights in the Nimbus process.
 *   **Debounce:** UI updates are immediate (optimistic); vector updates happen on save.
-*   **Scheduler Scaling & Stateful Batching:** Task auto-scheduling scales up to 150 tasks using stateful 20-task batches with load awareness across batches, keeping LLM response times well under control.
-*   **Context Window:** Completion calls use a `max_tokens` limit of **4096** (increased from 2048) to support large structured outputs (e.g., 100+ task schedules).
+*   **Scheduler Scaling:** Task auto-scheduling scales up to 150 tasks via shared `app.core.scheduling` placement (no chat completion for day buckets), committed in 20-task batches for progress UI.
+*   **Context Window:** Completion calls use a `max_tokens` limit of **4096** (increased from 2048) to support large structured outputs (planner, triage, summaries).
 *   **Fallback:** If inference fails (e.g. model not yet downloaded), AI endpoints return HTTP 500. No keyword fallback — treat AI features as optional.
 *   **Consolidated Background Jobs:** Embedding backfills and email polling run via an integrated async worker task inside the main FastAPI process to minimize memory footprint.
 *   **Caching:** Issue summaries are content-hash cached; regenerated only when issue content changes.

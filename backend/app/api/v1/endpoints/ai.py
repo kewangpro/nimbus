@@ -12,6 +12,12 @@ from uuid import UUID
 
 from app.api import deps
 from app.core import ai
+from app.core.scheduling import (
+    SPRINT_WEEKDAYS,
+    next_weekdays,
+    resolve_task_due_date,
+    weekday_loads,
+)
 from app.crud import crud_embedding, crud_audit, crud_issue, crud_issue_summary, crud_project, crud_user, crud_issue_link
 from app.schemas.issue import Issue, IssuePriority, IssueStatus, IssueUpdate
 
@@ -196,18 +202,10 @@ async def auto_schedule(
         _set_schedule_progress(current_user.id, status="done", processed=0, total=0)
         return {"scheduled_count": 0, "message": "No issues require rescheduling."}
 
-    logger.info(f"Redistributing {len(schedulable_issues)} issues for total sprint balance")
+    logger.info(f"Redistributing {len(schedulable_issues)} issues with shared sprint placement")
 
-    # Generate next 10 weekdays in user's timezone
-    next_10_weekdays = []
-    # today variable is already defined as now_in_tz.date()
-    current_date = today
-    while len(next_10_weekdays) < 10:
-        if current_date.weekday() < 5: # 0-4 are Mon-Fri
-            next_10_weekdays.append(current_date.strftime("%Y-%m-%d"))
-        current_date += timedelta(days=1)
-
-    sprint_end_date = datetime.strptime(next_10_weekdays[-1], "%Y-%m-%d").date()
+    weekdays = next_weekdays(today, SPRINT_WEEKDAYS)
+    sprint_end_date = weekdays[-1]
 
     # Priority mapping for numerical sorting
     priority_map = {
@@ -251,115 +249,40 @@ async def auto_schedule(
         total=len(schedulable_issues),
     )
 
-    # 2. Process in batches with Enforced Balancing
-    batch_size = 20
+    # Same placement engine as new-email create: content deadlines + lightest-day load balance.
+    # Exclude the pool from load counts so we redistribute them instead of double-counting.
+    pool_ids = [task.id for task in schedulable_issues]
+    loads = await weekday_loads(
+        db, current_user, weekdays, tz, exclude_issue_ids=pool_ids
+    )
+
     total_updated = 0
-    
-    # Track task counts per day for global balancing (Day 1-10)
-    day_counts = {str(i+1): 0 for i in range(10)}
-    
-    # Map Day 1-10 to dates
-    day_map = {str(i+1): d for i, d in enumerate(next_10_weekdays)}
-    
-    # Strict quota: No day should have significantly more than average
-    ideal_per_day = len(schedulable_issues) // 10
-    max_hard_limit = ideal_per_day + 3 # Allow slight flexibility for priorities
-
+    batch_size = 20
     for i in range(0, len(schedulable_issues), batch_size):
-        batch = schedulable_issues[i:i+batch_size]
-        logger.info(f"Balancing batch {i//batch_size + 1} ({len(batch)} tasks)")
-        
-        batch_id_map = {str(idx): str(task.id) for idx, task in enumerate(batch)}
-        batch_issues_text = "\n".join([f"- Index: {idx}, Title: {task.title}, Priority: {task.priority}" for idx, task in enumerate(batch)])
-        
-        counts_summary = ", ".join([f"Day {d}: {c} tasks" for d, c in day_counts.items()])
-        
-        prompt = f"""
-        You are an expert productivity scheduler. Today is {today.strftime("%Y-%m-%d")}.
-        Your goal is to bucket the following {len(batch)} tasks across the 10 workdays (Buckets 1 to 10).
-        
-        ### CURRENT WORKLOAD ###
-        {counts_summary}
-        (Target: ~{ideal_per_day} per day)
-        
-        ### THE ONLY 10 ALLOWED BUCKETS ###
-        1 ({next_10_weekdays[0]})
-        2 ({next_10_weekdays[1]})
-        3 ({next_10_weekdays[2]})
-        4 ({next_10_weekdays[3]})
-        5 ({next_10_weekdays[4]})
-        6 ({next_10_weekdays[5]})
-        7 ({next_10_weekdays[6]})
-        8 ({next_10_weekdays[7]})
-        9 ({next_10_weekdays[8]})
-        10 ({next_10_weekdays[9]})
-        
-        ### INSTRUCTIONS ###
-        1. FILL LIGHT DAYS: Day 1-10 must be roughly equal. Fill the days with fewer tasks first.
-        2. NO OVERLOADING: Do not put tasks on a day that already has {max_hard_limit} tasks if possible.
-        3. PRIORITY: 'URGENT' tasks MUST go in Day 1 or 2.
-        
-        ### TASK LIST ###
-        {batch_issues_text}
-        
-        ### OUTPUT FORMAT ###
-        Respond ONLY with a JSON array: [{{"index": 0, "day_number": 1}}, ...]
-        """
-        
-        system_message = "You are a task balancer. Distribute tasks across buckets 1-10 to ensure even workload."
-        response = await ai.generate_completion(prompt, system_prompt=system_message, max_tokens=512)
-        
-        batch_data = []
-        if response:
+        batch = schedulable_issues[i:i + batch_size]
+        logger.info(f"Placing batch {i // batch_size + 1} ({len(batch)} tasks)")
+
+        for task in batch:
+            existing_summary = await crud_issue_summary.get_by_issue_id(db, task.id)
+            summary_text = existing_summary.summary if existing_summary else ""
+            content_text = "\n".join(
+                part for part in (task.title or "", task.description or "", summary_text or "") if part
+            )
+            due_date = await resolve_task_due_date(
+                db,
+                current_user,
+                priority=task.priority,
+                content_text=content_text,
+                now=now_in_tz,
+                load_by_day=loads,
+            )
             try:
-                matches = re.findall(r'\{[^{}]*\}', response)
-                for m in matches:
-                    try:
-                        item = json.loads(m)
-                        if "index" in item and "day_number" in item:
-                            batch_data.append(item)
-                    except Exception: continue
-            except Exception: pass
-
-        # Create a set of processed indices in this batch to handle missing AI responses
-        processed_indices = set()
-
-        for item in batch_data:
-            idx_val = str(item.get("index"))
-            day_num_raw = item.get("day_number")
-            
-            if idx_val not in batch_id_map: continue
-            if idx_val in processed_indices: continue
-            processed_indices.add(idx_val)
-
-            # Deterministic Fallback: If AI suggests an overloaded day, find the truly least busy day
-            try:
-                d_int = int(day_num_raw)
-                if d_int < 1: d_int = 1
-                if d_int > 10: d_int = 10
-                day_num = str(d_int)
-            except (ValueError, TypeError):
-                day_num = "1"
-
-            # SAFETY LAYER: If the chosen day is already over the average, 
-            # and there's a day with significantly fewer tasks, override the AI.
-            current_day_load = day_counts[day_num]
-            min_day = min(day_counts, key=day_counts.get)
-            if current_day_load > day_counts[min_day] + 2:
-                day_num = min_day
-
-            issue_id_str = batch_id_map.get(idx_val)
-            date_str = day_map.get(day_num)
-
-            try:
-                issue_id = UUID(issue_id_str)
-                due_day = datetime.strptime(date_str, "%Y-%m-%d").date()
-                due_date = datetime.combine(due_day, time.min, tzinfo=tz)
-
-                issue_obj = await crud_issue.get(db, id=issue_id)
+                issue_obj = await crud_issue.get(db, id=task.id)
                 if issue_obj:
                     if issue_obj.due_date != due_date:
-                        await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
+                        await crud_issue.update(
+                            db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date)
+                        )
                         await crud_audit.log_action(
                             db,
                             action="issue.update",
@@ -372,40 +295,11 @@ async def auto_schedule(
                                 "via": "ai_scheduler",
                             },
                         )
-                    day_counts[day_num] += 1
+                    loads[due_date.astimezone(tz).date()] = loads.get(due_date.astimezone(tz).date(), 0) + 1
                     total_updated += 1
-            except Exception: continue
+            except Exception:
+                continue
 
-        # Ensure 100% Coverage: If AI missed any tasks in the batch, round-robin them
-        for idx, task in batch_id_map.items():
-            if idx not in processed_indices:
-                # Find least busy day
-                day_num = min(day_counts, key=day_counts.get)
-                date_str = day_map[day_num]
-                try:
-                    issue_id = UUID(task)
-                    due_day = datetime.strptime(date_str, "%Y-%m-%d").date()
-                    due_date = datetime.combine(due_day, time.min, tzinfo=tz)
-                    issue_obj = await crud_issue.get(db, id=issue_id)
-                    if issue_obj:
-                        if issue_obj.due_date != due_date:
-                            await crud_issue.update(db, db_obj=issue_obj, obj_in=IssueUpdate(due_date=due_date))
-                            await crud_audit.log_action(
-                                db,
-                                action="issue.update",
-                                user_id=current_user.id,
-                                entity_type="issue",
-                                entity_id=issue_obj.id,
-                                details={
-                                    "title": issue_obj.title,
-                                    "changes": ["due_date"],
-                                    "via": "ai_scheduler",
-                                },
-                            )
-                        day_counts[day_num] += 1
-                        total_updated += 1
-                except Exception: continue
-        
         await db.commit()
         _set_schedule_progress(
             current_user.id,

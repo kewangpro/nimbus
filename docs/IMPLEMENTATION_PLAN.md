@@ -51,7 +51,7 @@
 
 ## Phase 5: Advanced AI & Planning ✅
 *   [x] **AI Project Planner:** Break down natural language into structured issues.
-*   [x] **AI Scheduler:** Redistribute open tasks (unscheduled, scheduled for today/future, or mis-scheduled far future) across next 10 business days in stateful batches of 20, scalable to 150 tasks. Calendar updates live every 4s during the run. **Overdue tasks are skipped to prevent automatic rescheduling.**
+*   [x] **AI Scheduler:** Redistribute open tasks (unscheduled, scheduled for today/future, or mis-scheduled far future) across next 10 business days via shared placement (`resolve_task_due_date`), in progress batches of 20, scalable to 150 tasks. Calendar updates live every 4s during the run. **Overdue tasks are skipped to prevent automatic rescheduling.**
 *   [x] **Sprint Calendar:** Visual per-user 2-week sprint timeline with drag-and-drop rescheduling, bounding to 14 days max to avoid timeline sprawl, with quick indicator for tasks scheduled beyond the sprint.
 *   [x] **AI Summary:** Per-issue summary with next steps (cached by content hash).
 *   [x] **AI Filters:** Natural language to structured issue filters (List View).
@@ -231,11 +231,11 @@
 
 *   [x] **Sprint Window Bounding:** Implemented `getSprintPlanRange` in `frontend/lib/sprint-plan.ts` to bound the sprint view to 10 weekdays from today (`SPRINT_WEEKDAYS = 10`) with a 7-day overdue lookback cap (`OVERDUE_LOOKBACK_DAYS = 7`), preventing calendar timeline sprawl (e.g. 55-day wide columns).
 *   [x] **Outlier Tasks Dropdown Menu:** Added `<Button><CalendarClock /> X outside this plan</Button>` dropdown menu to display tasks older than the plan or scheduled beyond the 10-day sprint window, with one-click issue inspection.
-*   [x] **AI Scheduler Scaling (150 Tasks):** Raised `MAX_SCHEDULABLE_ISSUES = 150` with stateful 20-task batching and load balancing across the sprint.
+*   [x] **AI Scheduler Scaling (150 Tasks):** Raised `MAX_SCHEDULABLE_ISSUES = 150` with 20-task progress batches and load balancing across the sprint.
 *   [x] **Assignee Scoping Alignment:** Aligned `schedule_sprint` query to `assignee_id = current_user.id` (and client `owner_id`), matching the calendar view's query scope.
 *   [x] **Far-Future Outlier Prioritization:** Prioritized unscheduled and far-future tasks (`due_date > sprint_end_date`) to guarantee placement into the active 10-day sprint window.
-*   [x] **Batch Response Deduplication:** Safeguarded batch processing against duplicate indices from local LLM outputs.
 *   [x] **Real-Time Progress Endpoint & UI:** Added `GET /api/v1/ai/schedule/progress` and animated purple progress bar in frontend polling every 750ms with processed/total task counters.
-*   [x] **Comprehensive Test Suites:** Added frontend unit tests (`frontend/lib/sprint-plan.test.ts` via native Node.js test runner) and backend pytest suites covering far-future rebalancing, deduplication, assignee scoping, and progress polling.
+*   [x] **Comprehensive Test Suites:** Added frontend unit tests (`frontend/lib/sprint-plan.test.ts` via native Node.js test runner) and backend pytest suites covering far-future rebalancing, assignee scoping, progress polling, and shared placement.
 *   [x] **Email due dates (bug fix):** New email tasks are dated within the current 2-week sprint instead of landing outside the plan.
 *   [x] **Email create order (bug fix):** Summary, Message-ID audit, and IMAP `\Seen` complete before embedding so a slow embed cannot leave orphan duplicates without an AI summary.
+*   [x] **Shared sprint placement:** Email create and AI Schedule both use `resolve_task_due_date` / `place_on_sprint` (content deadlines + lightest-day load balance; no chat completion for day buckets).

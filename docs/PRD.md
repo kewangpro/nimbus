@@ -42,7 +42,7 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 
 ### 2.4 AI-Native Core (Local MLX + Llama 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
-*   **AI Scheduler:** Redistributes open (non-done, non-canceled) tasks — unscheduled, scheduled for today/future, or mis-scheduled far in the future — across the next 10 business days (Mon-Fri only). **Overdue tasks (due before today) are skipped** to prevent moving them automatically. Processes in stateful batches of **20 tasks**, scalable to 150 tasks. The calendar view focuses on the active 2-week sprint window (with an indicator for any tasks scheduled beyond the sprint) and updates live every 4 seconds during the run.
+*   **AI Scheduler:** Redistributes open (non-done, non-canceled) tasks across the next 10 business days using the same placement engine as new-email tasks (content deadlines + load balance). **Overdue tasks (due before today) are skipped.** Processes in batches of **20**, scalable to 150. The calendar focuses on the active 2-week sprint window with an outlier indicator.
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
 *   **Auto-Triage:** Suggests issue priority using Llama 3.2 via MLX.
 *   **Similar Issues:** Detects likely duplicates during issue creation.

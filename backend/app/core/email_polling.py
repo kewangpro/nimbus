@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.email_processor import email_processor
 from app.core.email_utils import extract_email_body_from_message
-from app.core.sprint import resolve_email_task_due_date
+from app.core.scheduling import resolve_task_due_date
 from app.schemas.issue import IssueCreate
 from app.models.issue import Issue
 from app.models.project import Project
@@ -377,11 +377,15 @@ async def process_email_source(db: AsyncSession, user: User, retry: bool = True)
                     if priority_val not in ["low", "medium", "high", "urgent"]:
                         priority_val = "medium"
 
-                    parsed_due_date = await resolve_email_task_due_date(
+                    content_for_schedule = "\n".join(
+                        part for part in (title_val, subject, body, summary_val or "") if part
+                    )
+                    parsed_due_date = await resolve_task_due_date(
                         db,
                         user,
                         extracted_due=task_data.get("due_date"),
                         priority=priority_val,
+                        content_text=content_for_schedule,
                     )
 
                     # Find user's "General" project

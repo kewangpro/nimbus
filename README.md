@@ -13,10 +13,9 @@ Nimbus is a modern, high-performance project management tool designed to replace
         *   **Input:** Open (non-done, non-canceled) issues that are **unscheduled** (no due date), **scheduled for today/future**, or **mis-scheduled far in the future**.
         *   **Constraint:** Overdue tasks (due before today) are **skipped** to prevent moving them automatically.
         *   **Output:** Updated `due_date` for every affected issue.
-        *   **Capacity:** Processes **20 tasks per batch** with stateful load-awareness across batches, scalable to **150 tasks**.
+        *   **Capacity:** Processes **20 tasks per batch**, scalable to **150 tasks**.
         *   **Live Calendar Updates & Real-Time Progress:** Features a live animated progress bar polling `GET /api/v1/ai/schedule/progress` every 750ms with processed/total task counters, alongside 4-second calendar polling so tasks populate in real time as each batch commits — no waiting for the full run to finish.
-        *   **Precision Intelligence:** Employs **Index Mapping** and **Day Number** strategies to ensure 100% scheduling accuracy even with smaller local models (1B/3B), with automatic response deduplication.
-        *   **Logic:** Prioritizes placement need (unscheduled and far-future outlier tasks) and urgent priorities first. Redistributes open backlog tasks evenly across the next 10 weekdays (2-week sprint), strictly avoiding weekends and future-date hallucinations.
+        *   **Logic:** Shares `app.core.scheduling` with new-email create — content deadlines are pinned; other tasks go to the lightest weekday (urgent/high prefer early days). Far-future and unscheduled tasks are placed first across the next 10 weekdays.
     *   **✨ Smart Search:** A dedicated search dialog in the header that uses vector embeddings to find relevant issues by meaning. Results link directly to the issue detail view.
     *   **🧭 Similar Issues:** Detects likely duplicates when creating new issues.
     *   **🪄 AI Auto-Triage:** A "Wand" button in the Create Issue dialog that automatically suggests the issue priority using Llama 3.2 via MLX.
@@ -160,7 +159,7 @@ AI runs entirely on-device via **MLX** on Apple Silicon — no external server r
 
 | Env Var | Default | Purpose |
 |:---|:---|:---|
-| `MLX_CHAT_MODEL` | `mlx-community/gemma-3-4b-it-4bit` | Conversational task balancing, planning, triage, scheduling, summary, email extraction |
+| `MLX_CHAT_MODEL` | `mlx-community/gemma-3-4b-it-4bit` | Planning, triage, summary, email extraction, and other chat completions |
 | `MLX_FAST_MODEL` | `mlx-community/Llama-3.2-1B-Instruct-4bit` | Fast fallback model if primary generation fails |
 | `MLX_BASE_URL` | (unset) | Optional OpenAI-compatible `mlx_lm.server` (e.g. `http://localhost:8080/v1`). When set, chat runs on that process instead of loading a second copy of the weights. |
 | `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1` | Semantic search embeddings |

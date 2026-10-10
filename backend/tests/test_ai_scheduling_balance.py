@@ -3,7 +3,6 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
-import json
 
 from app.crud import crud_issue, crud_project
 from app.schemas.project import ProjectCreate
@@ -49,32 +48,20 @@ async def test_ai_schedule_includes_today_tasks(
         owner_id=user.id
     )
 
-    # 2. Mock AI Completion
-    # Both tasks should be in the schedulable list.
-    mock_response = json.dumps([
-        {"index": 0, "day_number": 2},
-        {"index": 1, "day_number": 3}
-    ])
-    
-    with patch("app.core.ai.generate_completion", return_value=mock_response):
-        r = await client.post(
-            "/api/v1/ai/schedule", 
-            headers=normal_user_token_headers
-        )
-        
-        assert r.status_code == 200
-        data = r.json()
-        
-        # Both tasks should now be scheduled.
-        assert data["scheduled_count"] == 2
-        
-        await db.refresh(issue_today)
-        await db.refresh(issue_unscheduled)
-        
-        assert issue_unscheduled.due_date is not None
-        assert issue_today.due_date is not None
-        # Verify they moved to different days (Day 2 and Day 3)
-        assert issue_today.due_date.date() != now.date()
+    r = await client.post(
+        "/api/v1/ai/schedule",
+        headers=normal_user_token_headers,
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["scheduled_count"] == 2
+
+    await db.refresh(issue_today)
+    await db.refresh(issue_unscheduled)
+
+    assert issue_unscheduled.due_date is not None
+    assert issue_today.due_date is not None
 
 
 @pytest.mark.asyncio
@@ -103,23 +90,18 @@ async def test_ai_schedule_redistributes_far_future_tasks(
         owner_id=user.id
     )
 
-    mock_response = json.dumps([
-        {"index": 0, "day_number": 5}
-    ])
+    r = await client.post(
+        "/api/v1/ai/schedule",
+        headers=normal_user_token_headers,
+    )
 
-    with patch("app.core.ai.generate_completion", return_value=mock_response):
-        r = await client.post(
-            "/api/v1/ai/schedule",
-            headers=normal_user_token_headers
-        )
+    assert r.status_code == 200
+    await db.refresh(issue_far_future)
 
-        assert r.status_code == 200
-        await db.refresh(issue_far_future)
-
-        # Verify the far-future task was rescheduled within the 10-day (~14 calendar day) sprint
-        assert issue_far_future.due_date is not None
-        assert issue_far_future.due_date.date() < (now + timedelta(days=16)).date()
-        assert issue_far_future.due_date.date() != future_55_days.date()
+    # Verify the far-future task was rescheduled within the 10-day (~14 calendar day) sprint
+    assert issue_far_future.due_date is not None
+    assert issue_far_future.due_date.date() < (now + timedelta(days=16)).date()
+    assert issue_far_future.due_date.date() != future_55_days.date()
 
 
 @pytest.mark.asyncio
@@ -145,22 +127,14 @@ async def test_ai_schedule_deduplicates_ai_batch_response(
         owner_id=user.id
     )
 
-    # AI returns the same task index twice with different day suggestions
-    mock_response = json.dumps([
-        {"index": 0, "day_number": 1},
-        {"index": 0, "day_number": 2}
-    ])
+    r = await client.post(
+        "/api/v1/ai/schedule",
+        headers=normal_user_token_headers,
+    )
 
-    with patch("app.core.ai.generate_completion", return_value=mock_response):
-        r = await client.post(
-            "/api/v1/ai/schedule",
-            headers=normal_user_token_headers
-        )
-
-        assert r.status_code == 200
-        data = r.json()
-        # Scheduled count should be exactly 1, not 2
-        assert data["scheduled_count"] == 1
+    assert r.status_code == 200
+    data = r.json()
+    assert data["scheduled_count"] == 1
 
 
 @pytest.mark.asyncio
@@ -207,9 +181,7 @@ async def test_ai_schedule_matches_calendar_assignee_scope(
         owner_id=user.id,
     )
 
-    mock_response = json.dumps([{"index": 0, "day_number": 3}])
-    with patch("app.core.ai.generate_completion", return_value=mock_response):
-        r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+    r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
 
     assert r.status_code == 200
     await db.refresh(assigned_to_me)
@@ -259,14 +231,14 @@ async def test_ai_schedule_no_schedulable_issues(
 
 
 @pytest.mark.asyncio
-async def test_ai_schedule_round_robin_fallback_on_incomplete_ai_response(
+async def test_ai_schedule_places_all_tasks_without_llm(
     client: AsyncClient, normal_user_token_headers: dict, db: AsyncSession
 ) -> None:
-    """If the AI skips tasks or returns empty response, the 100% coverage fallback round-robins all tasks."""
+    """Shared placement covers every task without calling the chat model for day buckets."""
     from app.crud.crud_user import get_by_email
     user = await get_by_email(db, email="user@example.com")
 
-    p_in = ProjectCreate(name="Incomplete AI Response Project")
+    p_in = ProjectCreate(name="Shared Placement Project")
     project = await crud_project.create(db, obj_in=p_in, owner_id=user.id)
 
     task1 = await crud_issue.create(
@@ -280,9 +252,9 @@ async def test_ai_schedule_round_robin_fallback_on_incomplete_ai_response(
         owner_id=user.id,
     )
 
-    # AI returns empty response []
-    with patch("app.core.ai.generate_completion", return_value="[]"):
+    with patch("app.core.ai.generate_completion") as mock_ai:
         r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+        mock_ai.assert_not_called()
 
     assert r.status_code == 200
     data = r.json()
@@ -295,14 +267,14 @@ async def test_ai_schedule_round_robin_fallback_on_incomplete_ai_response(
 
 
 @pytest.mark.asyncio
-async def test_ai_schedule_overloaded_day_safety_override(
+async def test_ai_schedule_spreads_load_across_days(
     client: AsyncClient, normal_user_token_headers: dict, db: AsyncSession
 ) -> None:
-    """When the AI tries to dump all tasks onto the same day, the safety layer redistributes to least busy days."""
+    """Shared lightest-day placement spreads tasks instead of stacking one day."""
     from app.crud.crud_user import get_by_email
     user = await get_by_email(db, email="user@example.com")
 
-    p_in = ProjectCreate(name="Overloaded Day Safety Project")
+    p_in = ProjectCreate(name="Load Spread Project")
     project = await crud_project.create(db, obj_in=p_in, owner_id=user.id)
 
     tasks = []
@@ -314,16 +286,60 @@ async def test_ai_schedule_overloaded_day_safety_override(
         )
         tasks.append(t)
 
-    # AI suggests Day 1 for all 5 tasks
-    all_day_1 = json.dumps([{"index": i, "day_number": 1} for i in range(5)])
-
-    with patch("app.core.ai.generate_completion", return_value=all_day_1):
-        r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+    r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
 
     assert r.status_code == 200
     for t in tasks:
         await db.refresh(t)
 
     assigned_days = {t.due_date.date() for t in tasks}
-    # Safety override ensures tasks are spread across more than 1 day
     assert len(assigned_days) > 1
+
+
+@pytest.mark.asyncio
+async def test_ai_schedule_pins_content_deadline_from_description(
+    client: AsyncClient, normal_user_token_headers: dict, db: AsyncSession
+) -> None:
+    """Explicit deadlines in email/task text are pinned by the shared placement engine."""
+    from app.crud.crud_user import get_by_email
+    from app.core.scheduling import next_weekdays, SPRINT_WEEKDAYS
+    from zoneinfo import ZoneInfo
+
+    user = await get_by_email(db, email="user@example.com")
+    p_in = ProjectCreate(name="Content Deadline Project")
+    project = await crud_project.create(db, obj_in=p_in, owner_id=user.id)
+
+    today = datetime.now(ZoneInfo(getattr(user, "timezone", None) or "UTC")).date()
+    weekdays = next_weekdays(today, SPRINT_WEEKDAYS)
+    deadline = weekdays[4]
+
+    pinned = await crud_issue.create(
+        db,
+        obj_in=IssueCreate(
+            title="File the report",
+            description=f"Please submit by {deadline.isoformat()} so finance can close the books.",
+            project_id=project.id,
+            due_date=None,
+            priority="medium",
+            assignee_id=user.id,
+        ),
+        owner_id=user.id,
+    )
+    for i in range(4):
+        await crud_issue.create(
+            db,
+            obj_in=IssueCreate(
+                title=f"Filler {i}",
+                project_id=project.id,
+                due_date=None,
+                assignee_id=user.id,
+            ),
+            owner_id=user.id,
+        )
+
+    r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+
+    assert r.status_code == 200
+    await db.refresh(pinned)
+    assert pinned.due_date is not None
+    assert pinned.due_date.date() == deadline

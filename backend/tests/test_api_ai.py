@@ -1,9 +1,7 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
-import json
 from app.crud import crud_issue, crud_project
 from app.schemas.project import ProjectCreate
 from app.schemas.issue import IssueCreate
@@ -24,31 +22,21 @@ async def test_ai_schedule_endpoint(
     issue_unscheduled = await crud_issue.create(db, obj_in=IssueCreate(title="Unscheduled", project_id=project.id, due_date=None, assignee_id=user.id), owner_id=user.id)
     issue_in_window = await crud_issue.create(db, obj_in=IssueCreate(title="In Window", project_id=project.id, due_date=now + timedelta(days=2), assignee_id=user.id), owner_id=user.id)
 
-    mock_response = json.dumps([
-        {"index": 0, "day_number": 1},
-        {"index": 1, "day_number": 2},
-        {"index": 2, "day_number": 3},
-        {"index": 3, "day_number": 4}
-    ])
-    with patch("app.core.ai.generate_completion", return_value=mock_response):
-        r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
-        assert r.status_code == 200
-        data = r.json()
-        # We check for >= 3 to ensure the core tasks are handled, 
-        # allowing for slight variations in total count due to the redistribution logic.
-        assert data["scheduled_count"] >= 3
-        
-        # Verify that audit logs were written
-        audit_res = await client.get("/api/v1/audit-logs/", headers=normal_user_token_headers)
-        assert audit_res.status_code == 200
-        audit_data = audit_res.json()
-        
-        # Check if we have logs with via = ai_scheduler
-        ai_logs = [log for log in audit_data if log["action"] == "issue.update" and log["details"].get("via") == "ai_scheduler"]
-        assert len(ai_logs) > 0
-        assert ai_logs[0]["details"]["via"] == "ai_scheduler"
-        assert "changes" in ai_logs[0]["details"]
-        assert "due_date" in ai_logs[0]["details"]["changes"]
+    r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+    assert r.status_code == 200
+    data = r.json()
+    # Overdue excluded; future + unscheduled + in-window redistributed
+    assert data["scheduled_count"] >= 3
+
+    audit_res = await client.get("/api/v1/audit-logs/", headers=normal_user_token_headers)
+    assert audit_res.status_code == 200
+    audit_data = audit_res.json()
+
+    ai_logs = [log for log in audit_data if log["action"] == "issue.update" and log["details"].get("via") == "ai_scheduler"]
+    assert len(ai_logs) > 0
+    assert ai_logs[0]["details"]["via"] == "ai_scheduler"
+    assert "changes" in ai_logs[0]["details"]
+    assert "due_date" in ai_logs[0]["details"]["changes"]
 
 @pytest.mark.asyncio
 async def test_ai_schedule_priority_sorting(
@@ -63,12 +51,10 @@ async def test_ai_schedule_priority_sorting(
     issue_low = await crud_issue.create(db, obj_in=IssueCreate(title="Low", project_id=project.id, priority="low", due_date=None, assignee_id=user.id), owner_id=user.id)
     issue_high = await crud_issue.create(db, obj_in=IssueCreate(title="High", project_id=project.id, priority="high", due_date=None, assignee_id=user.id), owner_id=user.id)
 
-    mock_response = json.dumps([{"index": 0, "day_number": 1}, {"index": 1, "day_number": 2}])
-    with patch("app.core.ai.generate_completion", return_value=mock_response):
-        r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
-        assert r.status_code == 200
-        await db.refresh(issue_high)
-        assert issue_high.due_date is not None
+    r = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+    assert r.status_code == 200
+    await db.refresh(issue_high)
+    assert issue_high.due_date is not None
 
 
 @pytest.mark.asyncio
@@ -127,9 +113,7 @@ async def test_ai_schedule_progress_endpoint(
     assert "percent" in idle.json()
     assert "status" in idle.json()
 
-    mock_response = json.dumps([{"index": 0, "day_number": 1}])
-    with patch("app.core.ai.generate_completion", return_value=mock_response):
-        scheduled = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
+    scheduled = await client.post("/api/v1/ai/schedule", headers=normal_user_token_headers)
     assert scheduled.status_code == 200
 
     done = await client.get("/api/v1/ai/schedule/progress", headers=normal_user_token_headers)

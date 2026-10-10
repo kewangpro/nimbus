@@ -1,9 +1,7 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
-import json
 
 from app.crud import crud_issue, crud_project
 from app.schemas.project import ProjectCreate
@@ -51,30 +49,18 @@ async def test_ai_schedule_skips_overdue_tasks(
         owner_id=user.id
     )
 
-    # 2. Mock AI Completion
-    # Since overdue is excluded, only the unscheduled task should be passed to AI.
-    mock_response = json.dumps([
-        {"index": 0, "day_number": 1}
-    ])
-    
-    with patch("app.core.ai.generate_completion", return_value=mock_response) as mock_ai:
-        r = await client.post(
-            "/api/v1/ai/schedule", 
-            headers=normal_user_token_headers
-        )
-        
-        assert r.status_code == 200
-        
-        await db.refresh(issue_overdue)
-        await db.refresh(issue_unscheduled)
-        
-        # Verify overdue task was NOT moved
-        assert issue_overdue.due_date.date() == yesterday.date(), "Overdue task should not have been rescheduled"
-        
-        # Verify unscheduled task WAS moved
-        assert issue_unscheduled.due_date is not None, "Unscheduled task should have been rescheduled"
-        
-        # Verify only the unscheduled task was sent to AI
-        prompt = mock_ai.call_args[0][0]
-        assert "Overdue Task" not in prompt, "Overdue task should not be sent to AI"
-        assert "Unscheduled Task" in prompt, "Unscheduled task should be sent to AI"
+    r = await client.post(
+        "/api/v1/ai/schedule",
+        headers=normal_user_token_headers,
+    )
+
+    assert r.status_code == 200
+
+    await db.refresh(issue_overdue)
+    await db.refresh(issue_unscheduled)
+
+    # Verify overdue task was NOT moved
+    assert issue_overdue.due_date.date() == yesterday.date(), "Overdue task should not have been rescheduled"
+
+    # Verify unscheduled task WAS moved
+    assert issue_unscheduled.due_date is not None, "Unscheduled task should have been rescheduled"
