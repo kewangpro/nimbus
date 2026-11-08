@@ -100,15 +100,89 @@
         *   `{"type": "ISSUE_CREATED", "data": "uuid"}`
         *   `{"type": "ISSUE_UPDATED", "data": "uuid"}`
 ## 8. MCP Server (Model Context Protocol)
+
 *   **SSE URL:** `GET /mcp/sse` (Full URL: `http://localhost:8100/mcp/sse`)
-*   **Description:** Implements the MCP SSE transport for external AI assistant integration.
+*   **Description:** Implements the MCP SSE transport for external AI assistant integration (e.g. Ensemble).
 *   **Protocol:** [Model Context Protocol](https://modelcontextprotocol.io/)
 *   **Tools Provided:**
-    *   `list_calendar_events`: List scheduled issues.
-    *   `get_task_details`: Fetch full metadata for an issue.
-    *   `schedule_task`: Update issue due dates.
-    *   `create_calendar_task`: Create a new issue with a deadline and optional project name.
-    *   `search_tasks`: Semantic search for issues using natural language.
+    *   `list_calendar_events` (`days`): List scheduled issues.
+    *   `get_task_details` (`task_id`): Fetch full metadata for an issue.
+    *   `schedule_task` (`task_id`, `due_date_iso`): Update issue due dates.
+    *   `create_calendar_task` (`title`, optional `description`, `due_date_iso`, `project_name`): Create a new issue with a deadline and optional project name.
+    *   `search_tasks` (`query`, `limit`): Semantic search for issues using natural language.
+
+### SSE session (JSON-RPC)
+
+SSE is a **session pipe**, not token streaming:
+
+1. `GET` `http://localhost:8100/mcp/sse`; keep it open.
+2. Server: `event: endpoint` / `data: /mcp/messages/?session_id=…` (strip `\r`).
+3. `POST` JSON-RPC to `http://localhost:8100` + that path.
+4. Replies: `event: message` on the GET, matched by `id`.
+
+Envelope:
+
+```json
+{"jsonrpc": "2.0", "id": 1, "method": "…", "params": {…}}
+```
+
+Notifications omit `id`.
+
+### Smoke-test curls
+
+```bash
+mcp_rpc() {
+  local BASE="$1"; shift
+  local TMP; TMP=$(mktemp)
+  curl -NsS -m 20 -H 'Accept: text/event-stream' "$BASE/mcp/sse" | tr -d '\r' > "$TMP" &
+  local PID=$!
+  local EP="" i=0
+  while [ $i -lt 40 ]; do
+    EP=$(awk '/^event: endpoint$/{getline; if($1=="data:"){print substr($0,7); exit}}' "$TMP")
+    [ -n "$EP" ] && break
+    sleep 0.1; i=$((i+1))
+  done
+  echo "POST $BASE$EP" >&2
+  for json in "$@"; do
+    curl -sS -m 15 -H 'Content-Type: application/json' -d "$json" "$BASE$EP" >/dev/null
+  done
+  i=0
+  while [ $i -lt 50 ]; do
+    grep -q '"id": 2' "$TMP" 2>/dev/null || grep -q '"id":2' "$TMP" && break
+    sleep 0.1; i=$((i+1))
+  done
+  grep '^data: ' "$TMP" | sed 's/^data: //'
+  kill $PID 2>/dev/null; wait $PID 2>/dev/null; rm -f "$TMP"
+}
+
+INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+READY='{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
+LIST='{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+
+mcp_rpc http://localhost:8100 "$INIT" "$READY" "$LIST" | python3 -m json.tool
+
+mcp_rpc http://localhost:8100 "$INIT" "$READY" \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_calendar_events","arguments":{"days":7}}}'
+
+mcp_rpc http://localhost:8100 "$INIT" "$READY" \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_tasks","arguments":{"query":"sprint","limit":5}}}'
+
+mcp_rpc http://localhost:8100 "$INIT" "$READY" \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"create_calendar_task","arguments":{"title":"curl test"}}}'
+```
+
+Two terminals:
+
+```bash
+# 1 — keep open; copy data: path
+curl -N -H 'Accept: text/event-stream' http://localhost:8100/mcp/sse
+
+# 2
+EP='http://localhost:8100/mcp/messages/?session_id=PASTE'
+curl -s -H 'Content-Type: application/json' -d "$INIT"  "$EP"
+curl -s -H 'Content-Type: application/json' -d "$READY" "$EP"
+curl -s -H 'Content-Type: application/json' -d "$LIST"  "$EP"
+```
 
 ## 9. Audit Logs
 
