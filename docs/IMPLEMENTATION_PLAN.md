@@ -51,7 +51,7 @@
 
 ## Phase 5: Advanced AI & Planning ✅
 *   [x] **AI Project Planner:** Break down natural language into structured issues.
-*   [x] **AI Scheduler:** Redistribute open tasks (unscheduled, scheduled for today/future, or mis-scheduled far future) across next 10 business days via shared placement (`resolve_task_due_date`), in progress batches of 20, scalable to 150 tasks. Calendar updates live every 4s during the run. **Overdue tasks are skipped to prevent automatic rescheduling.**
+*   [x] **AI Scheduler:** Redistribute open tasks (unscheduled, scheduled for today/future, or mis-scheduled far future) across next 10 business days via shared placement (`resolve_task_due_date` — content deadlines, time-sensitive early placement, lightest-day balance), in progress batches of 20, scalable to 150 tasks. Calendar updates live every 4s during the run. **Overdue tasks are skipped to prevent automatic rescheduling.**
 *   [x] **Sprint Calendar:** Visual per-user 2-week sprint timeline with drag-and-drop rescheduling, bounding to 14 days max to avoid timeline sprawl, with quick indicator for tasks scheduled beyond the sprint.
 *   [x] **AI Summary:** Per-issue summary with next steps (cached by content hash).
 *   [x] **AI Filters:** Natural language to structured issue filters (List View).
@@ -180,10 +180,9 @@
 ---
 
 ## Phase 14: Scheduler Intelligence Optimization ✅
-**Goal:** Maximize scheduling accuracy for local 1B models when handling large backlogs.
+**Goal:** Improve scheduling accuracy and backlog handling (historical LLM day-bucket work later superseded by shared deterministic placement in Phase 17).
 
-*   [x] **Index Mapping:** Replaced 36-character UUIDs with short integers (`0, 1, 2...`) in prompts to save tokens and eliminate model confusion.
-*   [x] **Day Number Strategy:** Directed AI to output `day_number` (1-5) instead of date strings, preventing hallucinated future months.
+*   [x] **Index Mapping / Day Number (historical):** Earlier schedule path used short indices and `day_number` buckets for local LLM outputs; day placement now uses `app.core.scheduling` without chat completions.
 *   [x] **Priority Mapping:** Implemented numerical prioritization (`URGENT=0`, `HIGH=1`) to ensure correct sorting in batch processing.
 *   [x] **Skip Overdue Items:** Modified AI Scheduler to explicitly exclude already overdue items from the rescheduling pool, ensuring user-defined deadlines are respected.
 
@@ -222,7 +221,7 @@
     *   Wrapped `aioimaplib.IMAP4_SSL` to actively monitor connection tasks, instantly catching TLS/TCP handshake drops (such as `SSLError: WRONG_VERSION_NUMBER`), eliminating 60s blocking hangs and preventing unretrieved asyncio task exceptions in uvloop.
 *   [x] **Scheduler & Polling Performance Optimization:**
     *   Restored `UNSEEN SINCE <7 days ago>` query for email polling, reducing scan times from >50s to <4s in large mailboxes (100k+ messages).
-    *   Optimized `POST /ai/schedule` prompt by capping payload to the top 60 issues and using `max_tokens=512`, eliminating client request aborts and keeping scheduling times under 10s.
+    *   Schedule runs no longer call a chat model for day buckets; placement is shared deterministic logic in progress batches (historically capped LLM schedule payloads before that change).
 
 ---
 
@@ -238,4 +237,5 @@
 *   [x] **Comprehensive Test Suites:** Added frontend unit tests (`frontend/lib/sprint-plan.test.ts` via native Node.js test runner) and backend pytest suites covering far-future rebalancing, assignee scoping, progress polling, and shared placement.
 *   [x] **Email due dates (bug fix):** New email tasks are dated within the current 2-week sprint instead of landing outside the plan.
 *   [x] **Email create order (bug fix):** Summary, Message-ID audit, and IMAP `\Seen` complete before embedding so a slow embed cannot leave orphan duplicates without an AI summary.
-*   [x] **Shared sprint placement:** Email create and AI Schedule both use `resolve_task_due_date` / `place_on_sprint` (content deadlines + lightest-day load balance; no chat completion for day buckets).
+*   [x] **Shared sprint placement:** Email create and AI Schedule both use `resolve_task_due_date` / `place_on_sprint` (content deadlines, time-sensitive early placement, lightest-day load balance; no chat completion for day buckets).
+*   [x] **Time-sensitive early placement:** Without a pinable deadline, urgent/high and time-sensitive content (e.g. upcoming earnings calendars, reminders, near/past event dates) prefer the first two weekdays so medium newsletter-style tasks do not land on day 10 of the sprint.

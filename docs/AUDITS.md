@@ -26,7 +26,7 @@ Actions related to task (issue) management within projects.
 | `issue.update` | When an issue is updated (e.g., status changed, assignee updated, description modified). |
 | `issue.delete` | When an issue is permanently removed from the system. |
 | `issue.backfill` | When AI embeddings are backfilled for existing issues. |
-| `ai_schedule` | When the [AI Schedule](#📅-ai-schedule) organizes your tasks for the week. |
+| `issue.update` (`via: ai_scheduler`) | When [AI Schedule](UX_Design.md) changes an issue `due_date`. Stored as `issue.update` with `details.via = "ai_scheduler"`; Activity stats may roll these up as a virtual `ai_schedule` count. |
 
 ### 👤 User & Auth
 Actions related to user accounts and authentication.

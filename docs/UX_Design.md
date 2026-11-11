@@ -68,7 +68,7 @@
 
 #### 📅 AI Schedule
 *   **Location:** Calendar view "AI Schedule" button.
-*   **Interaction:** One click to redistribute open/unscheduled tasks across the next 10 business days using the same placement rules as new-email tasks (scalable up to 150). Displays real-time progress bar with live task counters (polling `/ai/schedule/progress`) and live 4-second calendar polling. **Overdue tasks are skipped** to respect their original deadlines.
+*   **Interaction:** One click to redistribute open/unscheduled tasks across the next 10 business days using the same placement rules as new-email tasks — pinned content deadlines, early days for urgent/high and time-sensitive content (e.g. upcoming earnings), otherwise lightest-day balance (scalable up to 150). Displays real-time progress bar with live task counters (polling `/ai/schedule/progress`) and live 4-second calendar polling. **Overdue tasks are skipped** to respect their original deadlines.
 
 #### 🔎 Smart Search
 *   **Location:** Global header "Smart Search..." input.

@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from app.core.scheduling import (
     SPRINT_WEEKDAYS,
     choose_sprint_due_date,
+    content_prefers_early,
     day_number_for_deadline,
     extract_deadline_hint,
     next_weekdays,
@@ -91,6 +92,63 @@ def test_choose_sprint_due_date_lightest_day():
     loads = {d: 2 for d in weekdays}
     loads[weekdays[3]] = 0
     assert choose_sprint_due_date(None, today, weekdays, loads) == weekdays[3]
+
+
+def test_content_prefers_early_upcoming_earnings():
+    today = date(2026, 11, 11)
+    text = (
+        "Upcoming Earnings Calendar\n"
+        "Caseys General Stores Inc (09/08)\n"
+        "Oracle Corporation (09/10)"
+    )
+    assert content_prefers_early(text, today) is True
+    assert extract_deadline_hint(text, today) is None
+
+
+def test_place_on_sprint_earnings_calendar_not_day_ten():
+    """Earnings/upcoming lists are time-sensitive — prefer early weekdays."""
+    today = date(2026, 10, 27)  # Tuesday
+    weekdays = next_weekdays(today, SPRINT_WEEKDAYS)
+    tz = ZoneInfo("UTC")
+    loads = {d: 0 for d in weekdays}
+    # Fill early days so a naive lightest-day pass would pick the end of the sprint.
+    for d in weekdays[:8]:
+        loads[d] = 5
+    loads[weekdays[9]] = 0
+
+    content = (
+        "Upcoming Earnings Calendar\n"
+        "This email provides a list of upcoming earnings releases.\n"
+        "- Caseys General Stores Inc (09/08)\n"
+        "- Oracle Corporation (09/10)"
+    )
+    chosen = place_on_sprint(
+        today=today,
+        weekdays=weekdays,
+        load_by_day=loads,
+        tz=tz,
+        priority="medium",
+        content_text=content,
+    )
+    assert chosen in weekdays[:2]
+    assert chosen != weekdays[9]
+
+
+def test_place_on_sprint_generic_medium_can_use_later_days():
+    today = date(2026, 10, 27)
+    weekdays = next_weekdays(today, SPRINT_WEEKDAYS)
+    tz = ZoneInfo("UTC")
+    loads = {d: 3 for d in weekdays}
+    loads[weekdays[7]] = 0
+    chosen = place_on_sprint(
+        today=today,
+        weekdays=weekdays,
+        load_by_day=loads,
+        tz=tz,
+        priority="medium",
+        content_text="Refactor logging helpers when convenient.",
+    )
+    assert chosen == weekdays[7]
 
 
 def test_truncate_for_schedule():

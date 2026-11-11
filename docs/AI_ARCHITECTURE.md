@@ -66,14 +66,15 @@ CREATE TABLE issue_links (
 *   **Scheduling:** Distributes tasks across the next 5 business days (Mon-Fri), respecting existing load.
 
 ### 4.3 AI Scheduler
-*   **Shared placement (`app.core.scheduling`):** Same engine as new-email task dating — `resolve_task_due_date` / `place_on_sprint`. Content deadlines and lightest-day load balancing apply identically on create and on Schedule.
+*   **Shared placement (`app.core.scheduling`):** Same engine as new-email task dating — `resolve_task_due_date` / `place_on_sprint`. Content deadlines and lightest-day load balancing apply identically on create and on Schedule. Time-sensitive content without a pinable deadline (e.g. upcoming earnings calendars) prefers the first two weekdays instead of landing late in the sprint.
 *   **Input:** Open (non-done, non-canceled) issues that are unscheduled, scheduled for today/future, or mis-scheduled far in the future. Uses title, description/AI summary, and priority (not a separate chat completion for day buckets).
 *   **Constraint:** Overdue tasks (due before today) are **excluded** from the rescheduling pool.
 *   **Output:** Optimized `due_date` for every issue in the pool.
 *   **Logic:**
     *   **Capacity:** Scalable to **150 tasks**, processed in batches of 20 for progress commits.
-    *   **Content Deadlines:** Explicit actionable deadlines in task/email text (e.g. "submit by 2026-10-15") are pinned to that sprint weekday. Newsletter publication/sent dates without deadline keywords are ignored.
-    *   **Total Sprint Balance:** Remaining tasks go to the lightest weekday (urgent/high prefer the first two days). Far-future and unscheduled tasks are placed first.
+    *   **Content Deadlines:** Explicit actionable deadlines in task/email text (e.g. "submit by 2026-10-15") are pinned to that sprint weekday. Newsletter publication/sent dates without deadline keywords are ignored (not pinned).
+    *   **Time-Sensitive Early Placement:** Without a pinable deadline, urgent/high priority and time-sensitive content (e.g. upcoming earnings calendars, reminders, near/past event `MM/DD` dates) prefer the first two weekdays so they do not land late in the sprint.
+    *   **Total Sprint Balance:** Other tasks go to the lightest weekday across the 10-day sprint. Far-future and unscheduled tasks are placed first.
     *   **Live UI Updates & Sprint Bounding:** The frontend polls `GET /issues/` every 4 seconds while the schedule request is in-flight. The sprint view is bounded to a 2-week window with an indicator for tasks outside the plan.
     *   **Real-Time Progress Endpoint:** Exposes `GET /api/v1/ai/schedule/progress` returning `{ "status": "idle" | "running" | "done", "processed": int, "total": int, "percent": int }` polled every 750ms by the frontend.
 
@@ -110,7 +111,7 @@ CREATE TABLE issue_links (
     *   **Task Description:** Stores the original email body to preserve full email context. All emails pass through `app.core.email_utils.extract_email_body_from_message` to strip `<style>`/`<script>` blocks, normalize whitespace, and detect/recover readable text from emails that dump CSS stylesheets into plain text.
     *   **AI Summary (`IssueSummary`):** Stores the AI-generated concise summary and key takeaways, which is linked to the issue and immediately rendered under the **AI Summary** section in the UI.
 *   **Prompting Strategy:** Uses an advanced system prompt with explicit **negative constraints** (ignore boilerplate, marketing footers, "Unsubscribe" links) and **few-shot examples** of both actionable tasks and non-actionable advertisements (which should return `{}`).
-*   **Due Date Extraction Policy:** To prevent tasks from being created as already-overdue, the system enforces a strict policy for `due_date`. A due date is ONLY suggested if there is a clear, explicit actionable deadline mentioned in the email (e.g., "submit by July 15", "due next Tuesday"). General dates like newsletter publication dates, sent dates, or chronological references in updates are ignored and mapped to `null`. Dates outside the current 2-week sprint (including missing dates) are placed into the sprint when the task is created.
+*   **Due Date Extraction Policy:** To prevent tasks from being created as already-overdue, the extractor only suggests `due_date` for a clear, explicit actionable deadline (e.g., "submit by July 15", "due next Tuesday"). Newsletter publication/sent dates and bare calendar lists are ignored (`null`). Final dating uses shared `app.core.scheduling`: keyword deadlines are pinned; time-sensitive content prefers early weekdays; everything else load-balances into the current 2-week sprint.
 *   **Parsing Resilience:**
     *   **Level 1:** Standard JSON parse after pre-cleaning (removing markdown code blocks and trailing comments).
     *   **Level 2:** Fallback to `ast.literal_eval` to handle AI-generated "JSON" that uses single quotes.

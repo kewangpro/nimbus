@@ -35,14 +35,14 @@ An **AI-Native OS for software delivery**. Unlike legacy tools where AI is a plu
 ### 2.3 SSO & Email Integration
 *   **Single Sign-On:** Login via Google or Outlook (OAuth2 PKCE).
 *   **Email Inbox:** View the last 3 days of inbox emails from within Nimbus ("View Inbox" button in the header).
-*   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project, dated within the current 2-week sprint.
+*   **Manual Task Creation:** Convert one or more emails to tasks in bulk. Tasks are automatically assigned to the logged-in user and created in the "General" project, dated via the same shared sprint placement as AI Schedule (content deadlines, time-sensitive early days, otherwise lightest-day within the 2-week sprint).
 *   **Intelligent Extraction:** AI identifies and extracts a structured task from a single email, creating a new issue for it.
 *   **Resilient Fallback:** If AI extraction fails or returns malformed data, Nimbus automatically creates a "Raw" task from the email subject and body to ensure zero data loss.
 *   **Automation Toggle:** Users can enable/disable automatic email-to-task generation in User Settings. When enabled, the background worker polls for emails since the last 7 days every minute, checking for unique Message-IDs in database audit logs from the last 14 days to process new emails regardless of their read status and seamlessly catch up after multi-day outages. Credential failures (`email.token_refresh_failed`), authentication errors, and connection drops are recorded in the audit log table (throttled to 1/hour per user) for immediate operational visibility.
 
 ### 2.4 AI-Native Core (Local MLX + Llama 3)
 *   **AI Project Planner:** Converts unstructured text into structured tasks with auto-scheduled due dates.
-*   **AI Scheduler:** Redistributes open (non-done, non-canceled) tasks across the next 10 business days using the same placement engine as new-email tasks (content deadlines + load balance). **Overdue tasks (due before today) are skipped.** Processes in batches of **20**, scalable to 150. The calendar focuses on the active 2-week sprint window with an outlier indicator.
+*   **AI Scheduler:** Redistributes open (non-done, non-canceled) tasks across the next 10 business days using the same placement engine as new-email tasks (content deadlines, time-sensitive early placement, lightest-day load balance). **Overdue tasks (due before today) are skipped.** Processes in batches of **20**, scalable to 150. The calendar focuses on the active 2-week sprint window with an outlier indicator.
 *   **Smart Search:** Semantic search using `pgvector` cosine distance.
 *   **Auto-Triage:** Suggests issue priority using Llama 3.2 via MLX.
 *   **Similar Issues:** Detects likely duplicates during issue creation.

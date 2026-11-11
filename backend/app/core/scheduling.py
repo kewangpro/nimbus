@@ -29,6 +29,20 @@ _DEADLINE_PATTERNS = [
     ),
 ]
 
+# Time-sensitive content without an explicit "due by" — place early, don't pin
+# bare calendar/publication dates as hard deadlines.
+_TIME_SENSITIVE_RE = re.compile(
+    r"\b("
+    r"upcoming|earnings|expires?|expir(?:e|ing)|asap|"
+    r"today|tomorrow|this\s+week|end\s+of\s+(?:day|week)|eod|eow|"
+    r"reminder|rsvp|time[- ]sensitive"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Bare MM/DD or MM/DD/YYYY event dates (earnings calendars, release lists).
+_EVENT_MDY_RE = re.compile(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b")
+
 _MONTH_DAY_FORMATS = (
     "%B %d, %Y",
     "%B %d %Y",
@@ -129,6 +143,44 @@ def extract_deadline_hint(text: Optional[str], today: date) -> Optional[date]:
     return None
 
 
+def _parse_event_mdy(month: int, day: int, year: Optional[int], today: date) -> Optional[date]:
+    try:
+        if year is None:
+            candidate = date(today.year, month, day)
+            # Yearless dates more than ~1 month in the past likely belong to the next year
+            # only when they are far ahead; for earnings lists, past/near dates mean ASAP.
+            return candidate
+        if year < 100:
+            year += 2000
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def content_prefers_early(text: Optional[str], today: date) -> bool:
+    """
+    True when content is time-sensitive but has no keyword deadline to pin.
+    Examples: upcoming earnings calendars, reminders, ASAP asks.
+    """
+    if not text:
+        return False
+    if _TIME_SENSITIVE_RE.search(text):
+        return True
+    # Event dates at or before the end of this week → review soon, not day 10.
+    week_end = today + timedelta(days=(4 - today.weekday()) % 7)
+    for match in _EVENT_MDY_RE.finditer(text):
+        month = int(match.group(1))
+        day = int(match.group(2))
+        year_raw = match.group(3)
+        year = int(year_raw) if year_raw else None
+        event = _parse_event_mdy(month, day, year, today)
+        if event is None:
+            continue
+        if event <= week_end:
+            return True
+    return False
+
+
 def day_number_for_deadline(
     deadline: date,
     weekday_dates: list[date],
@@ -224,6 +276,8 @@ def place_on_sprint(
         extracted_due=extracted_due,
     )
     prefer_early = str(priority or "").lower() in ("urgent", "high")
+    if not prefer_early and deadline is None:
+        prefer_early = content_prefers_early(content_text, today)
     return choose_sprint_due_date(
         deadline,
         today,

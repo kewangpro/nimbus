@@ -81,7 +81,7 @@
     *   **Body:** `{ "text": "Raw natural language plan..." }`
     *   **Response:** `List[PlannedIssue]` (suggested tasks).
 *   `POST /ai/schedule`
-    *   **Description:** Auto-assigns due dates for open (non-done, non-canceled) tasks assigned to the current user (and owned by clients) that are unscheduled, scheduled for today/future, or mis-scheduled far in the future. **Overdue tasks (due before today) are skipped.** Prioritizes placement needs (unscheduled and far-future outlier tasks) and urgent priorities, redistributing tasks evenly across the next 10 weekdays in stateful batches of 20 (scalable up to 150 tasks). The frontend polls for changes every 4 seconds during the run to render live calendar updates.
+    *   **Description:** Auto-assigns due dates for open (non-done, non-canceled) tasks assigned to the current user (and owned by clients) that are unscheduled, scheduled for today/future, or mis-scheduled far in the future. **Overdue tasks (due before today) are skipped.** Uses shared `app.core.scheduling` (same as new-email create): pins keyword content deadlines, prefers early weekdays for urgent/high and time-sensitive content, otherwise lightest-day load balance across the next 10 weekdays. Processes in progress batches of 20 (scalable up to 150). Audits due-date changes as `issue.update` with `details.via = "ai_scheduler"`. The frontend polls issues every 4 seconds during the run for live calendar updates.
     *   **Response:** `{ "scheduled_count": int, "message": "..." }`
 *   `GET /ai/schedule/progress`
     *   **Description:** Returns real-time AI auto-scheduling progress for the current user. Polled by the frontend calendar view every 750ms during an active scheduling run to power an animated progress bar with task counts.
